@@ -54,8 +54,10 @@ class PackageShow extends Component
         $this->planId = (string) ($this->plans->first()?->id ?? '');
         $this->gatewayKey = (string) ($this->gateways->first()?->key ?? '');
 
-        // کد آپدیت معتبر قبلی (session) برای راحتی مشتری
-        $this->updateCode = (string) session('shop_update_code', '');
+        // FIX (خرید پکیج برای مشتری واردشده): کد آپدیت از حساب مشتریِ لاگین‌شده پر می‌شود؛
+        // در نبود لاگین، از کد معتبر ذخیره‌شده در session (مکانیزم قدیمی) استفاده می‌کنیم.
+        $this->updateCode = auth('customer')->user()?->update_code
+            ?? (string) session('shop_update_code', '');
     }
 
     /* ---------------------------------------------------------------- */
@@ -121,20 +123,30 @@ class PackageShow extends Component
             && $plan->final_price <= 0;
     }
 
-    /** اشتراک فعالِ طرح‌محور مشتریِ session (با plan و packages) یا null */
-    #[Computed]
-    public function myActiveSubscription()
+    /** مشتریِ جاری: اولویت با مشتریِ لاگین‌شده، سپس کد ذخیره‌شده در session */
+    protected function currentCustomer(): ?Customer
     {
+        if ($customer = auth('customer')->user()) {
+            return $customer;
+        }
+
         $code = trim((string) session('shop_update_code', ''));
 
         if ($code === '') {
             return null;
         }
 
-        $customer = Customer::query()
+        return Customer::query()
             ->where('update_code', $code)
             ->where('status', 'active')
             ->first();
+    }
+
+    /** اشتراک فعالِ طرح‌محور مشتریِ session (با plan و packages) یا null */
+    #[Computed]
+    public function myActiveSubscription()
+    {
+        $customer = $this->currentCustomer();
 
         return $customer ? $this->findActivePlanSubscription($customer) : null;
     }
@@ -164,25 +176,32 @@ class PackageShow extends Component
     public function buy(PaymentService $paymentService, LicenseService $licenseService): void
     {
         // ---- کد آپدیت ----
-        $this->validate([
-            'updateCode' => ['required', 'string', 'max:64'],
-        ], [
-            'updateCode.required' => 'کد آپدیت الزامی است.',
-        ]);
-
-        // ---- مشتری ----
-        $customer = Customer::query()
-            ->where('update_code', trim($this->updateCode))
-            ->first();
+        // مشتری واردشده نیازی به تایپ کد ندارد؛ در غیر این صورت کد اجباری است.
+        $customer = auth('customer')->user();
 
         if (!$customer) {
-            $this->toast('کد آپدیت نامعتبر است.', 'error');
-            return;
-        }
+            $this->validate([
+                'updateCode' => ['required', 'string', 'max:64'],
+            ], [
+                'updateCode.required' => 'کد آپدیت الزامی است.',
+            ]);
 
-        if ($customer->status !== 'active') {
-            $this->toast('حساب این مشتری غیرفعال است.', 'error');
-            return;
+            $customer = Customer::query()
+                ->where('update_code', strtoupper(trim($this->updateCode)))
+                ->first();
+
+            if (!$customer) {
+                $this->toast('کد آپدیت نامعتبر است.', 'error');
+                return;
+            }
+
+            if ($customer->status !== 'active') {
+                $this->toast('حساب این مشتری غیرفعال است.', 'error');
+                return;
+            }
+        } else {
+            // هم‌گام نگه‌داشتن فیلد نمایش‌داده‌شده
+            $this->updateCode = $customer->update_code;
         }
 
         // ---- شاخه اشتراک فعال: این پکیج با طرحِ همین مشتری رایگان است ----

@@ -1,14 +1,22 @@
 <div class="space-y-6" id="comments">
 
     {{-- ============ Header ============ --}}
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="flex items-center gap-2 text-lg font-black text-zinc-900 dark:text-zinc-50">
             <x-icon name="message-square" class="size-5 text-brand-600" />
             دیدگاه‌ها
-            @if($this->approved->total())
-                <span class="rounded-full bg-zinc-200/70 px-2.5 py-0.5 text-xs tabular-nums text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">{{ fa_num($this->approved->total()) }}</span>
+            @if($this->approvedCount)
+                <span class="rounded-full bg-zinc-200/70 px-2.5 py-0.5 text-xs tabular-nums text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">{{ fa_num($this->approvedCount) }}</span>
             @endif
         </h2>
+
+        @if($this->averageRating)
+            <div class="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-1.5 ring-1 ring-amber-200/70 dark:bg-amber-500/10 dark:ring-amber-500/20">
+                <x-icon name="star" class="size-4 fill-amber-400 text-amber-500" />
+                <span class="text-sm font-black tabular-nums text-amber-700 dark:text-amber-300">{{ fa_num($this->averageRating) }}</span>
+                <span class="text-xs text-amber-600/80 dark:text-amber-400/70">از ۵</span>
+            </div>
+        @endif
     </div>
 
     {{-- ============ List ============ --}}
@@ -82,7 +90,7 @@
             </div>
 
             <x-field label="متن دیدگاه" for="cm-body" required>
-                <x-textarea id="cm-body" wire:model="body" rows="4" placeholder="تجربه‌تان از این پروژه را بنویسید…" />
+                <x-textarea id="cm-body" wire:model="body" rows="4" placeholder="تجربه‌تان از این {{ $label === 'محصول' ? 'پروژه' : 'پکیج' }} را بنویسید…" />
             </x-field>
 
             <div class="flex justify-end">

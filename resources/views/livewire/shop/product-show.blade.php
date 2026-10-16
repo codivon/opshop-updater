@@ -192,6 +192,6 @@
 
     {{-- ============ Comments ============ --}}
     <section>
-        <livewire:shop.product-comments :product="$product" :key="'pc-'.$product->id" />
+        <livewire:shop.comment-section :model="$product" label="محصول" :key="'cs-product-'.$product->id" />
     </section>
 </div>

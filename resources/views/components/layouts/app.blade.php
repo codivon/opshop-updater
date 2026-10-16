@@ -25,7 +25,7 @@
             'items' => [
                 ['route' => 'admin.products.index', 'title' => 'محصولات (پروژه‌ها)', 'icon' => 'rocket', 'match' => ['admin.products*']],
                 ['route' => 'admin.categories.index', 'title' => 'دسته‌بندی‌ها', 'icon' => 'tag', 'match' => ['admin.categories*']],
-                ['route' => 'admin.comments.index', 'title' => 'دیدگاه‌ها', 'icon' => 'message-square', 'match' => ['admin.comments*'], 'badge' => \App\Models\ProductComment::pendingCount()],
+                ['route' => 'admin.comments.index', 'title' => 'دیدگاه‌ها', 'icon' => 'message-square', 'match' => ['admin.comments*'], 'badge' => \App\Models\Comment::pendingCount()],
             ],
         ],
         [

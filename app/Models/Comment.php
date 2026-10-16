@@ -3,10 +3,18 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
-class ProductComment extends Model
+/**
+ * دیدگاه چندریختی — هم برای محصولات (پروژه‌های قابل‌فروش) و هم برای پکیج‌ها.
+ *
+ * commentable_type از morph map استفاده می‌کند: 'product' | 'package'
+ */
+class Comment extends Model
 {
+    public const TYPE_PRODUCT = 'product';
+    public const TYPE_PACKAGE = 'package';
+
     public const STATUS_PENDING  = 'pending';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
@@ -18,8 +26,8 @@ class ProductComment extends Model
     ];
 
     protected $fillable = [
-        'product_id', 'name', 'email', 'rating', 'body', 'status',
-        'admin_note', 'approved_at', 'ip',
+        'commentable_type', 'commentable_id', 'name', 'email', 'rating',
+        'body', 'status', 'admin_note', 'approved_at', 'ip',
     ];
 
     protected $casts = [
@@ -29,9 +37,9 @@ class ProductComment extends Model
 
     /* ---------------- Relationships ---------------- */
 
-    public function product(): BelongsTo
+    public function commentable(): MorphTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->morphTo();
     }
 
     /* ---------------- Helpers ---------------- */
@@ -44,6 +52,16 @@ class ProductComment extends Model
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    /** برچسب نوع دیدگاه برای نمایش در ادمین */
+    public function getTypeLabelAttribute(): string
+    {
+        return match ($this->commentable_type) {
+            self::TYPE_PRODUCT => 'محصول (پروژه)',
+            self::TYPE_PACKAGE => 'پکیج',
+            default            => $this->commentable_type,
+        };
     }
 
     public function approve(): void

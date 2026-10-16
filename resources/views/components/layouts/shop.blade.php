@@ -75,20 +75,30 @@
                 <a href="{{ route('shop.home') }}" wire:navigate
                    @class([
                        'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.home') || request()->routeIs('shop.package'),
-                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! (request()->routeIs('shop.home') || request()->routeIs('shop.package')),
+                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.home'),
+                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! request()->routeIs('shop.home'),
                    ])
-                   @if(request()->routeIs('shop.home') || request()->routeIs('shop.package') || request()->routeIs('shop.product')) aria-current="page" @endif>
-                    <x-icon name="package" class="size-4.5" />
-                    فروشگاه
+                   @if(request()->routeIs('shop.home')) aria-current="page" @endif>
+                    <x-icon name="home" class="size-4.5" />
+                    خانه
                 </a>
-                <a href="{{ route('shop.home') }}?tab=products" wire:navigate
+                <a href="{{ route('shop.packages') }}" wire:navigate
                    @class([
                        'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.product'),
-                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! request()->routeIs('shop.product'),
+                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.packages') || request()->routeIs('shop.package'),
+                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! (request()->routeIs('shop.packages') || request()->routeIs('shop.package')),
                    ])
-                   @if(request()->routeIs('shop.product')) aria-current="page" @endif>
+                   @if(request()->routeIs('shop.packages') || request()->routeIs('shop.package')) aria-current="page" @endif>
+                    <x-icon name="package" class="size-4.5" />
+                    پکیج‌ها
+                </a>
+                <a href="{{ route('shop.products') }}" wire:navigate
+                   @class([
+                       'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.products') || request()->routeIs('shop.product'),
+                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! (request()->routeIs('shop.products') || request()->routeIs('shop.product')),
+                   ])
+                   @if(request()->routeIs('shop.products') || request()->routeIs('shop.product')) aria-current="page" @endif>
                     <x-icon name="rocket" class="size-4.5" />
                     پروژه‌ها
                 </a>
@@ -117,11 +127,38 @@
                 <x-icon name="sun" class="size-5 dark:hidden" />
             </button>
 
+            @php($shopCustomer = auth('customer')->user())
+            @if($shopCustomer)
+                {{-- مشتری واردشده: پروفایل + خروج --}}
+                <a href="{{ route('customer.profile') }}" wire:navigate
+                   class="flex items-center gap-2 rounded-xl bg-zinc-100/80 py-1.5 pe-3 ps-1.5 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+                   title="پروفایل من">
+                    <x-avatar :name="$shopCustomer->name ?? 'مشتری'" size="sm" />
+                    <span class="hidden max-w-24 truncate sm:block">{{ $shopCustomer->name ?: 'مشتری' }}</span>
+                </a>
+                <form method="POST" action="{{ route('shop.logout') }}" id="customer-logout-form" class="contents">
+                    @csrf
+                </form>
+                <button type="button"
+                        onclick="document.getElementById('customer-logout-form').submit()"
+                        class="rounded-xl p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                        title="خروج از حساب مشتری" aria-label="خروج">
+                    <x-icon name="log-out" class="size-4.5" />
+                </button>
+            @else
+                {{-- ورود مشتری --}}
+                <a href="{{ route('shop.login', ['redirect' => url()->current()]) }}" wire:navigate
+                   class="flex items-center gap-1.5 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700 transition-colors hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20">
+                    <x-icon name="log-in" class="size-4" />
+                    <span class="hidden sm:block">ورود مشتریان</span>
+                </a>
+            @endif
+
             {{-- admin login --}}
             <a href="{{ route('login') }}" wire:navigate
                class="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                title="ورود به پنل مدیریت">
-                <x-icon name="log-in" class="size-4" />
+                <x-icon name="shield-check" class="size-4" />
                 <span class="hidden sm:block">ورود مدیر</span>
             </a>
         </div>

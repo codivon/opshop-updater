@@ -319,9 +319,24 @@
                 @endif
 
                 {{-- update code --}}
-                <x-field label="کد آپدیت مشتری" for="updateCode" required hint="کد آپدیت در پنل مشتری شما موجود است.">
-                    <x-input id="updateCode" wire:model="updateCode" icon="key" placeholder="کد آپدیت مشتری…" dir="ltr" class="text-start font-mono" />
-                </x-field>
+                @php($loggedInCustomer = auth('customer')->user())
+                @if($loggedInCustomer)
+                    <div class="flex items-start gap-3 rounded-xl bg-emerald-50 p-3.5 ring-1 ring-emerald-600/10 dark:bg-emerald-500/10 dark:ring-emerald-400/20">
+                        <x-icon name="badge-check" class="mt-0.5 size-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <div class="min-w-0 text-xs leading-5">
+                            <p class="font-bold text-emerald-700 dark:text-emerald-300">
+                                خرید با حساب شما: {{ $loggedInCustomer->name ?: 'مشتری' }}
+                            </p>
+                            <p class="mt-0.5 text-emerald-700/80 dark:text-emerald-400/80">
+                                کد آپدیت شما به‌صورت خودکار وارد شده است — <span class="font-mono" dir="ltr">{{ $loggedInCustomer->update_code }}</span>
+                            </p>
+                        </div>
+                    </div>
+                @else
+                    <x-field label="کد آپدیت مشتری" for="updateCode" required hint="کد آپدیت در پنل مشتری شما موجود است. برای راحتی، ابتدا وارد شوید.">
+                        <x-input id="updateCode" wire:model="updateCode" icon="key" placeholder="کد آپدیت مشتری…" dir="ltr" class="text-start font-mono" />
+                    </x-field>
+                @endif
 
                 {{-- buy button --}}
                 @php($buyDisabled = !$this->isFreeRoute && !$this->isCoveredBySubscription && $this->gateways->isEmpty())
@@ -336,5 +351,10 @@
                 </p>
             </div>
         </aside>
+    </section>
+
+    {{-- ============ Comments ============ --}}
+    <section class="mx-auto w-full max-w-7xl px-4 sm:px-6">
+        <livewire:shop.comment-section :model="$package" label="پکیج" :key="'cs-package-'.$package->id" />
     </section>
 </div>

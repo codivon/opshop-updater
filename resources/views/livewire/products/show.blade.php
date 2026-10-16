@@ -217,9 +217,9 @@
                                             </span>
                                         @endif
 
-                                        @if($comment->status === \App\Models\ProductComment::STATUS_APPROVED)
+                                        @if($comment->status === \App\Models\Comment::STATUS_APPROVED)
                                             <x-badge variant="success" icon="check-circle">تأیید شده</x-badge>
-                                        @elseif($comment->status === \App\Models\ProductComment::STATUS_PENDING)
+                                        @elseif($comment->status === \App\Models\Comment::STATUS_PENDING)
                                             <x-badge variant="warning" icon="clock">در انتظار</x-badge>
                                         @else
                                             <x-badge variant="danger" icon="x-circle">رد شده</x-badge>
@@ -238,7 +238,7 @@
                                         <x-icon name="check" class="size-4" />
                                     </button>
                                 @endif
-                                @if($comment->status !== \App\Models\ProductComment::STATUS_REJECTED)
+                                @if($comment->status !== \App\Models\Comment::STATUS_REJECTED)
                                     <button wire:click="rejectComment({{ $comment->id }})"
                                             class="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-500/10"
                                             title="رد" aria-label="رد دیدگاه">

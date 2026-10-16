@@ -76,47 +76,58 @@ document.addEventListener(
             (btn.getAttribute('type') || 'button') === 'submit' && !!btn.closest('form[wire\\:submit]');
         if (!btn.hasAttribute('wire:click') && !btn.hasAttribute('wire:submit') && !isSubmitInLivewireForm) return;
 
-        /* decorate */
-        btn.dataset.autoLoading = '1';
-        btn.setAttribute('disabled', '');
-        btn.classList.add('cursor-wait', 'opacity-60');
-        const spin = document.createElement('span');
-        spin.className = 'pointer-events-none inline-flex size-4 shrink-0 items-center justify-center';
-        spin.innerHTML = SPINNER_SVG;
-        btn.prepend(spin);
-
-        let released = false;
-        let sawBusy = false;
-        const release = () => {
-            if (released) return;
-            released = true;
-            window.removeEventListener('livewire:busy', onBusy);
-            window.removeEventListener('livewire:idle', onIdle);
-            window.removeEventListener('livewire:navigated', onNav);
-            if (!btn.isConnected) return;
-            delete btn.dataset.autoLoading;
-            btn.removeAttribute('disabled');
-            btn.classList.remove('cursor-wait', 'opacity-60');
-            spin.remove();
-        };
-        const onBusy = () => {
-            sawBusy = true;
-        };
-        const onIdle = () => {
-            if (sawBusy) release();
-        };
-        const onNav = () => release();
-
-        window.addEventListener('livewire:busy', onBusy);
-        window.addEventListener('livewire:idle', onIdle);
-        window.addEventListener('livewire:navigated', onNav, { once: true });
-
-        /* safety: no commit within 600ms → client-only action, restore */
+        /* FIX (ذخیره‌ی مودال‌ها هیچ اتفاقی نمی‌افتاد):Decorator باید در tick بعدی اجرا شود،
+           نه هم‌زمان با dispatch رویداد click. غیرفعال‌کردن (disabled) هم‌زمانِ
+           dispatch، رفتار پیش‌فرض کلیک (فعال‌سازی دکمه submit = ارسال فرم) را
+           کنسل می‌کند؛ چون مرورگر وضعیت disabled را هنگام اجرای activation
+           behavior بررسی می‌کند. با setTimeout(0) رویداد submit اول کامل
+           dispatch می‌شود (Livewire هم آن را intercept می‌کند) و بعد دکمه
+           برای جلوگیری از دوبار‌کلیک غیرفعال می‌شود. */
         setTimeout(() => {
-            if (!sawBusy) release();
-        }, 600);
-        /* hard cap */
-        setTimeout(release, 10000);
+            /* if a morph already replaced the button, skip */
+            if (!btn.isConnected || btn.disabled || btn.dataset.autoLoading === '1') return;
+
+            btn.dataset.autoLoading = '1';
+            btn.setAttribute('disabled', '');
+            btn.classList.add('cursor-wait', 'opacity-60');
+            const spin = document.createElement('span');
+            spin.className = 'pointer-events-none inline-flex size-4 shrink-0 items-center justify-center';
+            spin.innerHTML = SPINNER_SVG;
+            btn.prepend(spin);
+
+            let released = false;
+            let sawBusy = false;
+            const release = () => {
+                if (released) return;
+                released = true;
+                window.removeEventListener('livewire:busy', onBusy);
+                window.removeEventListener('livewire:idle', onIdle);
+                window.removeEventListener('livewire:navigated', onNav);
+                if (!btn.isConnected) return;
+                delete btn.dataset.autoLoading;
+                btn.removeAttribute('disabled');
+                btn.classList.remove('cursor-wait', 'opacity-60');
+                spin.remove();
+            };
+            const onBusy = () => {
+                sawBusy = true;
+            };
+            const onIdle = () => {
+                if (sawBusy) release();
+            };
+            const onNav = () => release();
+
+            window.addEventListener('livewire:busy', onBusy);
+            window.addEventListener('livewire:idle', onIdle);
+            window.addEventListener('livewire:navigated', onNav, { once: true });
+
+            /* safety: no commit within 600ms → client-only action, restore */
+            setTimeout(() => {
+                if (!sawBusy) release();
+            }, 600);
+            /* hard cap */
+            setTimeout(release, 10000);
+        }, 0);
     },
     true,
 );

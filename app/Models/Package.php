@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Storage;
 
 class Package extends Model
@@ -91,6 +92,12 @@ class Package extends Model
     public function activeImages(): HasMany
     {
         return $this->images()->where('is_active', true);
+    }
+
+    /** دیدگاه‌های چندریختی پکیج (فقط تأییدشده‌ها در فروشگاه نمایش داده می‌شوند) */
+    public function comments(): MorphMany
+    {
+        return $this->morphMany(Comment::class, 'commentable');
     }
 
     /* ---------------- Helpers ---------------- */

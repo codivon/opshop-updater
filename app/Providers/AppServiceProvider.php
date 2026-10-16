@@ -28,5 +28,12 @@ class AppServiceProvider extends ServiceProvider
         // این سهمِ پایه (کیس خالی) همیشه ست می‌شود؛ در درخواست‌های وب عادی،
         // middleware آن را با کیس واقعی بازنویسی می‌کند.
         View::share('errors', new ViewErrorBag);
+
+        // Morph map — ستون‌های *_type در DB کوتاه و پایدار می‌مانند
+        // (دیدگاه‌های چندریختی: محصول/پکیج).
+        \Illuminate\Database\Eloquent\Relations\Relation::morphMap([
+            \App\Models\Comment::TYPE_PRODUCT => \App\Models\Product::class,
+            \App\Models\Comment::TYPE_PACKAGE => \App\Models\Package::class,
+        ]);
     }
 }

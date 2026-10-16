@@ -3,8 +3,8 @@
 namespace App\Livewire\Products;
 
 use App\Livewire\Concerns\WithToasts;
+use App\Models\Comment;
 use App\Models\Product;
-use App\Models\ProductComment;
 use App\Models\ProductVersion;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -66,7 +66,7 @@ class Show extends Component
 
     public function mount(Product $product): void
     {
-        $this->product = $product->load(['category', 'versions', 'comments.product']);
+        $this->product = $product->load(['category', 'versions', 'comments.commentable']);
     }
 
     /* ================= Tab switching ================= */
@@ -198,7 +198,9 @@ class Show extends Component
 
     public function approveComment(int $id): void
     {
-        $comment = ProductComment::where('product_id', $this->product->id)->findOrFail($id);
+        $comment = Comment::where('commentable_type', Comment::TYPE_PRODUCT)
+            ->where('commentable_id', $this->product->id)
+            ->findOrFail($id);
         $comment->approve();
 
         $this->toast('دیدگاه تأیید و منتشر شد.');
@@ -206,7 +208,9 @@ class Show extends Component
 
     public function rejectComment(int $id): void
     {
-        $comment = ProductComment::where('product_id', $this->product->id)->findOrFail($id);
+        $comment = Comment::where('commentable_type', Comment::TYPE_PRODUCT)
+            ->where('commentable_id', $this->product->id)
+            ->findOrFail($id);
         $comment->reject();
 
         $this->toast('دیدگاه رد شد.');
@@ -214,7 +218,9 @@ class Show extends Component
 
     public function deleteComment(int $id): void
     {
-        $comment = ProductComment::where('product_id', $this->product->id)->findOrFail($id);
+        $comment = Comment::where('commentable_type', Comment::TYPE_PRODUCT)
+            ->where('commentable_id', $this->product->id)
+            ->findOrFail($id);
         $comment->delete();
 
         $this->toast('دیدگاه حذف شد.');

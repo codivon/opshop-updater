@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Product extends Model
 {
@@ -50,9 +51,9 @@ class Product extends Model
         return $this->hasMany(ProductPurchase::class);
     }
 
-    public function comments(): HasMany
+    public function comments(): MorphMany
     {
-        return $this->hasMany(ProductComment::class);
+        return $this->morphMany(Comment::class, 'commentable');
     }
 
     /* ---------------- Scopes ---------------- */
@@ -120,7 +121,7 @@ class Product extends Model
     public function getRatingAttribute(): ?float
     {
         $avg = $this->comments()
-            ->where('status', ProductComment::STATUS_APPROVED)
+            ->where('status', Comment::STATUS_APPROVED)
             ->whereNotNull('rating')
             ->avg('rating');
 
@@ -129,7 +130,7 @@ class Product extends Model
 
     public function approvedCommentsCount(): int
     {
-        return $this->comments()->where('status', ProductComment::STATUS_APPROVED)->count();
+        return $this->comments()->where('status', Comment::STATUS_APPROVED)->count();
     }
 
     public function isActive(): bool

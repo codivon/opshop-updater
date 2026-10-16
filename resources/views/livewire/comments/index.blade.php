@@ -4,24 +4,24 @@
     <div>
         <h1 class="flex items-center gap-2 text-xl font-black text-zinc-900 dark:text-zinc-50">
             <x-icon name="message-square" class="size-5 text-brand-600" />
-            دیدگاه‌های محصولات
+            دیدگاه‌ها
         </h1>
         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            مدیریت دیدگاه‌های ثبت‌شده روی صفحه محصولات — دیدگاه‌ها پس از تأیید شما در فروشگاه نمایش داده می‌شوند.
+            مدیریت دیدگاه‌های ثبت‌شده روی صفحه محصولات و پکیج‌ها — دیدگاه‌ها پس از تأیید شما در فروشگاه نمایش داده می‌شوند.
         </p>
     </div>
 
     {{-- ============ Filters ============ --}}
     <div class="card p-4">
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
-            <div class="sm:col-span-2">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
                 <x-input wire:model.live.debounce.400ms="search" type="search" icon="search" placeholder="جستجوی نام، ایمیل یا متن دیدگاه…" />
             </div>
             <div>
-                <x-select wire:model.live="statusFilter" :options="\App\Models\ProductComment::STATUS_LABELS" placeholder="همه وضعیت‌ها" />
+                <x-select wire:model.live="statusFilter" :options="\App\Models\Comment::STATUS_LABELS" placeholder="همه وضعیت‌ها" />
             </div>
             <div>
-                <x-select wire:model.live="productFilter" :options="$this->products" placeholder="همه محصولات" />
+                <x-select wire:model.live="typeFilter" :options="$this->types" placeholder="همه انواع" />
             </div>
         </div>
     </div>
@@ -45,20 +45,29 @@
                                     </span>
                                 @endif
 
-                                @if($comment->status === \App\Models\ProductComment::STATUS_APPROVED)
+                                @if($comment->status === \App\Models\Comment::STATUS_APPROVED)
                                     <x-badge variant="success" icon="check-circle">تأیید شده</x-badge>
-                                @elseif($comment->status === \App\Models\ProductComment::STATUS_PENDING)
+                                @elseif($comment->status === \App\Models\Comment::STATUS_PENDING)
                                     <x-badge variant="warning" icon="clock">در انتظار</x-badge>
                                 @else
                                     <x-badge variant="danger" icon="x-circle">رد شده</x-badge>
                                 @endif
 
-                                @if($comment->product)
-                                    <a href="{{ route('admin.products.show', $comment->product) }}" wire:navigate
-                                       class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2 py-0.5 text-[11px] font-bold text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
-                                        <x-icon name="rocket" class="size-3" />
-                                        {{ $comment->product->name }}
-                                    </a>
+                                @php($commentable = $comment->commentable)
+                                @if($commentable)
+                                    @if($comment->commentable_type === \App\Models\Comment::TYPE_PRODUCT)
+                                        <a href="{{ route('admin.products.show', $commentable) }}" wire:navigate
+                                           class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2 py-0.5 text-[11px] font-bold text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
+                                            <x-icon name="rocket" class="size-3" />
+                                            {{ $commentable->name }}
+                                        </a>
+                                    @else
+                                        <a href="{{ route('admin.packages.show', $commentable) }}" wire:navigate
+                                           class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2 py-0.5 text-[11px] font-bold text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
+                                            <x-icon name="package" class="size-3" />
+                                            {{ $commentable->name }}
+                                        </a>
+                                    @endif
                                 @endif
                             </div>
                             <p class="mt-1.5 whitespace-pre-line text-sm leading-6 text-zinc-600 dark:text-zinc-300">{{ $comment->body }}</p>
@@ -74,7 +83,7 @@
                                 <x-icon name="check" class="size-4" />
                             </button>
                         @endif
-                        @if($comment->status !== \App\Models\ProductComment::STATUS_REJECTED)
+                        @if($comment->status !== \App\Models\Comment::STATUS_REJECTED)
                             <button wire:click="reject({{ $comment->id }})"
                                     class="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-500/10"
                                     title="رد" aria-label="رد دیدگاه">

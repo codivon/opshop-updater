@@ -21,10 +21,43 @@ Route::get('uploads/{path}', \App\Http\Controllers\Front\UploadsServeController:
 Route::get('/', \App\Livewire\Shop\Home::class)->name('shop.home');
 Route::get('packages/{slug}', \App\Livewire\Shop\PackageShow::class)->name('shop.package');
 
+// صفحات مستقل فروشگاه (لیست کامل با فیلترها)
+Route::get('shop/packages', \App\Livewire\Shop\PackagesIndex::class)->name('shop.packages');
+Route::get('shop/products', \App\Livewire\Shop\ProductsIndex::class)->name('shop.products');
+
 // محصولات قابل‌فروش (پروژه‌ها — خرید مهمان بدون ثبت‌نام)
 Route::get('products/{slug}', \App\Livewire\Shop\ProductShow::class)->name('shop.product');
 Route::get('payment/result/product/{purchase}', \App\Livewire\Shop\ProductPaymentResult::class)->name('payment.result.product');
 Route::get('products/download/{token}', [\App\Http\Controllers\Front\ProductDownloadController::class, 'download'])->name('products.download');
+
+/*
+|--------------------------------------------------------------------------
+| احراز هویت مشتریان فروشگاه (ورود فقط با کد آپدیت)
+|--------------------------------------------------------------------------
+*/
+Route::get('customer/login', \App\Livewire\Shop\CustomerLogin::class)
+    ->name('shop.login')
+    ->middleware('guest:customer');
+
+// خروج مشتری
+// نکته: session()->invalidate() نمی‌زنیم چون کل سشن (از جمله لاگین مدیر در همان مرورگر) را نابود می‌کند؛
+// فقط داده‌های گارد مشتری پاک می‌شود و توکن CSRF تازه می‌شود.
+Route::post('customer/logout', function () {
+    \Illuminate\Support\Facades\Auth::guard('customer')->logout();
+    session()->forget('shop_update_code');
+    session()->regenerateToken();
+
+    return redirect()->route('shop.home');
+})->name('shop.logout')->middleware('auth:customer');
+
+Route::get('customer/profile', \App\Livewire\Shop\CustomerProfile::class)
+    ->name('customer.profile')
+    ->middleware('auth:customer');
+
+// دانلود آخرین نسخه‌ی پکیج برای مشتریِ دارای لایسنس فعال
+Route::get('customer/download/{license}', [\App\Http\Controllers\Front\CustomerPackageDownloadController::class, 'download'])
+    ->name('customer.package.download')
+    ->middleware('auth:customer');
 
 // طرح‌های اشتراک (فروش عمومی + نتیجه خرید اشتراک)
 Route::get('subscriptions', \App\Livewire\Shop\SubscriptionsIndex::class)->name('shop.subscriptions');
