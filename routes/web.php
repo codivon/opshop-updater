@@ -54,10 +54,9 @@ Route::get('customer/profile', \App\Livewire\Shop\CustomerProfile::class)
     ->name('customer.profile')
     ->middleware('auth:customer');
 
-// دانلود آخرین نسخه‌ی پکیج برای مشتریِ دارای لایسنس فعال
-Route::get('customer/download/{license}', [\App\Http\Controllers\Front\CustomerPackageDownloadController::class, 'download'])
-    ->name('customer.package.download')
-    ->middleware('auth:customer');
+// ⚠️ دانلود مستقیم پکیج برای مشتری عمداً وجود ندارد:
+// مشتری پکیج را فقط با «کد آپدیت» داخل فروشگاه‌ساز خودش نصب/به‌روزرسانی می‌کند
+// (جریان API آپدیت‌سنتر) و فایل از طریق پنل قابل دریافت نیست.
 
 // طرح‌های اشتراک (فروش عمومی + نتیجه خرید اشتراک)
 Route::get('subscriptions', \App\Livewire\Shop\SubscriptionsIndex::class)->name('shop.subscriptions');

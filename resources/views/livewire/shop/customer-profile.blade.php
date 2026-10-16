@@ -1,4 +1,4 @@
-<div class="mx-auto w-full max-w-7xl space-y-6 px-4 py-8 sm:px-6">
+<div class="mx-auto w-full max-w-7xl space-y-6 px-4 pt-8 sm:px-6">
 
     {{-- ============ Header ============ --}}
     @php($customer = auth('customer')->user())
@@ -138,11 +138,6 @@
 
                         {{-- actions --}}
                         <div class="flex shrink-0 items-center gap-2">
-                            @if($license)
-                                <a href="{{ route('customer.package.download', $license) }}">
-                                    <x-btn size="sm" icon="download">دانلود</x-btn>
-                                </a>
-                            @endif
                             <a href="{{ route('shop.package', $purchase->package->slug) }}" wire:navigate>
                                 <x-btn variant="secondary" size="sm" icon="external-link">صفحه پکیج</x-btn>
                             </a>
@@ -151,11 +146,24 @@
                 @endforeach
             </div>
 
+            {{-- راهنمای نصب: مشتری پکیج را مستقیم دانلود نمی‌کند؛ با کد آپدیت در فروشگاه خودش نصب می‌کند --}}
+            <div class="flex items-start gap-3 rounded-2xl bg-brand-50 p-4 ring-1 ring-brand-100 dark:bg-brand-500/10 dark:ring-brand-400/20">
+                <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-600 shadow-xs dark:bg-zinc-900 dark:text-brand-400">
+                    <x-icon name="info" class="size-4.5" />
+                </span>
+                <p class="text-xs leading-6 text-brand-800/90 dark:text-brand-200/80">
+                    دانلود مستقیم فایل پکیج‌ها ممکن نیست؛ برای نصب، در افزونه/فروشگاه ساز خود
+                    <span class="font-black">کد آپدیت</span>
+                    (<span class="font-mono font-bold" dir="ltr">{{ $customer->update_code }}</span>) را وارد کنید و
+                    پکیج خریداری‌شده به‌صورت خودکار نصب و به‌روزرسانی می‌شود.
+                </p>
+            </div>
+
             <div>{{ $this->purchases->links() }}</div>
         @else
             <div class="card">
                 <x-empty icon="package" title="هنوز پکیجی نخریده‌اید"
-                         description="از فروشگاه پکیج موردنظرتان را تهیه کنید تا اینجا قابل دانلود باشد.">
+                         description="از فروشگاه پکیج موردنظرتان را تهیه کنید تا با کد آپدیت، در فروشگاه ساز شما قابل نصب باشد.">
                     <a href="{{ route('shop.home') }}" wire:navigate>
                         <x-btn variant="soft" size="sm" icon="store">رفتن به فروشگاه</x-btn>
                     </a>

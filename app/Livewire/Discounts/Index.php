@@ -140,6 +140,11 @@ class Index extends Component
 
     public function save(): void
     {
+        // FIX (تکراری‌بودن کد با حروف کوچک/بزرگ): کد باید «قبل از validate» نرمال شود؛
+        // وگرنه 'welcome10' از قاعده unique رد می‌شد و بعد از نرمال‌سازی به 'WELCOME10'
+        // خطای یکتایی دیتابیس می‌داد.
+        $this->form['code'] = DiscountCode::normalize($this->form['code']);
+
         $data = $this->validate();
 
         // حداقل یک محدوده باید انتخاب شده باشد

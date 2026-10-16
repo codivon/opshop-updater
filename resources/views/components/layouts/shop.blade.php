@@ -55,7 +55,7 @@
     </style>
 </head>
 
-<body class="flex min-h-screen flex-col bg-zinc-50 antialiased dark:bg-zinc-950">
+<body class="min-h-screen bg-zinc-50 antialiased dark:bg-zinc-950">
 
     {{-- ============ Header (sticky) ============ --}}
     <header class="sticky top-0 z-40 border-b border-zinc-200/70 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
@@ -165,12 +165,13 @@
     </header>
 
     {{-- ============ Content ============ --}}
-    <main class="flex-1">
+    <main class="pb-8 sm:pb-10">
         {{ $slot }}
     </main>
 
     {{-- ============ Footer ============ --}}
-    <footer class="mt-auto border-t border-zinc-200/70 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+    {{-- فوتر چسبیده به محتوای بالای خود (جریان عادی سند) — نه چسبیده به پایین ویوپورت --}}
+    <footer class="border-t border-zinc-200/70 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div class="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 text-center sm:flex-row sm:text-start sm:px-6">
             <div class="flex items-center gap-2.5">
                 <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 text-white">

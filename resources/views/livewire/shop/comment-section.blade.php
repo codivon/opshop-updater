@@ -41,6 +41,24 @@
                                 <span class="text-xs text-zinc-400">{{ verta_date($comment->created_at) }}</span>
                             </div>
                             <p class="mt-2 whitespace-pre-line text-sm leading-7 text-zinc-600 dark:text-zinc-300">{{ $comment->body }}</p>
+
+                            {{-- پاسخ مدیر --}}
+                            @if($comment->hasReply())
+                                <div class="mt-3 flex items-start gap-2.5 rounded-xl bg-brand-50 p-3.5 ring-1 ring-brand-100 dark:bg-brand-500/10 dark:ring-brand-400/20" wire:key="shopcmreply-{{ $comment->id }}">
+                                    <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-brand-600 shadow-xs dark:bg-zinc-900 dark:text-brand-400">
+                                        <x-icon name="corner-up-left" class="size-3.5" />
+                                    </span>
+                                    <div class="min-w-0">
+                                        <p class="flex flex-wrap items-center gap-x-2 text-[11px] font-black text-brand-700 dark:text-brand-300">
+                                            پاسخ مدیر
+                                            @if($comment->replied_at)
+                                                <span class="font-normal text-brand-600/70 dark:text-brand-400/70">{{ verta_date($comment->replied_at) }}</span>
+                                            @endif
+                                        </p>
+                                        <p class="mt-1 whitespace-pre-line text-sm leading-6 text-brand-800/90 dark:text-brand-200/80">{{ $comment->reply }}</p>
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>

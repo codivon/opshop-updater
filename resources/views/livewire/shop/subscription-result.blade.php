@@ -1,4 +1,4 @@
-<div class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+<div class="mx-auto w-full max-w-3xl px-4 pt-10 sm:px-6">
 
     @php($state = match(true) {
         $order->admin_status === \App\Models\SubscriptionOrder::ADMIN_STATUS_APPROVED => 'approved',

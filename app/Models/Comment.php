@@ -28,11 +28,13 @@ class Comment extends Model
     protected $fillable = [
         'commentable_type', 'commentable_id', 'name', 'email', 'rating',
         'body', 'status', 'admin_note', 'approved_at', 'ip',
+        'reply', 'replied_at',
     ];
 
     protected $casts = [
         'rating'      => 'integer',
         'approved_at' => 'datetime',
+        'replied_at'  => 'datetime',
     ];
 
     /* ---------------- Relationships ---------------- */
@@ -52,6 +54,33 @@ class Comment extends Model
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    /** آیا مدیر به این دیدگاه پاسخ داده است؟ */
+    public function hasReply(): bool
+    {
+        return filled($this->reply);
+    }
+
+    /**
+     * ثبت/به‌روزرسانی پاسخ مدیر.
+     * (پاسخ فقط روی دیدگاه تأییدشده برای کاربر نمایش داده می‌شود؛
+     *  اما ثبتش روی هر وضعیتی مجاز است تا مدیر بتواند پیش از تأیید هم پاسخ آماده کند)
+     */
+    public function saveReply(string $reply): void
+    {
+        $this->update([
+            'reply'      => trim($reply),
+            'replied_at' => now(),
+        ]);
+    }
+
+    public function removeReply(): void
+    {
+        $this->update([
+            'reply'      => null,
+            'replied_at' => null,
+        ]);
     }
 
     /** برچسب نوع دیدگاه برای نمایش در ادمین */
