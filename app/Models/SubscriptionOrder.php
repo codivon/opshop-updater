@@ -30,6 +30,7 @@ class SubscriptionOrder extends Model
     protected $fillable = [
         'subscription_plan_id',
         'customer_id',
+        'discount_code_id',
         'amount',
         'discount',
         'final_amount',
@@ -76,6 +77,11 @@ class SubscriptionOrder extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    public function discountCode(): BelongsTo
+    {
+        return $this->belongsTo(DiscountCode::class);
+    }
+
     public function subscription(): BelongsTo
     {
         return $this->belongsTo(Subscription::class);
@@ -92,11 +98,19 @@ class SubscriptionOrder extends Model
 
     public function markAsPaid(?string $gateway = null): void
     {
+        // گارد idempotency: کال‌بک تکراری درگاه نباید شمارنده کد تخفیف را دوباره مصرف کند
+        if ($this->isPaid()) {
+            return;
+        }
+
         $this->update([
             'status'   => self::STATUS_PAID,
             'paid_at'  => now(),
             'gateway'  => $gateway ?? $this->gateway,
         ]);
+
+        // شمارنده استفاده از کد تخفیف فقط یک‌بار (همزمان با تأیید پرداخت) مصرف می‌شود
+        $this->discountCode?->recordUsage();
     }
 
     public function markAsFailed(?string $reason = null): void

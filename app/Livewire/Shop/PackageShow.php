@@ -4,12 +4,14 @@ namespace App\Livewire\Shop;
 
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
+use App\Models\DiscountCode;
 use App\Models\Gateway;
 use App\Models\Package;
 use App\Models\PackageLicense;
 use App\Models\PackagePricingPlan;
 use App\Models\PackagePurchase;
 use App\Models\Subscription;
+use App\Services\DiscountService;
 use App\Services\LicenseService;
 use App\Services\PaymentService;
 use Carbon\Carbon;
@@ -35,6 +37,12 @@ class PackageShow extends Component
 
     /** درگاه پرداخت انتخاب‌شده */
     public string $gatewayKey = '';
+
+    /** کد تخفیف تایپ‌شده (پیش از اعمال) */
+    public string $discountCode = '';
+
+    /** کد تخفیف اعمال‌شده (پس از اعتبارسنجی سمت سرور — کد نرمال‌شده) */
+    public string $appliedCode = '';
 
     public function mount(string $slug): void
     {
@@ -142,6 +150,83 @@ class PackageShow extends Component
             ->first();
     }
 
+    /* ---------------------------------------------------------------- */
+    /*  کد تخفیف                                                          */
+    /* ---------------------------------------------------------------- */
+
+    /** مبلغ مبنا برای کد تخفیف: final_price طرح انتخاب‌شده (۰ اگر طرحی انتخاب نشده) */
+    protected function discountBaseAmount(): int
+    {
+        if ($this->package->is_free) {
+            return 0;
+        }
+
+        $plan = $this->planId !== ''
+            ? $this->plans->firstWhere('id', (int) $this->planId)
+            : null;
+
+        return $plan ? (int) $plan->final_price : 0;
+    }
+
+    /** اعمال کد تخفیف (اعتبارسنجی سمت سرور + پیش‌نمایش) */
+    public function applyDiscount(DiscountService $discountService): void
+    {
+        $base = $this->discountBaseAmount();
+
+        if ($base <= 0) {
+            $this->toast(!$this->package->is_free && $this->plans->isNotEmpty()
+                ? 'ابتدا طرح قیمت‌گذاری را انتخاب کنید.'
+                : 'برای این پکیج امکان استفاده از کد تخفیف وجود ندارد.', 'warning');
+            return;
+        }
+
+        $result = $discountService->resolve($this->discountCode, DiscountCode::CONTEXT_PACKAGE, $base);
+
+        if (!$result['ok']) {
+            $this->appliedCode = '';
+            $this->toast($result['message'], 'error');
+            return;
+        }
+
+        if ($result['code'] === null) {
+            $this->appliedCode = '';
+            $this->toast('ابتدا یک کد تخفیف وارد کنید.', 'warning');
+            return;
+        }
+
+        $this->appliedCode = $result['code']->code;
+        $this->toast($result['message']);
+    }
+
+    /** حذف کد تخفیف اعمال‌شده */
+    public function removeDiscount(): void
+    {
+        $this->discountCode = '';
+        $this->appliedCode = '';
+    }
+
+    /**
+     * رزول مجدد کد اعمال‌شده برای نمایش زنده‌ی مبلغ پس از تخفیف (مبنای طرحِ فعلی).
+     * اگر کد نامعتبر شده باشد null برمی‌گردد.
+     */
+    #[Computed]
+    public function appliedDiscount(): ?array
+    {
+        if ($this->appliedCode === '') {
+            return null;
+        }
+
+        $base = $this->discountBaseAmount();
+
+        if ($base <= 0) {
+            return null;
+        }
+
+        $result = app(DiscountService::class)->resolve($this->appliedCode, DiscountCode::CONTEXT_PACKAGE, $base);
+
+        return $result['ok'] ? $result : null;
+    }
+
     /** اشتراک فعالِ طرح‌محور مشتریِ session (با plan و packages) یا null */
     #[Computed]
     public function myActiveSubscription()
@@ -173,7 +258,7 @@ class PackageShow extends Component
     /*  Buy                                                              */
     /* ---------------------------------------------------------------- */
 
-    public function buy(PaymentService $paymentService, LicenseService $licenseService): void
+    public function buy(PaymentService $paymentService, LicenseService $licenseService, DiscountService $discountService): void
     {
         // ---- کد آپدیت ----
         // مشتری واردشده نیازی به تایپ کد ندارد؛ در غیر این صورت کد اجباری است.
@@ -254,8 +339,37 @@ class PackageShow extends Component
             return;
         }
 
+        // ---- کد تخفیف (راستی‌آزمایی مجدد سمت سرور) ----
+        // فقط وقتی مبلغ مبنا > ۰ کد اعتبارسنجی می‌شود؛ در خرید رایگانِ بدون مبلغ،
+        // کدِ تایپ‌شده‌ی نیمه‌کاره نباید جلوی دریافت رایگان را بگیرد.
+        $couponBase = $this->discountBaseAmount();
+
+        if ($couponBase > 0) {
+            $couponResult = $discountService->resolve(
+                $this->appliedCode !== '' ? $this->appliedCode : $this->discountCode,
+                DiscountCode::CONTEXT_PACKAGE,
+                $couponBase
+            );
+
+            if (!$couponResult['ok']) {
+                $this->appliedCode = '';
+                $this->toast($couponResult['message'], 'error');
+                return;
+            }
+
+            /** @var \App\Models\DiscountCode|null $coupon */
+            $coupon         = $couponResult['code'];
+            $couponDiscount = $couponResult['discount'];
+            $finalPrice     = $couponResult['final'];
+        } else {
+            $coupon         = null;
+            $couponDiscount = 0;
+            $finalPrice     = 0;
+        }
+
         // ---- مسیر رایگان ----
-        if ($this->package->is_free || ($plan && $plan->final_price <= 0)) {
+        // (پکیج رایگان، طرح صفر تومانی، یا کد تخفیفِ پوشش‌دهنده‌ی کامل مبلغ)
+        if ($this->package->is_free || ($plan && $plan->final_price <= 0) || $finalPrice <= 0) {
             // پکیج رایگان بدون طرح → لایسنس نامحدود
             if (!$plan) {
                 $plan = new PackagePricingPlan([
@@ -265,16 +379,22 @@ class PackageShow extends Component
             }
 
             $purchase = PackagePurchase::create([
-                'package_id'      => $this->package->id,
-                'version_id'      => $latestVersion->id,
-                'pricing_plan_id' => $plan->exists ? $plan->id : null,
-                'customer_id'     => $customer->id,
-                'amount'          => 0,
-                'status'          => PackagePurchase::STATUS_PAID,
-                'paid_at'         => now(),
+                'package_id'       => $this->package->id,
+                'version_id'       => $latestVersion->id,
+                'pricing_plan_id'  => $plan->exists ? $plan->id : null,
+                'customer_id'      => $customer->id,
+                'discount_code_id' => $coupon?->id,
+                'original_amount'  => $couponBase,
+                'amount'           => 0,
+                'discount_amount'  => $couponDiscount,
+                'status'           => PackagePurchase::STATUS_PAID,
+                'paid_at'          => now(),
             ]);
 
             $licenseService->issueOrRenew($purchase, $plan);
+
+            // مسیر رایگان از markAsPaid عبور نمی‌کند → مصرف شمارنده کد اینجا انجام می‌شود
+            $coupon?->recordUsage();
 
             // به‌جای flash از put استفاده می‌کنیم تا پس از رفت‌وبرگشت از درگاه هم
             // کد آپدیت در صفحه پکیج باقی بماند (flash با اولین request بعدی مصرف می‌شود).
@@ -293,14 +413,17 @@ class PackageShow extends Component
         }
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $this->package->id,
-            'version_id'      => $latestVersion->id,
-            'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'callback_url'    => route('payment.callback'),
-            'amount'          => $plan->final_price,
-            'gateway'         => $this->gatewayKey,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'package_id'       => $this->package->id,
+            'version_id'       => $latestVersion->id,
+            'pricing_plan_id'  => $plan->id,
+            'customer_id'      => $customer->id,
+            'discount_code_id' => $coupon?->id,
+            'callback_url'     => route('payment.callback'),
+            'original_amount'  => (int) $plan->final_price,
+            'amount'           => $finalPrice,
+            'discount_amount'  => $couponDiscount,
+            'gateway'          => $this->gatewayKey,
+            'status'           => PackagePurchase::STATUS_PENDING,
         ]);
 
         session()->put('shop_update_code', trim($this->updateCode));

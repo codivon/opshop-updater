@@ -40,6 +40,7 @@ class Icon extends Component
         'receipt' => '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>',
         'tag' => '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="0.5" fill="currentColor"/>',
         'ticket' => '<path d="M2 9a3 3 0 0 1 1 5.8A2 2 0 0 0 5 17h14a2 2 0 0 0 2-2.2A3 3 0 0 1 20 9a3 3 0 0 1-1.8-2.5A2 2 0 0 0 16 5H5a2 2 0 0 0-1.2 1.5A3 3 0 0 1 2 9z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>',
+        'ticket-percent' => '<path d="M2 9a3 3 0 0 1 1 5.8A2 2 0 0 0 5 17h14a2 2 0 0 0 2-2.2A3 3 0 0 1 20 9a3 3 0 0 1-1.8-2.5A2 2 0 0 0 16 5H5a2 2 0 0 0-1.2 1.5A3 3 0 0 1 2 9z"/><path d="m9.5 14.5 5-5"/><path d="M9.5 9.5h.01"/><path d="M14.5 14.5h.01"/>',
         'file-text' => '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>',
         'archive' => '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
         'database' => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',

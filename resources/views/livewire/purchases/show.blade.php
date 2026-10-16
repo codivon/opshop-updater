@@ -46,6 +46,12 @@
                         <div>
                             <p class="text-xs font-medium text-brand-50/90">مبلغ پرداخت</p>
                             <p class="mt-1 text-2xl font-black tabular-nums">{{ money($purchase->amount) }}</p>
+                            @if($purchase->discount_amount > 0)
+                                <p class="mt-1 text-xs text-brand-50/80">
+                                    <span class="line-through">{{ money($purchase->original_amount ?? ($purchase->amount + $purchase->discount_amount)) }}</span>
+                                    · کد تخفیف {{ $purchase->discountCode?->code ?? '—' }} ({{ money($purchase->discount_amount) }} تخفیف)
+                                </p>
+                            @endif
                         </div>
                     </div>
                     <x-badge :variant="$variant">{{ $label }}</x-badge>

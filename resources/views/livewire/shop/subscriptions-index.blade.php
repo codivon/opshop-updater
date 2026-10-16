@@ -181,6 +181,8 @@
 
                         {{-- inline checkout --}}
                         @if($buyingSlug === $plan->slug)
+                            @php($pw = $this->priceWithDiscount($plan))
+                            @php($checkoutFree = $pw['final'] <= 0)
                             <form wire:submit="buy" class="space-y-3 border-t border-zinc-100 bg-brand-50/50 p-5 dark:border-zinc-800 dark:bg-brand-500/5">
                                 <div>
                                     <label class="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-200">
@@ -192,21 +194,31 @@
                                     @error('updateCode') <p class="mt-1 text-xs font-bold text-rose-600 dark:text-rose-400">{{ $message }}</p> @enderror
                                 </div>
 
-                                @if($plan->final_price > 0)
+                                @if(!$checkoutFree)
                                     <div>
                                         @include('livewire.shop.partials.gateway-picker', ['gateways' => $this->gateways])
                                     </div>
                                 @endif
 
+                                {{-- کد تخفیف --}}
+                                @include('livewire.shop.partials.discount-field', ['baseAmount' => (int) $plan->final_price])
+
                                 <div class="flex items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm ring-1 ring-zinc-200/70 dark:bg-zinc-800 dark:ring-zinc-700/50">
                                     <span class="text-zinc-500 dark:text-zinc-400">مبلغ قابل پرداخت</span>
-                                    <span class="font-black tabular-nums text-zinc-900 dark:text-zinc-50">
-                                        {{ $plan->final_price > 0 ? money($plan->final_price) : 'رایگان' }}
+                                    <span class="text-end font-black tabular-nums text-zinc-900 dark:text-zinc-50">
+                                        @if($checkoutFree)
+                                            <span class="text-emerald-600">{{ $pw['discount'] > 0 ? 'رایگان با کد تخفیف' : 'رایگان' }}</span>
+                                        @elseif($pw['discount'] > 0)
+                                            <span class="block text-[11px] font-normal text-zinc-400 line-through">{{ money($pw['base']) }}</span>
+                                            <span class="text-emerald-600">{{ money($pw['final']) }}</span>
+                                        @else
+                                            {{ money($pw['final']) }}
+                                        @endif
                                     </span>
                                 </div>
 
                                 <x-btn variant="primary" icon="wallet" class="w-full" type="submit" :loading="true">
-                                    {{ $plan->final_price > 0 ? 'ادامه و پرداخت' : 'ثبت درخواست رایگان' }}
+                                    {{ $checkoutFree ? 'ثبت درخواست رایگان' : 'ادامه و پرداخت' }}
                                 </x-btn>
                                 <p class="text-center text-[11px] leading-5 text-zinc-400">
                                     پس از پرداخت، درخواست شما برای تأیید مدیر ارسال می‌شود و اشتراک پس از تأیید فعال خواهد شد.

@@ -101,8 +101,26 @@
             </div>
             <div class="flex items-center justify-between gap-4">
                 <dt class="shrink-0 text-zinc-500 dark:text-zinc-400">مبلغ</dt>
-                <dd class="font-bold tabular-nums">{{ $purchase->amount > 0 ? money($purchase->amount) : 'رایگان' }}</dd>
+                <dd class="font-bold tabular-nums">
+                    @if($purchase->amount > 0)
+                        {{ money($purchase->amount) }}
+                    @else
+                        <span class="text-emerald-600">{{ $purchase->discount_amount > 0 ? 'رایگان با کد تخفیف' : 'رایگان' }}</span>
+                    @endif
+                </dd>
             </div>
+            @if($purchase->discount_amount > 0)
+                <div class="flex items-center justify-between gap-4">
+                    <dt class="shrink-0 flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
+                        <x-icon name="ticket-percent" class="size-3.5 text-emerald-500" />
+                        کد تخفیف
+                    </dt>
+                    <dd class="font-bold">
+                        <span class="font-mono text-emerald-700 dark:text-emerald-400" dir="ltr">{{ $purchase->discountCode?->code }}</span>
+                        <span class="text-xs text-emerald-700/80 dark:text-emerald-400/80">— {{ money($purchase->discount_amount) }}</span>
+                    </dd>
+                </div>
+            @endif
             @if($purchase->gateway)
                 <div class="flex items-center justify-between gap-4">
                     <dt class="shrink-0 text-zinc-500 dark:text-zinc-400">درگاه</dt>

@@ -80,12 +80,30 @@
                         <p class="text-xs text-zinc-500 dark:text-zinc-400">مبلغ</p>
                         <p class="mt-1.5 text-sm font-black tabular-nums text-zinc-900 dark:text-zinc-100">
                             @if($purchase->amount <= 0)
-                                <span class="text-emerald-600">رایگان</span>
+                                <span class="text-emerald-600">{{ $purchase->discount_amount > 0 ? 'رایگان با کد تخفیف' : 'رایگان' }}</span>
                             @else
                                 {{ money($purchase->amount) }}
                             @endif
                         </p>
+                        @if($purchase->discount_amount > 0)
+                            <p class="mt-1 text-[11px] text-zinc-400">
+                                مبلغ قبل از تخفیف: <span class="line-through">{{ money($purchase->original_amount ?? ($purchase->amount + $purchase->discount_amount)) }}</span>
+                            </p>
+                        @endif
                     </div>
+
+                    @if($purchase->discount_amount > 0)
+                        <div class="rounded-xl bg-emerald-50 p-4 ring-1 ring-emerald-600/15 dark:bg-emerald-500/10 dark:ring-emerald-400/20">
+                            <p class="flex items-center gap-1.5 text-xs text-emerald-700/90 dark:text-emerald-400/90">
+                                <x-icon name="ticket-percent" class="size-3.5" />
+                                کد تخفیف
+                            </p>
+                            <p class="mt-1.5 flex flex-wrap items-center gap-2">
+                                <span class="font-mono font-black text-emerald-800 dark:text-emerald-300" dir="ltr">{{ $purchase->discountCode?->code }}</span>
+                                <span class="text-xs font-bold text-emerald-700/80 dark:text-emerald-400/80">— {{ money($purchase->discount_amount) }} تخفیف</span>
+                            </p>
+                        </div>
+                    @endif
 
                     <div class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/80 dark:bg-zinc-800/60 dark:ring-zinc-700">
                         <p class="text-xs text-zinc-500 dark:text-zinc-400">درگاه پرداخت</p>
