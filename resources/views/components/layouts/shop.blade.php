@@ -78,9 +78,19 @@
                        'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.home') || request()->routeIs('shop.package'),
                        'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! (request()->routeIs('shop.home') || request()->routeIs('shop.package')),
                    ])
-                   @if(request()->routeIs('shop.home') || request()->routeIs('shop.package')) aria-current="page" @endif>
+                   @if(request()->routeIs('shop.home') || request()->routeIs('shop.package') || request()->routeIs('shop.product')) aria-current="page" @endif>
                     <x-icon name="package" class="size-4.5" />
                     فروشگاه
+                </a>
+                <a href="{{ route('shop.home') }}?tab=products" wire:navigate
+                   @class([
+                       'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.product'),
+                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! request()->routeIs('shop.product'),
+                   ])
+                   @if(request()->routeIs('shop.product')) aria-current="page" @endif>
+                    <x-icon name="rocket" class="size-4.5" />
+                    پروژه‌ها
                 </a>
                 <a href="{{ route('shop.subscriptions') }}" wire:navigate
                    @class([

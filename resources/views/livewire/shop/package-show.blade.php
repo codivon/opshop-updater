@@ -35,8 +35,8 @@
                         @if($package->latestVersion)
                             <x-badge variant="primary" class="font-mono" dir="ltr">v{{ $package->latestVersion->version }}</x-badge>
                         @endif
-                        @if($package->category)
-                            <x-badge variant="neutral" icon="tag">{{ \App\Livewire\Shop\Home::CATEGORIES[$package->category] ?? $package->category }}</x-badge>
+                        @if($package->categoryModel)
+                            <x-badge variant="neutral" icon="tag">{{ $package->categoryModel->name }}</x-badge>
                         @endif
                         @if($package->is_free)
                             <x-badge variant="success" icon="gift">رایگان</x-badge>

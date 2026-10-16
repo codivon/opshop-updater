@@ -35,10 +35,10 @@
                                 <x-icon name="info" class="size-3" />
                                 {{ $statusLabel }}
                             </span>
-                            @if($package->category)
+                            @if($package->categoryModel)
                                 <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style="background: rgba(255,255,255,.22)">
                                     <x-icon name="tag" class="size-3" />
-                                    {{ \App\Livewire\Packages\Index::CATEGORIES[$package->category] ?? 'سایر' }}
+                                    {{ $package->categoryModel->name }}
                                 </span>
                             @endif
                             @if($package->is_free)
@@ -527,7 +527,7 @@
                 </x-field>
 
                 <x-field label="دسته‌بندی">
-                    <x-select wire:model="form.category" :options="\App\Livewire\Packages\Index::CATEGORIES" placeholder="انتخاب دسته‌بندی…" />
+                    <x-select wire:model="form.category_id" :options="$this->categories" placeholder="انتخاب دسته‌بندی…" />
                 </x-field>
             </div>
 

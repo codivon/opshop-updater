@@ -12,6 +12,7 @@
 
 - **پنل مدیریت** (`/admin/*`): مدیریت پروژه‌ها، پکیج‌ها، نسخه‌ها، طرح‌های قیمت، لایسنس‌ها، خریدها، مشتریان، اشتراک‌ها، کاربران، گزارش‌ها، لاگ‌ها، تنظیمات و درگاه‌های پرداخت.
 - **فروشگاه عمومی** (`/` و `/packages/{slug}`): مشتریان پکیج‌ها را می‌بینند و **با «کد آپدیت» (update_code)** بدون ثبت‌نم خرید می‌کنند؛ پکیج رایگان → لایسنس فوری؛ پکیج پرداختی → انتقال به درگاه → صفحه نتیجه.
+- **فروشگاه محصولات (پروژه‌های قابل‌فروش)** (`/products/{slug}`): 🆕 فروش مستقیم پروژه‌های آماده (اسکریپت، قالب، اپلیکیشن و…) — **خرید مهمان بدون هیچ ورود اطلاعات**، صفحه تکی با دیدگاه‌ها (تأیید مدیر)، نسخه‌بندی و دانلود ZIP توکنی. تب «پروژه‌ها» در صفحه اصلی فروشگاه + فیلتر دسته‌بندی/قیمت/جستجو/مرتب‌سازی روی هر دو تب.
 - **API عمومی v1** (`/api/v1/*`): برای سیستم‌های لاراولیِ خودِ مشتریان — چک آپدیت، خرید، تأیید پرداخت، لایسنس، دانلود توکنی (۱۵ دقیقه). احراز هویت با همان `update_code` + هدر `X-Project-Url` (قفل دامنه).
 
 **اصل مهم:** پنل کاملاً با **Livewire 3** بازنویسی شده (SPA با `wire:navigate`)، طراحی همه المان‌ها از صفر با Tailwind CSS 4 انجام شده و لایه API v1 دست‌نخورده مانده (backward-compat با کلاینت‌های موجود).
@@ -59,14 +60,27 @@ php artisan serve          # http://localhost:8000
 - **Setting** (`settings`): key, value, type, group (general/email). `Setting::set()`.
 - **Transaction**: جدول shetabit (`transactions`).
 
+### 🆕 مدل محصولات قابل‌فروش (فروشگاه پروژه‌ها — Task 23)
+- **Category** (`categories`): دسته‌بندی مشترک با `type` (`product` | `package`). ۶ دسته پیش‌فرض محصول در مایگریشن seed می‌شود؛ دسته‌های قدیمی متنی پکیج‌ها هم در مایگریشن backfill به این جدول منتقل شده‌اند (`packages.category_id` + ستون قدیمی `category` برای سازگاری API هم‌زمان sync می‌شود).
+- **Product** (`products`): category_id, name, slug, short_description(TEXT), description(HTML CKEditor), thumbnail, price, discount(درصد), is_free, status(draft/active/archived), sort_order, sales_count, views_count. Accessorها: `final_price` (تخفیف‌خورده)، `is_effectively_free`، `rating` (میانگین دیدگاه‌های تأییدشده)، `thumbnail_url` (fallback به placeholder پکیج). ⚠️ در مدل Package رابطه دسته‌بندی `categoryModel()` است نه `category()` — چون ستون متنی `category` از قبل هست و attribute بر relation اولویت دارد.
+- **ProductVersion**: product_id, version, type(major/minor/patch), changelog/what_added/what_changed/what_fixed, file_path (disk `local` → `storage/app/private/products/{slug}/`), file_hash(SHA256), file_size, is_mandatory, status, downloads_count, release_date.
+- **ProductPurchase** (`product_purchases`): product_id, version_id, transaction_id, amount, gateway, payment_url, callback_url, status(pending/paid/failed/refunded), paid_at, meta(json). markAsPaid → `product->incrementSales()`. `createDownloadToken()` → توکن یک‌بارمصرف ۱۵ دقیقه‌ای.
+- **ProductComment**: product_id, name (مهمان), email?, rating(1..5 nullable), body, status(pending/approved/rejected), approved_at, ip. نمایش در صفحه تکی فقط approved؛ ثبت همیشه pending → تأیید مدیر از پنل.
+- **ProductDownloadToken**: token (`pdt_…`), product_id, product_version_id, purchase_id, expires_at(+15m), used_at (یک‌بارمصرف), ip.
+- **جریان پرداخت محصول**: `PaymentService::createProductPayment()` (نکته resolveFormUrl سه‌گانه: PackagePurchase | SubscriptionOrder | ProductPurchase → مسیر امضادار `payment.form.product`) + `verifyProductPayment()`. کال‌بک مشترک `/payment/callback` در WebPaymentController سه نوع تراکنش را به ترتیب تشخیص می‌دهد: SubscriptionOrder → ProductPurchase → PackagePurchase. پیامک مدیر `admin_product_paid` هنگام فروش موفق.
+- **خرید مهمان در صفحه تکی** (`Shop\ProductShow::buy`): رایگان → خرید paid فوری + ریدایرکت به `payment.result.product`؛ پولی → انتخاب درگاه (همان picker لوگودار مشترک `shop/partials/gateway-picker`) → درگاه → کال‌بک → نتیجه. صفحه نتیجه (`Shop\ProductPaymentResult`) دکمه دانلود با توکن تازه هر کلیک دارد + پیگیری خرید مهمان با شماره تراکنش (کامپوننت `Shop\PurchaseTrack` در تب پروژه‌های صفحه اصلی).
+
 ---
 
 ## ۴. نقشه مسیرها
 
 ### وب (`routes/web.php`)
 ```
-GET  /                              → Shop\Home            (فروشگاه)
+GET  /                              → Shop\Home            (فروشگاه — تب‌های پکیج‌ها/پروژه‌ها + فیلترها)
 GET  /packages/{slug}               → Shop\PackageShow     (جزئیات + checkout)
+GET  /products/{slug}               → Shop\ProductShow     (🆕 صفحه تکی محصول قابل‌فروش + دیدگاه‌ها)
+GET  /payment/result/product/{purchase} → Shop\ProductPaymentResult (🆕 نتیجه خرید محصول + دانلود)
+GET  /products/download/{token}     → ProductDownloadController (🆕 دانلود ZIP توکنی یک‌بارمصرف)
 GET  /payment/callback              → WebPaymentController (بازگشت از درگاه، GET)
 POST /payment/callback              → WebPaymentController (POST بانک، CSRF-exempt)
 GET  /payment/result/{purchase}     → Shop\PaymentResult   (صفحه نتیجه)
@@ -272,11 +286,14 @@ admin-panel/
 ├─ app/
 │  ├─ Livewire/            Dashboard, Projects/, Updates/, Packages/(Index+Show+…), Licenses/,
 │  │                       Purchases/, Customers/, Subscriptions/, Users/, Reports/, Logs/,
-│  │                       Settings/, Gateways, Shop/(Home+PackageShow+PaymentResult), Concerns/WithToasts
+│  │                       Settings/, Gateways, Sms/, Categories/(Index 🆕), Products/(Index+Show 🆕),
+│  │                       Comments/(Index 🆕), Shop/(Home+PackageShow+ProductShow 🆕+ProductComments 🆕
+│  │                       +ProductPaymentResult 🆕+PurchaseTrack 🆕+PaymentResult+Subscriptions*), Concerns/WithToasts
 │  ├─ Http/Controllers/    Api/(ApiPackageController, ApiPaymentCallbackController, UpdateController,
 │  │                       ApiPackageDownloadController), Front/(WebPaymentController, UpdateDownloadController,
-│  │                       PaymentForm/Return, UploadsServeController)
-│  ├─ Services/            PaymentService, LicenseService, PackageApiAuthService, ImageUploadService,
+│  │                       ProductDownloadController 🆕, PaymentForm/Return, UploadsServeController)
+│  ├─ Services/            PaymentService (با createProductPayment/verifyProductPayment 🆕), LicenseService,
+│  │                       PackageApiAuthService, ImageUploadService (+uploadThumbnailProduct 🆕),
 │  │                       SubscriptionService, Sms/(SmsManager + Drivers/۵درایور + Contracts),
 │  │                       Payments/(SamanCached + SepRest + WsdlCache)
 │  ├─ Models/              (بخش ۳)
@@ -292,7 +309,7 @@ admin-panel/
 │  ├─ js/{app.js, livewire-config.js, ckeditor.js, loading.js}
 │  └─ views/
 │     ├─ components/       (UI + layouts/(app|guest|shop) + ckeditor)
-│     ├─ livewire/         (صفحات پنل + shop/)
+│     ├─ livewire/         (صفحات پنل + shop/ + products/ 🆕 + categories/ 🆕 + comments/ 🆕)
 │     ├─ auth/             (login/register/passwords — طراحی جدید)
 │     └─ vendor/livewire/tailwind.blade.php   (صفحه‌بندی RTL)
 ├─ routes/                 web.php + api/v1.php
@@ -306,4 +323,11 @@ admin-panel/
 **گاتچای WSDL (۲۸)**: کشِ دیسک خود PHP (`/tmp/wsdl-*`) می‌تواند WSDLِ خراب قبلی را نگه دارد و حتی بعد از رفع فایل، `SoapFault: Unable to parse URL` بدهد → `rm /tmp/wsdl-*` و تکرار تست.
 **گاتچای WSDL (۲۹)**: در بازنویسی ارجاعات WSDL فقط `xsd:import/wsdl:import` را لوکال کنید؛ `soap:address location` آدرس واقعی درگاه است و نباید عوض شود.
 
-*آخرین به‌روزرسانی: بعد از Task 20 (پیامک کامل + رفع سامان + آپلود self-healing + توضیح کوتاه ۱۰۰۰+ کلمه). همه‌چیز E2E تست‌شده و سبز است.*
+**گاتچای Task 23 (محصولات)**:
+- (۳۰) ستون `category` متنی در جدول packages با رابطه هم‌نام تداخل دارد → رابطه حتماً `categoryModel()` نام‌گذاری شد (attribute همیشه بر relation اولویت دارد و رشته برمی‌گرداند).
+- (۳۱) `final_price` در PackagePricingPlan accessor است (نه ستون) → در SQL‌های مرتب‌سازی/فیلتر قیمت باید `MIN(COALESCE(pp.discount_price, pp.price))` استفاده شود نه `pp.final_price`.
+- (۳۲) مایگریشن `mimes:zip` روی محتوای تصادفی فیک fail می‌شود (content-sniffing) — در تست با فایل ZIP واقعی (امضای PK) تست کنید.
+- (۳۳) ستون `payment.result.product/{purchase}` و توکن‌های دانلود محصول public هستند؛ URL صفحه نتیجه id ساده دارد (مثل packages) — پس از پرداخت فقط دارنده لینک دانلود می‌گیرد؛ اگر نیاز به محرمانگی بیشتر شد signed URL اضافه شود.
+- (۳۴) ریدایرکت درایور local به `APP_URL` ساخته می‌شود — برای تست محلی `APP_URL=http://127.0.0.1:8000` باشد وگرنه پورت از URL می‌افتد (Connection refused).
+
+*آخرین به‌روزرسانی: بعد از Task 23 (فروشگاه محصولات قابل‌فروش: دسته‌بندی مشترک + صفحه تکی + دیدگاه‌ها + نسخه‌بندی + خرید مهمان + دانلود توکنی + فیلترهای فروشگاه). همه‌چیز E2E تست‌شده و سبز است.*

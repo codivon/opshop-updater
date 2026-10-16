@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Gateway;
 use App\Models\PackagePurchase;
+use App\Models\ProductPurchase;
 use App\Models\SubscriptionOrder;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -173,6 +174,81 @@ class PaymentService
     }
 
     /**
+     * ایجاد تراکنش پرداخت برای خرید محصول (پروژه‌ی قابل‌فروش — مهمان).
+     * قرارداد خروجی همان createPayment است: payment_url قابل ریدایرکت.
+     */
+    public function createProductPayment(ProductPurchase $purchase, ?string $gateway = null): array
+    {
+        if ($purchase->amount <= 0) {
+            throw new RuntimeException('مبلغ تراکنش باید بزرگ‌تر از صفر باشد.');
+        }
+
+        try {
+            $gateway = $gateway ?? Gateway::where('is_active', true)->first()?->key ?? 'zarinpal';
+            $gatewayConfigs = get_gateway_configs($gateway);
+
+            // کال‌بک درگاه همان مسیر مشترک پنل است؛ WebPaymentController تشخیص می‌دهد
+            // که تراکنش متعلق به خرید محصول است و آن را به صفحه نتیجه محصول هدایت می‌کند.
+            $callbackUrl = URL::route('payment.callback');
+
+            $productName = $purchase->product?->name ?? 'محصول';
+
+            $invoice = (new Invoice)
+                ->amount(intval($purchase->amount))
+                ->detail('description', "خرید محصول {$productName}")
+                ->detail('product_purchase_id', $purchase->id)
+                ->detail('product_id', $purchase->product_id);
+
+            $payment = Payment::via($gateway)
+                ->config($gatewayConfigs)
+                ->callbackUrl($callbackUrl)
+                ->purchase(
+                    $invoice,
+                    function ($driver, $transactionId) use ($purchase, $gateway) {
+                        $purchase->update([
+                            'transaction_id' => $transactionId,
+                            'gateway'        => $gateway,
+                        ]);
+
+                        Log::info('Product purchase transaction created', [
+                            'purchase_id'    => $purchase->id,
+                            'transaction_id' => $transactionId,
+                            'gateway'        => $gateway,
+                        ]);
+                    }
+                );
+
+            /** @var \Shetabit\Multipay\RedirectionForm $form */
+            $form = $payment->pay();
+
+            $paymentUrl = $this->resolveFormUrl($form, $purchase, $gateway, 'payment.form.product');
+
+            if (!$paymentUrl) {
+                throw new RuntimeException('دریافت آدرس پرداخت از درگاه ناموفق بود.');
+            }
+
+            $purchase->update([
+                'payment_url' => $paymentUrl,
+                'status'      => ProductPurchase::STATUS_PENDING,
+            ]);
+
+            return [
+                'payment_url'    => $paymentUrl,
+                'transaction_id' => (string) $purchase->transaction_id,
+                'amount'         => $purchase->amount,
+                'gateway'        => $purchase->gateway ?? $gateway,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Product payment creation failed', [
+                'purchase_id' => $purchase->id,
+                'error'       => $e->getMessage(),
+            ]);
+            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * تأیید پرداخت سفارش اشتراک بعد از بازگشت از درگاه.
      * توجه: در این مرحله فقط پرداخت تأیید می‌شود؛ فعال‌سازی اشتراک و صدور
      * لایسنس پکیج‌های همراه، پس از تأیید مدیر (SubscriptionService::approve) انجام می‌شود.
@@ -278,7 +354,7 @@ class PaymentService
      *  ۱) درایورهای URL‌محور (GET بدون ورودی) → اکشن فرم
      *  ۲) درایورهای فرم‌محور POST → HTML فرم در meta + مسیر امضادار (۳۰ دقیقه)
      */
-    private function resolveFormUrl(\Shetabit\Multipay\RedirectionForm $form, PackagePurchase|SubscriptionOrder $payable, string $gateway, string $routeName): string
+    private function resolveFormUrl(\Shetabit\Multipay\RedirectionForm $form, PackagePurchase|SubscriptionOrder|ProductPurchase $payable, string $gateway, string $routeName): string
     {
         $action = trim((string) $form->getAction());
         $method = strtoupper((string) $form->getMethod());
@@ -299,8 +375,95 @@ class PaymentService
         return URL::temporarySignedRoute(
             $routeName,
             now()->addMinutes(30),
-            [$payable instanceof SubscriptionOrder ? 'order' : 'purchase' => $payable->id]
+            [match (true) {
+                $payable instanceof SubscriptionOrder => 'order',
+                $payable instanceof ProductPurchase   => 'productPurchase',
+                default                               => 'purchase',
+            } => $payable->id]
         );
+    }
+
+    /**
+     * تأیید پرداخت محصول بعد از بازگشت از درگاه (مهمان — بدون لایسنس).
+     * موفق → markAsPaid (افزایش فروش محصول) + آماده‌شدن دانلود در صفحه نتیجه.
+     *
+     * @return array{paid: bool, purchase?: ProductPurchase, message: string}
+     */
+    public function verifyProductPayment(string $transactionId): array
+    {
+        $purchase = ProductPurchase::where('transaction_id', $transactionId)->first();
+
+        if (!$purchase) {
+            Log::warning('Product purchase not found for verification', ['transaction_id' => $transactionId]);
+
+            return [
+                'paid'    => false,
+                'message' => 'تراکنش محصول یافت نشد.',
+            ];
+        }
+
+        if ($purchase->isPaid()) {
+            return [
+                'paid'      => true,
+                'purchase'  => $purchase,
+                'message'   => 'این تراکنش قبلاً تأیید شده است.',
+            ];
+        }
+
+        try {
+            $gateway = $purchase->gateway ?? 'zarinpal';
+            $gatewayConfigs = get_gateway_configs($gateway);
+
+            Payment::via($gateway)
+                ->config($gatewayConfigs)
+                ->amount($purchase->amount)
+                ->transactionId($transactionId)
+                ->verify();
+
+            $purchase->markAsPaid($gateway);
+
+            Log::info('Product payment verified', [
+                'purchase_id'    => $purchase->id,
+                'transaction_id' => $transactionId,
+                'gateway'        => $gateway,
+            ]);
+
+            return [
+                'paid'      => true,
+                'purchase'  => $purchase,
+                'message'   => 'پرداخت با موفقیت تأیید شد.',
+            ];
+
+        } catch (InvalidPaymentException $e) {
+            $purchase->markAsFailed($e->getMessage());
+
+            Log::error('Invalid product payment', [
+                'transaction_id' => $transactionId,
+                'purchase_id'    => $purchase->id,
+                'error'          => $e->getMessage(),
+            ]);
+
+            return [
+                'paid'     => false,
+                'purchase' => $purchase,
+                'message'  => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+            ];
+
+        } catch (\Exception $e) {
+            $purchase->markAsFailed($e->getMessage());
+
+            Log::error('Product payment verification exception', [
+                'transaction_id' => $transactionId,
+                'purchase_id'    => $purchase->id,
+                'error'          => $e->getMessage(),
+            ]);
+
+            return [
+                'paid'     => false,
+                'purchase' => $purchase,
+                'message'  => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+            ];
+        }
     }
 
     /**

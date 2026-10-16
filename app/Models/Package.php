@@ -39,6 +39,15 @@ class Package extends Model
         return $this->belongsTo(Project::class);
     }
 
+    /**
+     * ⚠️ نام متد «categoryModel» است نه «category» — چون ستون متنی category
+     * از قبل روی این مدل وجود دارد و attribute همیشه بر relation اولویت دارد.
+     */
+    public function categoryModel(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
     public function versions(): HasMany
     {
         return $this->hasMany(PackageVersion::class)->orderByDesc('release_date');

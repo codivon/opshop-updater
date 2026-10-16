@@ -39,7 +39,7 @@ class PackageShow extends Component
     public function mount(string $slug): void
     {
         $package = Package::query()
-            ->with(['activePricingPlans', 'images', 'project:id,name'])
+            ->with(['activePricingPlans', 'images', 'project:id,name', 'categoryModel:id,name'])
             ->where('slug', $slug)
             ->where('status', Package::STATUS_ACTIVE)
             ->first();

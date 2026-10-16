@@ -21,6 +21,11 @@ Route::get('uploads/{path}', \App\Http\Controllers\Front\UploadsServeController:
 Route::get('/', \App\Livewire\Shop\Home::class)->name('shop.home');
 Route::get('packages/{slug}', \App\Livewire\Shop\PackageShow::class)->name('shop.package');
 
+// محصولات قابل‌فروش (پروژه‌ها — خرید مهمان بدون ثبت‌نام)
+Route::get('products/{slug}', \App\Livewire\Shop\ProductShow::class)->name('shop.product');
+Route::get('payment/result/product/{purchase}', \App\Livewire\Shop\ProductPaymentResult::class)->name('payment.result.product');
+Route::get('products/download/{token}', [\App\Http\Controllers\Front\ProductDownloadController::class, 'download'])->name('products.download');
+
 // طرح‌های اشتراک (فروش عمومی + نتیجه خرید اشتراک)
 Route::get('subscriptions', \App\Livewire\Shop\SubscriptionsIndex::class)->name('shop.subscriptions');
 Route::get('subscription/result/{order}', \App\Livewire\Shop\SubscriptionResult::class)->name('subscription.result');
@@ -50,6 +55,11 @@ Route::get('payment/form/subscription/{order}', [\App\Http\Controllers\Front\Pay
     ->name('payment.form.subscription')
     ->middleware('signed');
 
+// همان فرم برای خرید محصولات قابل‌فروش
+Route::get('payment/form/product/{productPurchase}', [\App\Http\Controllers\Front\PaymentFormController::class, 'showProduct'])
+    ->name('payment.form.product')
+    ->middleware('signed');
+
 // مسیر عمومی دانلود آپدیت (بدون احراز هویت)
 Route::get('get-update/{code}', [UpdateDownloadController::class, 'download'])->name('public.download');
 
@@ -68,6 +78,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
     Route::get('updates', \App\Livewire\Updates\Index::class)->name('updates.index');
     Route::get('packages', \App\Livewire\Packages\Index::class)->name('packages.index');
     Route::get('packages/{package}', \App\Livewire\Packages\Show::class)->name('packages.show');
+
+    // محصولات (پروژه‌های قابل‌فروش) + دسته‌بندی‌ها + دیدگاه‌ها
+    Route::get('products', \App\Livewire\Products\Index::class)->name('products.index');
+    Route::get('products/{product}', \App\Livewire\Products\Show::class)->name('products.show');
+    Route::get('categories', \App\Livewire\Categories\Index::class)->name('categories.index');
+    Route::get('comments', \App\Livewire\Comments\Index::class)->name('comments.index');
 
     // فروش و مشتریان
     Route::get('licenses', \App\Livewire\Licenses\Index::class)->name('licenses.index');

@@ -27,6 +27,12 @@
                 <option value="{{ $project->id }}">{{ $project->name }}</option>
             @endforeach
         </select>
+        <select wire:model.live="categoryFilter" class="input sm:w-40" aria-label="فیلتر دسته‌بندی">
+            <option value="">همه دسته‌ها</option>
+            @foreach($this->categories as $catId => $catName)
+                <option value="{{ $catId }}">{{ $catName }}</option>
+            @endforeach
+        </select>
         <select wire:model.live="status" class="input sm:w-44">
             <option value="">همه وضعیت‌ها</option>
             <option value="active">فعال</option>
@@ -47,7 +53,7 @@
                 <option value="downloads_desc">پرمصرف‌ترین</option>
             </select>
         </div>
-        <div wire:loading wire:target="search, status, project_id, sort" class="flex items-center gap-2 text-xs text-brand-600 dark:text-brand-400">
+        <div wire:loading wire:target="search, status, project_id, categoryFilter, sort" class="flex items-center gap-2 text-xs text-brand-600 dark:text-brand-400">
             <x-icon name="loader" class="size-4 animate-spin" />
             در حال فیلتر…
         </div>
@@ -111,7 +117,7 @@
                                 <span class="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-medium text-zinc-700 backdrop-blur-sm"
                                       style="box-shadow: inset 0 0 0 1px rgb(9 9 11 / 0.08)">
                                     <x-icon name="tag" class="size-3 text-brand-600" />
-                                    {{ \App\Livewire\Packages\Index::CATEGORIES[$package->category ?? ''] ?? 'سایر' }}
+                                    {{ $package->categoryModel?->name ?? 'سایر' }}
                                 </span>
                             </div>
                             @php($statusVariant = match($package->status) {
@@ -231,7 +237,7 @@
                 </x-field>
 
                 <x-field label="دسته‌بندی">
-                    <x-select wire:model="form.category" :options="\App\Livewire\Packages\Index::CATEGORIES" placeholder="انتخاب دسته‌بندی…" />
+                    <x-select wire:model="form.category_id" :options="$this->categories" placeholder="انتخاب دسته‌بندی…" />
                 </x-field>
             </div>
 

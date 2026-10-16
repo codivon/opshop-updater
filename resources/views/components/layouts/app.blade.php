@@ -13,11 +13,19 @@
             ],
         ],
         [
-            'label' => 'محصولات',
+            'label' => 'سیستم آپدیت',
             'items' => [
                 ['route' => 'admin.projects.index', 'title' => 'پروژه‌ها', 'icon' => 'folder', 'match' => ['admin.projects*']],
                 ['route' => 'admin.updates.index', 'title' => 'آپدیت‌ها', 'icon' => 'git-branch', 'match' => ['admin.updates*']],
                 ['route' => 'admin.packages.index', 'title' => 'پکیج‌ها', 'icon' => 'package', 'match' => ['admin.packages.index', 'admin.packages.show']],
+            ],
+        ],
+        [
+            'label' => 'فروشگاه',
+            'items' => [
+                ['route' => 'admin.products.index', 'title' => 'محصولات (پروژه‌ها)', 'icon' => 'rocket', 'match' => ['admin.products*']],
+                ['route' => 'admin.categories.index', 'title' => 'دسته‌بندی‌ها', 'icon' => 'tag', 'match' => ['admin.categories*']],
+                ['route' => 'admin.comments.index', 'title' => 'دیدگاه‌ها', 'icon' => 'message-square', 'match' => ['admin.comments*'], 'badge' => \App\Models\ProductComment::pendingCount()],
             ],
         ],
         [

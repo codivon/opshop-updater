@@ -4,6 +4,7 @@ namespace App\Livewire\Packages;
 
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
+use App\Models\Category;
 use App\Models\Package;
 use App\Models\Project;
 use App\Services\ImageUploadService;
@@ -29,6 +30,9 @@ class Index extends Component
 
     #[Url]
     public string $project_id = '';
+
+    #[Url]
+    public string $categoryFilter = '';
 
     /** فیلتر نمایش/ترتیب: جدیدترین، قدیمی‌ترین، نام، قیمت، دانلود و… */
     #[Url]
@@ -69,6 +73,11 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function updatedCategoryFilter(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatedSort(): void
     {
         $this->resetPage();
@@ -78,13 +87,14 @@ class Index extends Component
     public function records()
     {
         return Package::query()
-            ->with(['project:id,name', 'latestVersion'])
+            ->with(['project:id,name', 'latestVersion', 'categoryModel:id,name'])
             ->withCount('activeVersions')
             ->when($this->search, fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('slug', 'like', "%{$this->search}%")))
             ->when($this->status, fn ($q) => $q->where('status', $this->status))
             ->when($this->project_id !== '', fn ($q) => $q->where('project_id', (int) $this->project_id))
+            ->when($this->categoryFilter !== '', fn ($q) => $q->where('category_id', (int) $this->categoryFilter))
             ->when($this->sort === 'newest', fn ($q) => $q->latest())
             ->when($this->sort === 'oldest', fn ($q) => $q->oldest())
             ->when($this->sort === 'id_desc', fn ($q) => $q->orderByDesc('id'))
@@ -101,6 +111,18 @@ class Index extends Component
     public function projects()
     {
         return Project::query()->orderBy('name')->get(['id', 'name']);
+    }
+
+    /** دسته‌بندی‌های ساختاریافته پکیج (جدول categories) */
+    #[Computed]
+    public function categories()
+    {
+        return Category::query()
+            ->ofType(Category::TYPE_PACKAGE)
+            ->ordered()
+            ->get()
+            ->mapWithKeys(fn ($cat) => [$cat->id => $cat->name])
+            ->all();
     }
 
     /* ---------------------------------------------------------------- */
@@ -153,7 +175,7 @@ class Index extends Component
             'short_description' => '',
             'description'       => '',
             'author'            => '',
-            'category'          => '',
+            'category_id'       => '',
             'is_free'           => false,
             'default_price'     => 0,
             'status'            => 'draft',
@@ -170,9 +192,10 @@ class Index extends Component
         $this->editingId = $package->id;
         $this->form = $package->only([
             'project_id', 'name', 'slug', 'short_description', 'description',
-            'author', 'category', 'is_free', 'default_price', 'status',
+            'author', 'is_free', 'default_price', 'status',
             'module_name', 'sort_order',
         ]);
+        $this->form['category_id'] = (string) ($package->category_id ?? '');
         $this->showModal = true;
     }
 
@@ -197,6 +220,12 @@ class Index extends Component
         $form['is_free'] = (bool) ($form['is_free'] ?? false);
         $form['default_price'] = (int) ($form['default_price'] ?? 0);
         $form['sort_order'] = (int) ($form['sort_order'] ?? 0);
+
+        // دسته‌بندی ساختاریافته → هم category_id و هم ستون قدیمی category (برای سازگاری API)
+        $form['category_id'] = filled($form['category_id'] ?? '') ? (int) $form['category_id'] : null;
+        $form['category'] = $form['category_id']
+            ? (string) Category::find($form['category_id'])?->name
+            : null;
 
         if ($this->editingId) {
             Package::findOrFail($this->editingId)->update($form);
@@ -256,7 +285,7 @@ class Index extends Component
             'form.short_description' => ['nullable', 'string', 'max:10000'],
             'form.description'       => ['nullable', 'string'],
             'form.author'            => ['nullable', 'string', 'max:100'],
-            'form.category'          => ['nullable', 'string', 'max:50'],
+            'form.category_id'       => ['nullable', 'exists:categories,id'],
             'form.is_free'           => ['nullable', 'boolean'],
             'form.default_price'     => ['nullable', 'integer', 'min:0'],
             'form.status'            => ['required', 'in:draft,active,archived'],

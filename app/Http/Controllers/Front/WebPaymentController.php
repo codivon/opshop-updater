@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Front;
 
 use App\Http\Controllers\Controller;
 use App\Models\PackagePurchase;
+use App\Models\ProductPurchase;
 use App\Models\SubscriptionOrder;
 use App\Services\PaymentService;
 use App\Services\Sms\SmsManager;
@@ -17,10 +18,12 @@ use Illuminate\Http\Request;
  * هم GET و هم POST پشتیبانی می‌شود (POST درگاه‌ها CSRF ندارند →
  * مسیر payment/callback در استثناهای VerifyCsrfToken قرار دارد).
  *
- * دو نوع تراکنش از این مسیر عبور می‌کنند:
+ * سه نوع تراکنش از این مسیر عبور می‌کنند:
  *  ۱) خرید پکیج (PackagePurchase) — مانند قبل
  *  ۲) سفارش اشتراک (SubscriptionOrder) — پس از تأیید پرداخت، به صفحه نتیجه
  *     اشتراک می‌رود (پرداخت موفق + «در انتظار تأیید مدیر»).
+ *  ۳) خرید محصول/پروژه‌ی قابل‌فروش (ProductPurchase) — مهمان؛ صفحه نتیجه محصول
+ *     با دکمه دانلود.
  *
  * پس از تأیید پرداخت:
  *  - خریدهای API (callback_url بیرونی) → صفحه‌ی «نتیجه پرداخت» (payment/return)
@@ -87,7 +90,33 @@ class WebPaymentController extends Controller
                 );
         }
 
-        // ---------- ۲) خرید پکیج (مانند قبل) ----------
+        // ---------- ۲) خرید محصول (پروژه‌ی قابل‌فروش — مهمان) ----------
+        $productPurchase = ProductPurchase::where('transaction_id', $transactionId)->first();
+
+        if ($productPurchase) {
+            $result = $this->paymentService->verifyProductPayment($transactionId);
+            $productPurchase->refresh();
+
+            // 📱 پیامک مدیر: فروش موفق محصول
+            if (($result['paid'] ?? false) && $productPurchase->isPaid()) {
+                $vars = [
+                    'product_name' => $productPurchase->product?->name ?? 'محصول',
+                    'amount'       => number_format((int) $productPurchase->amount),
+                    'gateway'      => $productPurchase->gateway ?? '-',
+                ];
+
+                $this->smsManager->notifyAdmin('admin_product_paid', $vars, $productPurchase);
+            }
+
+            return redirect()
+                ->route('payment.result.product', $productPurchase)
+                ->with(
+                    ($result['paid'] ?? false) ? 'success' : 'error',
+                    $result['message'] ?? (($result['paid'] ?? false) ? 'پرداخت با موفقیت تأیید شد.' : 'پرداخت ناموفق بود.')
+                );
+        }
+
+        // ---------- ۳) خرید پکیج (مانند قبل) ----------
         $purchase = PackagePurchase::where('transaction_id', $transactionId)->first();
 
         if (!$purchase) {

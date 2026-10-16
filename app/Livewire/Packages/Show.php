@@ -129,6 +129,18 @@ class Show extends Component
         return \App\Models\Project::query()->orderBy('name')->get(['id', 'name']);
     }
 
+    /** دسته‌بندی‌های ساختاریافته پکیج (جدول categories) */
+    #[Computed]
+    public function categories()
+    {
+        return \App\Models\Category::query()
+            ->ofType(\App\Models\Category::TYPE_PACKAGE)
+            ->ordered()
+            ->get()
+            ->mapWithKeys(fn ($cat) => [$cat->id => $cat->name])
+            ->all();
+    }
+
     /* ---------------------------------------------------------------- */
     /*  Package edit (all fields of the old edit form)                   */
     /* ---------------------------------------------------------------- */
@@ -138,9 +150,10 @@ class Show extends Component
         $this->resetValidation();
         $this->form = $this->package->only([
             'project_id', 'name', 'slug', 'short_description', 'description',
-            'author', 'category', 'is_free', 'default_price', 'status',
+            'author', 'is_free', 'default_price', 'status',
             'module_name', 'sort_order',
         ]);
+        $this->form['category_id'] = (string) ($this->package->category_id ?? '');
         $this->form['thumbnail_url'] = '';
         $this->removeThumbnail = false;
         $this->thumbnailFile = null;
@@ -161,7 +174,7 @@ class Show extends Component
             'form.short_description' => ['nullable', 'string', 'max:10000'],
             'form.description'       => ['nullable', 'string'],
             'form.author'            => ['nullable', 'string', 'max:100'],
-            'form.category'          => ['nullable', 'string', 'max:50'],
+            'form.category_id'       => ['nullable', 'exists:categories,id'],
             'form.thumbnail_url'     => ['nullable', 'url', 'max:255'],
             'form.is_free'           => ['nullable', 'boolean'],
             'form.default_price'     => ['nullable', 'integer', 'min:0'],
@@ -191,6 +204,12 @@ class Show extends Component
         $form['is_free'] = (bool) ($form['is_free'] ?? false);
         $form['default_price'] = (int) ($form['default_price'] ?? 0);
         $form['sort_order'] = (int) ($form['sort_order'] ?? 0);
+
+        // دسته‌بندی ساختاریافته → هم category_id و هم ستون قدیمی category (سازگاری API)
+        $form['category_id'] = filled($form['category_id'] ?? '') ? (int) $form['category_id'] : null;
+        $form['category'] = $form['category_id']
+            ? (string) \App\Models\Category::find($form['category_id'])?->name
+            : null;
 
         $imageService = app(ImageUploadService::class);
 

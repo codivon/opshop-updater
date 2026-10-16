@@ -53,6 +53,20 @@ class ImageUploadService
     }
 
     /* ===================================================================
+     *  آپلود تصویر شاخص محصول قابل‌فروش (پروژه)
+     *  Returns: مسیر نسبی (uploads/products/thumbnails/xxx.jpg)
+     * =================================================================== */
+    public function uploadThumbnailProduct(UploadedFile $file, string $slug): string
+    {
+        $this->validateImage($file);
+
+        $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $filename  = 'product_' . \Illuminate\Support\Str::slug($slug) . '_thumb_' . time() . '_' . Str::random(6) . '.' . $extension;
+
+        return $this->storeFile($file, 'uploads/products/thumbnails', $filename);
+    }
+
+    /* ===================================================================
      *  آپلود چندین تصویر گالری
      *  Returns: array of PackageImage
      * =================================================================== */

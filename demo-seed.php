@@ -8,12 +8,17 @@ $app = require __DIR__ . '/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use App\Models\Customer;
+use App\Models\Category;
 use App\Models\Package;
 use App\Models\PackageImage;
 use App\Models\PackageLicense;
 use App\Models\PackagePricingPlan;
 use App\Models\PackagePurchase;
 use App\Models\PackageVersion;
+use App\Models\Product;
+use App\Models\ProductComment;
+use App\Models\ProductPurchase;
+use App\Models\ProductVersion;
 use App\Models\Project;
 use App\Models\Subscription;
 use App\Models\SubscriptionOrder;
@@ -333,9 +338,189 @@ User::updateOrCreate(
     ['name' => 'مدیر سیستم', 'password' => bcrypt('secret123'), 'status' => 'active'],
 );
 
+// ============================================================
+//  انتقال دسته‌های متنی پکیج‌ها → جدول categories (type=package)
+//  (همان منطق مایگریشن backfill — برای نصب تازه هم دسته‌بندی دمو ساخته شود)
+// ============================================================
+$legacyCats = Package::query()
+    ->whereNotNull('category')->where('category', '!=', '')
+    ->distinct()->orderBy('category')->pluck('category');
+
+$catLabels = \App\Livewire\Packages\Index::CATEGORIES;
+
+foreach ($legacyCats as $legacyName) {
+    $cat = Category::firstOrCreate(
+        ['type' => 'package', 'name' => $catLabels[$legacyName] ?? $legacyName],
+        ['slug' => Str::slug($legacyName) ?: ('pkg-' . Str::lower(Str::random(6))), 'is_active' => true, 'sort_order' => 50]
+    );
+
+    Package::where('category', $legacyName)->update(['category_id' => $cat->id]);
+}
+
+// ============================================================
+//  محصولات قابل‌فروش (پروژه‌ها — خرید مهمان)
+// ============================================================
+
+// ---------- دسته‌بندی‌های محصول ----------
+$productCats = collect([
+    ['name' => 'اسکریپت',   'slug' => 'script',      'sort_order' => 1],
+    ['name' => 'قالب',      'slug' => 'template',    'sort_order' => 2],
+    ['name' => 'اپلیکیشن',  'slug' => 'application', 'sort_order' => 3],
+    ['name' => 'افزونه',    'slug' => 'plugin',      'sort_order' => 4],
+    ['name' => 'پنل آماده', 'slug' => 'ready-panel', 'sort_order' => 5],
+    ['name' => 'سایر',      'slug' => 'misc',        'sort_order' => 99],
+])->mapWithKeys(fn ($c) => [Category::updateOrCreate(['type' => 'product', 'slug' => $c['slug']], $c + ['is_active' => true])->slug => true]);
+
+// ---------- محصولات دمو ----------
+$demoProducts = [
+    [
+        'slug' => 'laravel-shop-script', 'category' => 'script', 'price' => 4900000, 'discount' => 20, 'is_free' => false,
+        'name' => 'اسکریپت فروشگاهی لاراول (ShopPro)',
+        'short_description' => "فروشگاه‌ساز کامل با لاراول ۱۳ — پنل مدیریت، درگاه‌های پرداخت ایرانی، مدیریت محصول و سفارش، سئو و گزارش‌گیری. نصب پنج‌دقیقه‌ای با مستندات فارسی.",
+        'description' => "<h2>اسکریپت فروشگاهی ShopPro</h2><p>یک فروشگاه اینترنتی کامل و آماده راه‌اندازی بر پایه <strong>Laravel 13 + Livewire 3</strong> با طراحی مدرن RTL و فونت وزیرمتن.</p><h3>امکانات کلیدی</h3><ul><li>پنل مدیریت کامل (محصول، سفارش، مشتری، تخفیف)</li><li>۱۲ درگاه پرداخت ایرانی آماده</li><li>چندفروشندگی و مدیریت انبار</li><li>سئو پیشرفته + اسکیما</li><li>نصب آسان با ویزارد فارسی</li></ul><p>مستندات نصب و توسعه به‌همراه فایل ارائه می‌شود.</p>",
+        'sales' => 34, 'views' => 1280, 'sort' => 1,
+        'versions' => [
+            ['v' => '3.2.0', 'type' => 'minor', 'changelog' => "افزودن درگاه زیبال\nبهبود سرعت صفحه محصول\nرفع باگ محاسبه ارسال رایگان", 'added' => 'درگاه زیبال + صف بررسی سفارش‌ها', 'changed' => 'کش توضیحات محصول', 'fixed' => 'باگ محاسبه ارسال رایگان برای سبد بالای ۵ میلیون'],
+            ['v' => '3.1.0', 'type' => 'minor', 'changelog' => "افزودن گزارش فروش ماهانه\nپشتیبانی از PHP 8.4", 'added' => 'گزارش فروش ماهانه', 'changed' => null, 'fixed' => null],
+            ['v' => '3.0.0', 'type' => 'major', 'changelog' => "بازطراحی کامل پنل با Tailwind 4\nمهاجرت به Livewire 3", 'added' => null, 'changed' => 'مهاجرت کامل به Livewire 3', 'fixed' => null],
+        ],
+    ],
+    [
+        'slug' => 'admin-dashboard-template', 'category' => 'template', 'price' => 1900000, 'discount' => 0, 'is_free' => false,
+        'name' => 'قالب پنل مدیریت (AdminKit RTL)',
+        'short_description' => "قالب HTML پنل مدیریت RTL با بیش از ۴۰ صفحه آماده، دارک‌مود، چارت و جدول‌های پیشرفته — بدون وابستگی به فریم‌ورک.",
+        'description' => "<h2>قالب پنل مدیریت AdminKit</h2><p>بیش از <strong>۴۰ صفحه آماده</strong> با طراحی تمیز، دارک‌مود خودکار و کامپوننت‌های Tailwind CSS 4.</p><ul><li>داشبورد، جدول‌ها، فرم‌ها، چارت</li><li>RTL کامل + LTR</li><li>بدون jQuery — Alpine.js</li></ul>",
+        'sales' => 18, 'views' => 760, 'sort' => 2,
+        'versions' => [
+            ['v' => '2.1.0', 'type' => 'minor', 'changelog' => "۵ صفحه جدید (چت، کانبان، تقویم)\nبهبود دسترسی‌پذیری", 'added' => 'صفحات چت، کانبان و تقویم', 'changed' => null, 'fixed' => 'رفع مشکل اسکرول در سافاری'],
+            ['v' => '2.0.0', 'type' => 'major', 'changelog' => "مهاجرت به Tailwind 4", 'added' => null, 'changed' => 'Tailwind 4 + فونت وزیرمتن', 'fixed' => null],
+        ],
+    ],
+    [
+        'slug' => 'inventory-app', 'category' => 'application', 'price' => 7800000, 'discount' => 10, 'is_free' => false,
+        'name' => 'اپلیکیشن مدیریت انبار (StockMaster)',
+        'short_description' => "سامانه تحت وب مدیریت انبار با بارکدخوان، حواله ورود/خروج، شمارش موجودی و اتصال به فروشگاه — مناسب کسب‌وکارهای متوسط.",
+        'description' => "<h2>StockMaster — مدیریت انبار حرفه‌ای</h2><p>سامانه کامل انبار با <strong>پشتیبانی بارکد</strong>، حواله‌های ورود/خروج، گردش کالا و گزارش‌های لحظه‌ای.</p><ul><li>چند انبار و چند شعبه</li><li>اتصال به فروشگاه‌ساز ShopPro</li><li>گزارش گردش کالا و کم‌موجودی</li></ul>",
+        'sales' => 9, 'views' => 430, 'sort' => 3,
+        'versions' => [
+            ['v' => '1.4.2', 'type' => 'patch', 'changelog' => "رفع باگ چاپ حواله\nبهبود سرعت جستجوی کالا", 'added' => null, 'changed' => null, 'fixed' => 'باگ چاپ حواله در فایرفاکس'],
+        ],
+    ],
+    [
+        'slug' => 'seo-tools-pack', 'category' => 'plugin', 'price' => 0, 'discount' => 0, 'is_free' => true,
+        'name' => 'پک ابزار سئو (رایگان)',
+        'short_description' => "مجموعه ابزار رایگان سئو: تولید اسکیما، بررسی متاتگ، مپ XML خودکار و آنالیز کلمات کلیدی — هدیه فروشگاه.",
+        'description' => "<h2>پک ابزار سئو — رایگان!</h2><p>چهار ابزار کاربردی سئو در یک بسته: تولیدکننده <strong>JSON-LD Schema</strong>، بررسی متاتگ، SiteMap خودکار و پیشنهاد کلمه کلیدی.</p>",
+        'sales' => 210, 'views' => 3120, 'sort' => 4,
+        'versions' => [
+            ['v' => '1.0.0', 'type' => 'minor', 'changelog' => "انتشار اولیه", 'added' => null, 'changed' => null, 'fixed' => null],
+        ],
+    ],
+];
+
+foreach ($demoProducts as $row) {
+    $product = Product::updateOrCreate(
+        ['slug' => $row['slug']],
+        [
+            'category_id'       => Category::where('type', 'product')->where('slug', $row['category'])->value('id'),
+            'name'              => $row['name'],
+            'short_description' => $row['short_description'],
+            'description'       => $row['description'],
+            'price'             => $row['price'],
+            'discount'          => $row['discount'],
+            'is_free'           => $row['is_free'],
+            'status'            => 'active',
+            'sort_order'        => $row['sort'],
+            'sales_count'       => $row['sales'],
+            'views_count'       => $row['views'],
+        ]
+    );
+
+    // نسخه‌ها + فایل ZIP دمو
+    foreach ($row['versions'] as $i => $v) {
+        $existing = ProductVersion::where('product_id', $product->id)->where('version', $v['v'])->first();
+
+        $filePath = null; $fileHash = null; $fileSize = null;
+
+        $dir = storage_path('app/private/products/' . $product->slug);
+        if (!is_dir($dir)) { @mkdir($dir, 0775, true); }
+        $zipPath = $dir . '/v' . $v['v'] . '.zip';
+
+        if (!file_exists($zipPath)) {
+            $zip = new ZipArchive();
+            if ($zip->open($zipPath, ZipArchive::CREATE) === true) {
+                $zip->addFromString('README.txt',
+                    "محصول: {$product->name}\nنسخه: {$v['v']}\n\nاین یک فایل دموی فروشگاه آپدیت‌سنتر است.\nفایل واقعی هر نسخه را از پنل مدیریت آپلود کنید.\n");
+                $zip->addFromString('docs/install-fa.txt', "راهنمای نصب نسخه {$v['v']} — مستندات دمو\n");
+                $zip->close();
+            }
+        }
+
+        if (file_exists($zipPath)) {
+            $filePath = 'products/' . $product->slug . '/v' . $v['v'] . '.zip';
+            $fileHash = hash_file('sha256', $zipPath);
+            $fileSize = filesize($zipPath);
+        }
+
+        $payload = [
+            'type'         => $v['type'],
+            'changelog'    => $v['changelog'],
+            'what_added'   => $v['added'],
+            'what_changed' => $v['changed'],
+            'what_fixed'   => $v['fixed'],
+            'file_path'    => $filePath,
+            'file_hash'    => $fileHash,
+            'file_size'    => $fileSize,
+            'status'       => 'active',
+            'release_date' => now()->subDays($i * 21 + 5),
+        ];
+
+        $existing ? $existing->update($payload) : $product->versions()->create(['version' => $v['v']] + $payload);
+    }
+
+    // خرید دمو (paid) برای محصول پولی — برای نمایش آمار
+    if (!$row['is_free'] && !$product->purchases()->where('status', 'paid')->exists()) {
+        $latestV = $product->latestVersion()->first();
+        if ($latestV) {
+            ProductPurchase::create([
+                'product_id'    => $product->id,
+                'version_id'    => $latestV->id,
+                'transaction_id' => 'DEMO-PROD-' . strtoupper(Str::random(10)),
+                'amount'        => $product->final_price,
+                'gateway'       => 'local',
+                'status'        => 'paid',
+                'paid_at'       => now()->subDays(rand(2, 20)),
+                'meta'          => ['demo' => true],
+            ]);
+        }
+    }
+
+    // دیدگاه‌های دمو (تأییدشده + یک در انتظار)
+    if (!$product->comments()->exists()) {
+        $demoComments = [
+            ['name' => 'سینا مرادی',   'rating' => 5, 'status' => 'approved', 'body' => 'کیفیت کد عالیه، مستندات هم کامل بود. نصبش ده دقیقه طول کشید و بدون مشکل بالا اومد. حتماً پیشنهاد می‌کنم.'],
+            ['name' => 'نازنین احمدی', 'rating' => 4, 'status' => 'approved', 'body' => 'بسیار خوب و تمیز. فقط ای کاش تعداد قالب‌های آماده بیشتر بود. پشتیبانی هم سریع جواب داد.'],
+            ['name' => 'کاربر مهمان',  'rating' => null, 'status' => 'pending', 'body' => 'این نسخه با PHP 8.4 هم سازگاره؟ ممنون می‌شم قبل از خرید راهنمایی کنید.'],
+        ];
+
+        foreach ($demoComments as $ci => $c) {
+            $product->comments()->create($c + [
+                'email'       => null,
+                'approved_at' => $c['status'] === 'approved' ? now()->subDays(rand(1, 15)) : null,
+                'created_at'  => now()->subDays(rand(3, 30)),
+                'ip'          => '127.0.0.1',
+            ]);
+        }
+    }
+}
+
 echo "Demo data seeded OK\n";
 echo 'Projects: ' . Project::count() . ' | Packages: ' . Package::count() . ' | Versions: ' . PackageVersion::count()
     . ' | Plans: ' . PackagePricingPlan::count() . ' | Customers: ' . Customer::count()
     . ' | Licenses: ' . PackageLicense::count() . ' | Purchases: ' . PackagePurchase::count()
     . ' | Subscriptions: ' . Subscription::count() . ' | Updates: ' . Update::count()
     . ' | SubPlans: ' . SubscriptionPlan::count() . ' | SubOrders: ' . SubscriptionOrder::count() . "\n";
+echo 'Products: ' . Product::count() . ' | ProductVersions: ' . ProductVersion::count()
+    . ' | ProductComments: ' . ProductComment::count()
+    . ' | ProductPurchases: ' . ProductPurchase::count()
+    . ' | Categories: ' . Category::count() . "\n";
