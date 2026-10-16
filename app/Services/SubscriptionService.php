@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Customer;
+use App\Models\DiscountCode;
 use App\Models\Package;
 use App\Models\PackageLicense;
 use App\Models\Subscription;
@@ -40,11 +41,12 @@ class SubscriptionService
      * ثبت سفارش اشتراک.
      *
      * @param  string|null $callbackUrl آدرس بازگشت فروشگاه مشتری (API) — در مسیر وب خالی است.
+     * @param  DiscountCode|null $coupon کد تخفیف اعمال‌شده (از قبل اعتبارسنجی‌شده توسط DiscountService)
      * @return array{order: SubscriptionOrder, payment_url?: string, transaction_id?: string, is_free?: bool, message?: string}
      *
      * @throws RuntimeException (طرح غیرفعال / یک‌بارمصرفِ استفاده‌شده / خطای درگاه)
      */
-    public function purchase(Customer $customer, SubscriptionPlan $plan, ?string $gatewayKey = null, ?string $callbackUrl = null): array
+    public function purchase(Customer $customer, SubscriptionPlan $plan, ?string $gatewayKey = null, ?string $callbackUrl = null, ?DiscountCode $coupon = null): array
     {
         if (!$plan->is_active) {
             throw new RuntimeException('این طرح اشتراک فعال نیست.');
@@ -60,8 +62,18 @@ class SubscriptionService
         }
 
         $amount    = (int) $plan->price;
-        $discount  = (int) ($plan->discount_price ?? 0);
-        $final     = $plan->final_price;
+        $discount  = (int) ($plan->discount_price ?? 0); // تخفیف خودِ طرح (مبلغ)
+        $baseFinal = $plan->final_price;
+
+        // ---- کد تخفیف (کوپن) ----
+        // تخفیف کد روی مبلغِ پس از تخفیف طرح محاسبه می‌شود؛ مبلغ نهایی هرگز منفی نمی‌شود.
+        $couponDiscount = 0;
+        if ($coupon && $baseFinal > 0) {
+            $couponDiscount = $coupon->calculateDiscount($baseFinal);
+        }
+
+        $final = max(0, $baseFinal - $couponDiscount);
+        $totalDiscount = $discount + $couponDiscount;
 
         // snapshot طرح در meta (برای زمانی که طرح بعداً حذف/ویرایش شود)
         $snapshot = [
@@ -81,11 +93,22 @@ class SubscriptionService
             ],
         ];
 
+        // snapshot کد تخفیف (برای گزارش بعدی حتی پس از حذف کد)
+        if ($coupon && $couponDiscount > 0) {
+            $snapshot['coupon'] = [
+                'code'     => $coupon->code,
+                'type'     => $coupon->type,
+                'value'    => (int) $coupon->value,
+                'discount' => $couponDiscount,
+            ];
+        }
+
         $order = SubscriptionOrder::create([
             'subscription_plan_id' => $plan->id,
             'customer_id'          => $customer->id,
+            'discount_code_id'     => ($coupon && $couponDiscount > 0) ? $coupon->id : null,
             'amount'               => $amount,
-            'discount'             => $discount,
+            'discount'             => $totalDiscount,
             'final_amount'         => $final,
             'callback_url'         => $callbackUrl,
             'status'               => SubscriptionOrder::STATUS_PENDING,
@@ -94,15 +117,20 @@ class SubscriptionService
         ]);
 
         // ---------- مسیر رایگان: بدون درگاه، مستقیم در انتظار تأیید مدیر ----------
+        // (طرح رایگان یا کد تخفیفِ ۱۰۰٪)
         if ($final <= 0) {
             $order->update([
                 'amount'       => 0,
-                'discount'     => 0,
+                // اگر کوپن پوشش کامل داده، تخفیفِ ثبت‌شده باید حفظ شود (برای گزارش/نمایش)
+                'discount'     => ($coupon && $couponDiscount > 0) ? $totalDiscount : 0,
                 'final_amount' => 0,
                 'status'       => SubscriptionOrder::STATUS_PAID,
                 'paid_at'      => now(),
                 'gateway'      => null,
             ]);
+
+            // مصرف شمارنده کد تخفیف (مسیر رایگان از markAsPaid عبور نمی‌کند)
+            $order->discountCode?->recordUsage();
 
             // 📱 پیامک: تأیید ثبت درخواست به مشتری + اطلاع‌رسانی فوری به مدیر
             try {

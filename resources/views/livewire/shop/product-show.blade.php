@@ -79,9 +79,20 @@
                 <div class="flex items-end justify-between">
                     <div>
                         <p class="text-xs text-zinc-500 dark:text-zinc-400">قیمت پروژه</p>
-                        <div class="mt-1 flex items-baseline gap-2">
+                        <div class="mt-1 flex flex-wrap items-baseline gap-2">
                             @if($product->is_effectively_free)
                                 <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">رایگان</span>
+                            @elseif($this->appliedDiscount)
+                                @php($applied = $this->appliedDiscount)
+                                @if($product->discount > 0)
+                                    <span class="text-sm text-zinc-400 line-through">{{ money($product->price) }}</span>
+                                @endif
+                                <span class="text-sm text-zinc-400 line-through">{{ money($product->final_price) }}</span>
+                                @if($applied['final'] <= 0)
+                                    <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">رایگان با کد تخفیف</span>
+                                @else
+                                    <span class="text-2xl font-black tabular-nums text-emerald-600 dark:text-emerald-400">{{ money($applied['final']) }}</span>
+                                @endif
                             @else
                                 @if($product->discount > 0)
                                     <span class="text-sm text-zinc-400 line-through">{{ money($product->price) }}</span>
@@ -96,14 +107,20 @@
                     </span>
                 </div>
 
-                @unless($product->is_effectively_free)
+                @php($appliedDiscount = $this->appliedDiscount)
+                @php($productFree = $product->is_effectively_free || ($appliedDiscount !== null && $appliedDiscount['final'] <= 0))
+
+                {{-- کد تخفیف --}}
+                @include('livewire.shop.partials.discount-field', ['baseAmount' => (int) $product->final_price])
+
+                @unless($productFree)
                     @include('livewire.shop.partials.gateway-picker', ['gateways' => $this->gateways])
                 @endunless
 
                 <x-btn wire:click="buy" :loading="true" size="lg" class="w-full"
-                       :icon="$product->is_effectively_free ? 'download' : 'credit-card'">
-                    @if($product->is_effectively_free)
-                        دریافت رایگان و دانلود
+                       :icon="$productFree ? 'download' : 'credit-card'">
+                    @if($productFree)
+                        {{ $appliedDiscount !== null ? 'دریافت رایگان با کد تخفیف' : 'دریافت رایگان و دانلود' }}
                     @else
                         خرید و دانلود فوری
                     @endif

@@ -4,9 +4,11 @@ namespace App\Livewire\Shop;
 
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
+use App\Models\DiscountCode;
 use App\Models\Gateway;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
+use App\Services\DiscountService;
 use App\Services\SubscriptionService;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -27,6 +29,12 @@ class SubscriptionsIndex extends Component
 
     /** طرح در حال خرید (slug) */
     public string $buyingSlug = '';
+
+    /** کد تخفیف تایپ‌شده (پیش از اعمال) */
+    public string $discountCode = '';
+
+    /** کد تخفیف اعمال‌شده (پس از اعتبارسنجی سمت سرور — کد نرمال‌شده) */
+    public string $appliedCode = '';
 
     public function mount(): void
     {
@@ -80,10 +88,107 @@ class SubscriptionsIndex extends Component
 
     public function setBuying(string $slug): void
     {
+        // با تغییر طرحِ در حال خرید، پیش‌نمایش تخفیف قبلی پاک می‌شود
+        if ($this->buyingSlug !== $slug) {
+            $this->appliedCode = '';
+        }
+
         $this->buyingSlug = $this->buyingSlug === $slug ? '' : $slug;
     }
 
-    public function buy(SubscriptionService $service): void
+    /* ---------------------------------------------------------------- */
+    /*  کد تخفیف                                                          */
+    /* ---------------------------------------------------------------- */
+
+    /** طرحِ در حال خرید (یا null) */
+    protected function buyingPlan(): ?SubscriptionPlan
+    {
+        return $this->buyingSlug !== ''
+            ? SubscriptionPlan::active()->where('slug', trim($this->buyingSlug))->first()
+            : null;
+    }
+
+    /** اعمال کد تخفیف (اعتبارسنجی سمت سرور + پیش‌نمایش) */
+    public function applyDiscount(DiscountService $discountService): void
+    {
+        $plan = $this->buyingPlan();
+        $base = $plan ? (int) $plan->final_price : 0;
+
+        if ($base <= 0) {
+            $this->toast('ابتدا طرح موردنظر را برای خرید انتخاب کنید.', 'warning');
+            return;
+        }
+
+        $result = $discountService->resolve($this->discountCode, DiscountCode::CONTEXT_SUBSCRIPTION, $base);
+
+        if (!$result['ok']) {
+            $this->appliedCode = '';
+            $this->toast($result['message'], 'error');
+            return;
+        }
+
+        if ($result['code'] === null) {
+            $this->appliedCode = '';
+            $this->toast('ابتدا یک کد تخفیف وارد کنید.', 'warning');
+            return;
+        }
+
+        $this->appliedCode = $result['code']->code;
+        $this->toast($result['message']);
+    }
+
+    /** حذف کد تخفیف اعمال‌شده */
+    public function removeDiscount(): void
+    {
+        $this->discountCode = '';
+        $this->appliedCode = '';
+    }
+
+    /**
+     * مبلغ نهایی طرح با احتساب کد تخفیف اعمال‌شده (برای نمایش در فرم خرید).
+     * خروجی: [base, discount, final] — بدون تخفیف معتبر → discount = 0
+     */
+    public function priceWithDiscount(SubscriptionPlan $plan): array
+    {
+        $base = (int) $plan->final_price;
+
+        if ($this->appliedCode === '' || $base <= 0) {
+            return ['base' => $base, 'discount' => 0, 'final' => $base];
+        }
+
+        $result = app(DiscountService::class)->resolve($this->appliedCode, DiscountCode::CONTEXT_SUBSCRIPTION, $base);
+
+        if (!$result['ok']) {
+            return ['base' => $base, 'discount' => 0, 'final' => $base];
+        }
+
+        return ['base' => $base, 'discount' => $result['discount'], 'final' => $result['final']];
+    }
+
+    /**
+     * رزول مجدد کد اعمال‌شده برای طرحِ در حال خرید (سازگار با partial مشترک discount-field).
+     * اگر کد نامعتبر شده یا طرحی در حال خرید نباشد null برمی‌گردد.
+     */
+    #[Computed]
+    public function appliedDiscount(): ?array
+    {
+        if ($this->appliedCode === '') {
+            return null;
+        }
+
+        $plan = $this->buyingPlan();
+        $base = $plan ? (int) $plan->final_price : 0;
+
+        if ($base <= 0) {
+            return null;
+        }
+
+        $result = app(DiscountService::class)->resolve($this->appliedCode, DiscountCode::CONTEXT_SUBSCRIPTION, $base);
+
+        return $result['ok'] ? $result : null;
+    }
+
+    public function buy(SubscriptionService $service, DiscountService $discountService): void
     {
         $this->validate([
             'updateCode' => ['required', 'string', 'max:64'],
@@ -115,12 +220,34 @@ class SubscriptionsIndex extends Component
             return;
         }
 
+        // ---- کد تخفیف (راستی‌آزمایی مجدد سمت سرور) ----
+        $coupon = null;
+        $base   = (int) $plan->final_price;
+
+        if ($base > 0) {
+            $couponResult = $discountService->resolve(
+                $this->appliedCode !== '' ? $this->appliedCode : $this->discountCode,
+                DiscountCode::CONTEXT_SUBSCRIPTION,
+                $base
+            );
+
+            if (!$couponResult['ok']) {
+                $this->appliedCode = '';
+                $this->toast($couponResult['message'], 'error');
+
+                return;
+            }
+
+            $coupon = $couponResult['code'];
+        }
+
         try {
             $result = $service->purchase(
                 $customer,
                 $plan,
                 $plan->final_price > 0 ? $this->gatewayKey : null,
-                null
+                null,
+                $coupon
             );
         } catch (\Throwable $e) {
             $this->toast($e->getMessage(), 'error');

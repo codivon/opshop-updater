@@ -12,8 +12,9 @@ class PackagePurchase extends Model
 
     protected $fillable = [
         'package_id', 'version_id', 'pricing_plan_id', 'customer_id',
-        'license_id', 'transaction_id', 'callback_url', 'amount',
-        'gateway', 'payment_url', 'status', 'paid_at', 'meta',
+        'license_id', 'transaction_id', 'discount_code_id',
+        'original_amount', 'amount', 'discount_amount',
+        'callback_url', 'gateway', 'payment_url', 'status', 'paid_at', 'meta',
     ];
 
     protected $casts = [
@@ -54,6 +55,11 @@ class PackagePurchase extends Model
         return $this->belongsTo(PackageLicense::class);
     }
 
+    public function discountCode(): BelongsTo
+    {
+        return $this->belongsTo(DiscountCode::class);
+    }
+
     /* ---------------- Helpers ---------------- */
 
     public function isPaid(): bool
@@ -63,11 +69,19 @@ class PackagePurchase extends Model
 
     public function markAsPaid(?string $gateway = null): void
     {
+        // گارد idempotency: کال‌بک تکراری درگاه نباید شمارنده کد تخفیف/لایسنس را دوباره مصرف کند
+        if ($this->isPaid()) {
+            return;
+        }
+
         $this->update([
             'status'  => self::STATUS_PAID,
             'paid_at' => now(),
             'gateway' => $gateway ?? $this->gateway,
         ]);
+
+        // شمارنده استفاده از کد تخفیف فقط یک‌بار (همزمان با تأیید پرداخت) مصرف می‌شود
+        $this->discountCode?->recordUsage();
     }
 
     public function markAsFailed(?string $reason = null): void

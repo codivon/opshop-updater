@@ -116,6 +116,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
     Route::get('products', \App\Livewire\Products\Index::class)->name('products.index');
     Route::get('products/{product}', \App\Livewire\Products\Show::class)->name('products.show');
     Route::get('categories', \App\Livewire\Categories\Index::class)->name('categories.index');
+    Route::get('discounts', \App\Livewire\Discounts\Index::class)->name('discounts.index');
     Route::get('comments', \App\Livewire\Comments\Index::class)->name('comments.index');
 
     // فروش و مشتریان

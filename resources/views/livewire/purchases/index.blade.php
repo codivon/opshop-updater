@@ -120,6 +120,9 @@
                                 </td>
                                 <td class="whitespace-nowrap text-sm font-black tabular-nums text-zinc-800 dark:text-zinc-100">
                                     {{ money($purchase->amount) }}
+                                    @if($purchase->discount_amount > 0)
+                                        <x-badge variant="success" icon="ticket-percent" class="mt-1 block w-fit">{{ money($purchase->discount_amount, false) }}− تخفیف</x-badge>
+                                    @endif
                                 </td>
                                 <td class="hidden md:table-cell">
                                     <x-badge variant="neutral" class="font-mono uppercase">{{ $purchase->gateway ?? '—' }}</x-badge>

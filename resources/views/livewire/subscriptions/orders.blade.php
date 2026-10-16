@@ -140,6 +140,9 @@
                                 <td class="whitespace-nowrap">
                                     @if($order->final_amount > 0)
                                         <span class="text-sm font-bold tabular-nums text-zinc-800 dark:text-zinc-100">{{ fa_num(money($order->final_amount)) }}</span>
+                                        @if($order->discount > 0)
+                                            <x-badge variant="success" icon="ticket-percent" class="mt-1">{{ money($order->discount, false) }}− تخفیف</x-badge>
+                                        @endif
                                     @else
                                         <x-badge variant="success" icon="gift">رایگان</x-badge>
                                     @endif

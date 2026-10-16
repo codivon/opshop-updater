@@ -20,7 +20,8 @@ class ProductPurchase extends Model
     ];
 
     protected $fillable = [
-        'product_id', 'version_id', 'transaction_id', 'amount', 'gateway',
+        'product_id', 'version_id', 'transaction_id', 'discount_code_id',
+        'original_amount', 'amount', 'discount_amount', 'gateway',
         'payment_url', 'callback_url', 'status', 'paid_at', 'meta',
     ];
 
@@ -42,6 +43,11 @@ class ProductPurchase extends Model
         return $this->belongsTo(ProductVersion::class);
     }
 
+    public function discountCode(): BelongsTo
+    {
+        return $this->belongsTo(DiscountCode::class);
+    }
+
     /* ---------------- Helpers ---------------- */
 
     public function isPaid(): bool
@@ -56,6 +62,11 @@ class ProductPurchase extends Model
 
     public function markAsPaid(?string $gateway = null): void
     {
+        // گارد idempotency: کال‌بک تکراری درگاه نباید فروش/شمارنده کد تخفیف را دوباره مصرف کند
+        if ($this->isPaid()) {
+            return;
+        }
+
         $this->update([
             'status'  => self::STATUS_PAID,
             'paid_at' => now(),
@@ -65,6 +76,9 @@ class ProductPurchase extends Model
         if ($this->product) {
             $this->product->incrementSales();
         }
+
+        // شمارنده استفاده از کد تخفیف فقط یک‌بار (همزمان با تأیید پرداخت) مصرف می‌شود
+        $this->discountCode?->recordUsage();
     }
 
     public function markAsFailed(?string $reason = null): void

@@ -36,6 +36,7 @@
                 ['route' => 'admin.customers.index', 'title' => 'مشتریان', 'icon' => 'users', 'match' => ['admin.customers*']],
                 ['route' => 'admin.subscriptions.index', 'title' => 'اشتراک‌ها', 'icon' => 'ticket', 'match' => ['admin.subscriptions.index']],
                 ['route' => 'admin.plans.index', 'title' => 'طرح‌های اشتراک', 'icon' => 'crown', 'match' => ['admin.plans.index']],
+                ['route' => 'admin.discounts.index', 'title' => 'کدهای تخفیف', 'icon' => 'ticket-percent', 'match' => ['admin.discounts*']],
                 ['route' => 'admin.subscriptions.orders', 'title' => 'درخواست‌های اشتراک', 'icon' => 'hourglass', 'match' => ['admin.subscriptions.orders'], 'badge' => \App\Services\SubscriptionService::pendingApprovalsCount()],
             ],
         ],

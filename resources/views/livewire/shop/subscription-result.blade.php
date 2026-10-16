@@ -86,9 +86,34 @@
             <div class="rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
                 <p class="text-xs text-zinc-400">مبلغ</p>
                 <p class="mt-1 text-sm font-black tabular-nums text-zinc-800 dark:text-zinc-100">
-                    {{ $order->final_amount > 0 ? fa_num(money($order->final_amount)) : 'رایگان' }}
+                    @if($order->final_amount > 0)
+                        {{ fa_num(money($order->final_amount)) }}
+                    @else
+                        <span class="text-emerald-600">{{ $order->discount_code_id ? 'رایگان با کد تخفیف' : 'رایگان' }}</span>
+                    @endif
                 </p>
+                @if($order->discount > 0 && $order->final_amount > 0)
+                    <p class="mt-1 text-[11px] text-zinc-400">
+                        مبلغ قبل از تخفیف: <span class="line-through">{{ money($order->amount) }}</span>
+                    </p>
+                @endif
             </div>
+            @if($order->discount > 0)
+                <div class="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-600/15 dark:bg-emerald-500/10 dark:ring-emerald-400/20">
+                    <p class="flex items-center gap-1.5 text-xs text-emerald-700/90 dark:text-emerald-400/90">
+                        <x-icon name="ticket-percent" class="size-3.5" />
+                        تخفیف اعمال‌شده
+                    </p>
+                    <p class="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                        @if($order->discountCode)
+                            <span class="font-mono font-black text-emerald-800 dark:text-emerald-300" dir="ltr">{{ $order->discountCode->code }}</span>
+                        @elseif(isset($order->meta['coupon']['code']))
+                            <span class="font-mono font-black text-emerald-800 dark:text-emerald-300" dir="ltr">{{ $order->meta['coupon']['code'] }}</span>
+                        @endif
+                        <span class="text-xs font-bold text-emerald-700/80 dark:text-emerald-400/80">— {{ money($order->discount) }}</span>
+                    </p>
+                </div>
+            @endif
             <div class="rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
                 <p class="text-xs text-zinc-400">وضعیت</p>
                 <p class="mt-1 text-sm font-bold text-zinc-800 dark:text-zinc-100">

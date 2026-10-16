@@ -70,6 +70,15 @@ php artisan serve          # http://localhost:8000
 - **جریان پرداخت محصول**: `PaymentService::createProductPayment()` (نکته resolveFormUrl سه‌گانه: PackagePurchase | SubscriptionOrder | ProductPurchase → مسیر امضادار `payment.form.product`) + `verifyProductPayment()`. کال‌بک مشترک `/payment/callback` در WebPaymentController سه نوع تراکنش را به ترتیب تشخیص می‌دهد: SubscriptionOrder → ProductPurchase → PackagePurchase. پیامک مدیر `admin_product_paid` هنگام فروش موفق.
 - **خرید مهمان در صفحه تکی** (`Shop\ProductShow::buy`): رایگان → خرید paid فوری + ریدایرکت به `payment.result.product`؛ پولی → انتخاب درگاه (همان picker لوگودار مشترک `shop/partials/gateway-picker`) → درگاه → کال‌بک → نتیجه. صفحه نتیجه (`Shop\ProductPaymentResult`) دکمه دانلود با توکن تازه هر کلیک دارد + پیگیری خرید مهمان با شماره تراکنش (کامپوننت `Shop\PurchaseTrack` در تب پروژه‌های صفحه اصلی).
 
+### 🆕 سیستم کد تخفیف (کوپن) — برای همه خریدها (پکیج/محصول/اشتراک)
+- **DiscountCode** (`discount_codes`): `code` (یکتا، ذخیره با حروف بزرگ)، `type` (`percent` | `fixed`)، `value` (درصد ۱..۱۰۰ یا مبلغ ثابت تومان)، **`max_uses`** (null=نامحدود) + **`used_count`**، **`expires_at`** (null=بدون انقضا)، سه فلگ محدوده `applies_packages/products/subscriptions`، `is_active`، `notes`.
+- **DiscountService::resolve($input, $context, $amount)** → `[ok, message, code, discount, final]`. همه چک‌ها: فعال‌بودن، انقضا، ظرفیت (`hasRemainingUses`)، محدوده (`appliesTo`). ⚠️ همیشه سمت سرور قبل از ایجاد خرید دوباره resolve می‌شود؛ پیش‌نمایش UI فقط نمایشی است.
+- **مصرف شمارنده**: `DiscountCode::recordUsage()` — increment اتمیک با گارد ظرفیت (`used_count < max_uses`). فقط **یک‌بار** در هر خرید: مسیر پرداختی داخل `markAsPaid()` هر سه مدل خرید (با گارد idempotency `isPaid()` در برابر کال‌بک تکراری درگاه)، مسیر رایگان/تخفیف ۱۰۰٪ مستقیم بعد از `create` (چون از `markAsPaid` عبور نمی‌کند).
+- **ستون‌های جدید در `package_purchases` و `product_purchases`**: `discount_code_id` (FK، nullOnDelete)، `original_amount` (مبلغ قبل از کوپن)، `discount_amount` — ⚠️ ستون `amount` از این به بعد **مبلغ نهایی بعد از تخفیف** است و درگاه بر همین مبنا شارژ/verify می‌کند (سایت‌های قدیمی با amount=۰ هم سازگارند چون discount_amount پیش‌فرض ۰). در `subscription_orders` فقط `discount_code_id` اضافه شد (ستون‌های amount/discount/final_amount از قبل بود)؛ snapshot کوپن داخل `meta.coupon` ذخیره می‌شود تا بعد از حذف کد هم گزارش بماند.
+- **UI فروشگاه**: پارشیال مشترک `shop/partials/discount-field.blade.php` (قرارداد: پراپرتی‌های public `discountCode`/`appliedCode` + `#[Computed] appliedDiscount()` + اکشن‌های `applyDiscount()`/`removeDiscount()`)، در هر سه صفحه: package-show، product-show، subscriptions-index. تخفیف ۱۰۰٪ → مسیر رایگان («رایگان با کد تخفیف» + بدون نیاز به درگاه).
+- **پنل ادمین**: `/admin/discounts` (`Livewire\Discounts\Index`) — CRUD مودال، تولید خودکار کد (بدون حروف مبهم)، فیلتر وضعیت (فعال/غیرفعال/منقضی/تکمیل‌ظرفیت)، شمارش استفاده از هر سه جدول خرید. لینک در سایدبار با آیکون `ticket-percent`.
+- ⚠️ گاتچا: وقتی مبلغ مبنا صفر است (پکیج رایگان/طرح رایگان) کدِ تایپ‌شده نیمه‌کاره **نادیده** گرفته می‌شود نه خطا — تا جلوی دریافت رایگان گرفته نشود.
+
 ---
 
 ## ۴. نقشه مسیرها
@@ -287,8 +296,10 @@ admin-panel/
 │  ├─ Livewire/            Dashboard, Projects/, Updates/, Packages/(Index+Show+…), Licenses/,
 │  │                       Purchases/, Customers/, Subscriptions/, Users/, Reports/, Logs/,
 │  │                       Settings/, Gateways, Sms/, Categories/(Index 🆕), Products/(Index+Show 🆕),
-│  │                       Comments/(Index 🆕), Shop/(Home+PackageShow+ProductShow 🆕+ProductComments 🆕
-│  │                       +ProductPaymentResult 🆕+PurchaseTrack 🆕+PaymentResult+Subscriptions*), Concerns/WithToasts
+│  │                       Comments/(Index 🆕), Discounts/(Index 🆕 کدتخفیف), Shop/(Home+PackageShow
+│  │                       +ProductShow 🆕+CustomerLogin/Profile 🆕+PackagesIndex/ProductsIndex 🆕
+│  │                       +CommentSection 🆕+ProductPaymentResult+PurchaseTrack+PaymentResult
+│  │                       +Subscriptions*), Concerns/WithToasts
 │  ├─ Http/Controllers/    Api/(ApiPackageController, ApiPaymentCallbackController, UpdateController,
 │  │                       ApiPackageDownloadController), Front/(WebPaymentController, UpdateDownloadController,
 │  │                       ProductDownloadController 🆕, PaymentForm/Return, UploadsServeController)

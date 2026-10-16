@@ -274,6 +274,8 @@
 
                 {{-- selected plan summary --}}
                 @php($selectedPlan = $this->planId !== '' ? $this->plans->firstWhere('id', (int) $this->planId) : null)
+                @php($appliedDiscount = $this->appliedDiscount)
+                @php($effectiveFree = $this->isFreeRoute || ($appliedDiscount !== null && $appliedDiscount['final'] <= 0))
                 @if($selectedPlan)
                     <div class="flex items-center justify-between rounded-xl bg-zinc-50 px-4 py-3 ring-1 ring-zinc-200/80 dark:bg-zinc-800/60 dark:ring-zinc-700">
                         <span class="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
@@ -285,11 +287,14 @@
                 @endif
                 <div class="flex items-center justify-between rounded-xl bg-zinc-50 px-4 py-3 ring-1 ring-zinc-200/80 dark:bg-zinc-800/60 dark:ring-zinc-700">
                     <span class="text-xs text-zinc-500 dark:text-zinc-400">مبلغ قابل پرداخت</span>
-                    <span class="text-sm font-black tabular-nums text-zinc-900 dark:text-zinc-50">
+                    <span class="text-end text-sm font-black tabular-nums text-zinc-900 dark:text-zinc-50">
                         @if($this->isCoveredBySubscription)
                             <span class="text-emerald-600 dark:text-emerald-400">رایگان با اشتراک شما</span>
-                        @elseif($this->isFreeRoute)
-                            <span class="text-emerald-600">رایگان</span>
+                        @elseif($effectiveFree)
+                            <span class="text-emerald-600">{{ $appliedDiscount !== null ? 'رایگان با کد تخفیف' : 'رایگان' }}</span>
+                        @elseif($selectedPlan && $appliedDiscount)
+                            <span class="block text-[11px] font-normal text-zinc-400 line-through">{{ money($selectedPlan->final_price) }}</span>
+                            <span class="text-emerald-600 dark:text-emerald-400">{{ money($appliedDiscount['final']) }}</span>
                         @elseif($selectedPlan)
                             {{ money($selectedPlan->final_price) }}
                         @else
@@ -297,6 +302,11 @@
                         @endif
                     </span>
                 </div>
+
+                {{-- کد تخفیف --}}
+                @if(!$this->isCoveredBySubscription && !$package->is_free)
+                    @include('livewire.shop.partials.discount-field', ['baseAmount' => $selectedPlan ? (int) $selectedPlan->final_price : 0])
+                @endif
 
                 {{-- plan select (mobile-friendly fallback for changing plan from checkout) --}}
                 @if($this->plans->isNotEmpty() && !$package->is_free && !$this->isCoveredBySubscription && $this->plans->count() > 1)
@@ -307,7 +317,7 @@
                 @endif
 
                 {{-- gateway --}}
-                @if(!$this->isFreeRoute && !$this->isCoveredBySubscription)
+                @if(!$effectiveFree && !$this->isCoveredBySubscription)
                     @if($this->gateways->isNotEmpty())
                         @include('livewire.shop.partials.gateway-picker', ['gateways' => $this->gateways])
                     @else
@@ -339,15 +349,15 @@
                 @endif
 
                 {{-- buy button --}}
-                @php($buyDisabled = !$this->isFreeRoute && !$this->isCoveredBySubscription && $this->gateways->isEmpty())
+                @php($buyDisabled = !$effectiveFree && !$this->isCoveredBySubscription && $this->gateways->isEmpty())
                 @php($covered = $this->isCoveredBySubscription)
-                <x-btn wire:click="buy" :loading="true" icon="{{ $covered ? 'crown' : ($this->isFreeRoute ? 'download' : 'wallet') }}" class="w-full" :disabled="$buyDisabled">
-                    {{ $covered ? 'دریافت رایگان با اشتراک' : ($this->isFreeRoute ? 'دریافت رایگان' : 'خرید و پرداخت') }}
+                <x-btn wire:click="buy" :loading="true" icon="{{ $covered ? 'crown' : ($effectiveFree ? 'download' : 'wallet') }}" class="w-full" :disabled="$buyDisabled">
+                    {{ $covered ? 'دریافت رایگان با اشتراک' : ($effectiveFree ? 'دریافت رایگان' : 'خرید و پرداخت') }}
                 </x-btn>
 
                 <p class="flex items-center justify-center gap-1.5 text-xs leading-4 text-zinc-400">
                     <x-icon name="shield-check" class="size-4 shrink-0 text-emerald-500" />
-                    {{ $covered ? 'این دریافت از طریق اشتراک فعال شما و بدون پرداخت انجام می‌شود.' : 'پرداخت از طریق درگاه‌های بانکی امن انجام می‌شود.' }}
+                    {{ $covered ? 'این دریافت از طریق اشتراک فعال شما و بدون پرداخت انجام می‌شود.' : ($effectiveFree ? 'هیچ مبلغی کسر نمی‌شود؛ لایسنس بلافاصله صادر می‌شود.' : 'پرداخت از طریق درگاه‌های بانکی امن انجام می‌شود.') }}
                 </p>
             </div>
         </aside>
