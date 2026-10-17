@@ -69,6 +69,9 @@ class BackupService
 
     protected static array $columnCache = [];
 
+    /** کش متادیتای ستون‌ها (nullable/default/type) برای مدیریت ناهم‌خوانی اسکما در بازیابی */
+    protected static array $columnMetaCache = [];
+
     /* ================================================================
      *  مسیرها
      * ================================================================ */
@@ -97,9 +100,21 @@ class BackupService
         return $dir;
     }
 
-    public static function publicRoot(): string
+    /**
+     * ریشه‌های فایل‌های قابل پشتیبان‌گیری — این اپ فایل‌ها را در چند محل نگه می‌دارد:
+     *  - تصاویر: public/uploads (اصلی) یا storage/app/public/uploads (جایگزین روی هاست‌های با public غیرقابل‌نوشتن)
+     *  - فایل‌های دانلود: storage/app/{updates,packages,products} (دیسک local)
+     * کلیدها به‌عنوان پیشوند در ساختار ZIP (files/{prefix}/…) به‌کار می‌روند.
+     */
+    public static function fileRoots(): array
     {
-        return storage_path('app/public');
+        return [
+            'public-uploads'       => public_path('uploads'),
+            'storage-app-public'   => storage_path('app/public'),
+            'storage-app-updates'  => storage_path('app/updates'),
+            'storage-app-packages' => storage_path('app/packages'),
+            'storage-app-products' => storage_path('app/products'),
+        ];
     }
 
     /* ================================================================
@@ -158,6 +173,45 @@ class BackupService
         return static::$columnCache[$table] ??= Schema::getColumnListing($table);
     }
 
+    /** متادیتای ستون‌ها (nullable/default/type) با کش */
+    protected static function tableColumnsMeta(string $table): array
+    {
+        if (! isset(static::$columnMetaCache[$table])) {
+            $map = [];
+
+            try {
+                foreach (Schema::getColumns($table) as $col) {
+                    $map[strtolower((string) $col['name'])] = [
+                        'nullable' => (bool) ($col['nullable'] ?? false),
+                        'default'  => array_key_exists('default', $col) ? $col['default'] : null,
+                        'type'     => strtolower((string) ($col['type_name'] ?? $col['type'] ?? '')),
+                    ];
+                }
+            } catch (Throwable) {
+                $map = [];
+            }
+
+            static::$columnMetaCache[$table] = $map;
+        }
+
+        return static::$columnMetaCache[$table];
+    }
+
+    /** مقدار جایگزین برای ستون NOT NULL بدون default وقتی دادهٔ پشتیبان null است */
+    protected static function notNullFallback(string $type): mixed
+    {
+        return match (true) {
+            str_contains($type, 'datetime') || str_contains($type, 'timestamp') => '1970-01-01 00:00:01',
+            str_contains($type, 'date') => '1970-01-01',
+            str_contains($type, 'time') => '00:00:00',
+            str_contains($type, 'json') => '{}',
+            str_contains($type, 'int') || str_contains($type, 'decimal') || str_contains($type, 'double')
+                || str_contains($type, 'float') || str_contains($type, 'real') || str_contains($type, 'numeric')
+                || str_contains($type, 'bool') => 0,
+            default => '',
+        };
+    }
+
     /** مرتب‌سازی نام جداول بر اساس اولویت درج */
     public static function orderTables(array $tables): array
     {
@@ -168,33 +222,34 @@ class BackupService
         return $priority->merge($rest)->all();
     }
 
-    /** تعداد و حجم فایل‌های رسانه‌ای (با کش ۱۰ دقیقه‌ای) */
+    /** تعداد و حجم فایل‌های قابل پشتیبان (همهٔ ریشه‌ها — با کش ۱۰ دقیقه‌ای) */
     public static function filesStat(): array
     {
         return Cache::remember('backup:files-stat', 600, function () {
-            $root = self::publicRoot();
-            if (! is_dir($root)) {
-                return ['count' => 0, 'size' => 0];
-            }
-
             $count = 0;
             $size  = 0;
 
             try {
-                $iterator = new RecursiveIteratorIterator(
-                    new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)
-                );
-
-                foreach ($iterator as $file) {
-                    /** @var \SplFileInfo $file */
-                    if (! $file->isFile()) {
+                foreach (self::fileRoots() as $root) {
+                    if (! is_dir($root)) {
                         continue;
                     }
-                    if (str_contains($file->getPathname(), DIRECTORY_SEPARATOR . 'livewire-tmp' . DIRECTORY_SEPARATOR)) {
-                        continue; // فایل موقت آپلود لایو‌وایر
+
+                    $iterator = new RecursiveIteratorIterator(
+                        new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)
+                    );
+
+                    foreach ($iterator as $file) {
+                        /** @var \SplFileInfo $file */
+                        if (! $file->isFile()) {
+                            continue;
+                        }
+                        if (str_contains($file->getPathname(), DIRECTORY_SEPARATOR . 'livewire-tmp' . DIRECTORY_SEPARATOR)) {
+                            continue; // فایل موقت آپلود لایو‌وایر
+                        }
+                        $count++;
+                        $size += $file->getSize();
                     }
-                    $count++;
-                    $size += $file->getSize();
                 }
             } catch (Throwable) {
                 //
@@ -470,7 +525,7 @@ class BackupService
         if (! $manifestPath || ! is_file($manifestPath)) {
             $manifestPath = self::tmpDir($rec->id) . '/manifest.txt';
             $cursor['manifest']   = $manifestPath;
-            $cursor['files_total'] = self::buildManifest(self::publicRoot(), $manifestPath);
+            $cursor['files_total'] = self::buildManifest($manifestPath);
             $rec->update(['cursor' => $cursor]);
         }
 
@@ -536,7 +591,8 @@ class BackupService
                 }
 
                 $index++;
-                $abs = self::publicRoot() . '/' . $rel;
+
+                [$abs, $entryName] = self::resolveManifestLine($rel);
 
                 if (! is_file($abs) || ! is_readable($abs)) {
                     $cursor['files_errors'] = ($cursor['files_errors'] ?? 0) + 1;
@@ -544,7 +600,6 @@ class BackupService
                 }
 
                 // فایل‌های رسانه (تصویر/ویدیو) بدون فشرده‌سازی — سرعت چند برابر، حجم تقریباً یکسان
-                $entryName = 'files/' . $rel;
                 $zip->addFile($abs, $entryName);
                 try { $zip->setCompressionName($entryName, ZipArchive::CM_STORE); } catch (Throwable) { /* نسخه‌های قدیمی */ }
                 $cursor['files_done'] = ($cursor['files_done'] ?? 0) + 1;
@@ -947,6 +1002,7 @@ class BackupService
         }
 
         $columns = array_flip(self::tableColumns($table));
+        $meta    = self::tableColumnsMeta($table);
 
         if ($columns === []) {
             $cursor['stats']['skipped_tables'][$table] = 'جدول بدون ستون است';
@@ -994,6 +1050,7 @@ class BackupService
         $tRestored = 0;
         $tSkipped  = 0;
         $tFailed   = 0;
+        $tFixed    = 0;
 
         try {
             while (microtime(true) < $deadline) {
@@ -1021,6 +1078,21 @@ class BackupService
                     }
 
                     $row = array_intersect_key($row, $columns); // فقط ستون‌های موجود در دیتابیس فعلی
+
+                    // ستون NOT NULL که در پشتیبان null است (ناهم‌خوانی اسکما) → قابل درج شود، نه رد
+                    foreach ($row as $colName => $colVal) {
+                        if ($colVal !== null || ! isset($meta[$colName]) || $meta[$colName]['nullable']) {
+                            continue;
+                        }
+
+                        if ($meta[$colName]['default'] !== null) {
+                            unset($row[$colName]); // دیتابیس مقدار پیش‌فرض را اعمال می‌کند
+                        } else {
+                            $row[$colName] = self::notNullFallback($meta[$colName]['type']);
+                        }
+
+                        $tFixed++;
+                    }
 
                     if ($row === [] || ($hasId && ! isset($row['id']))) {
                         $tFailed++;
@@ -1086,12 +1158,13 @@ class BackupService
                     'restored' => $tRestored,
                     'skipped'  => $tSkipped,
                     'failed'   => $tFailed,
+                    'fixed'    => $tFixed,
                 ];
 
                 $rec->update(['cursor' => $cursor]);
             }
 
-            if ($tFailed === 0 && $tRestored === 0 && $tSkipped === 0) {
+            if ($tFailed === 0 && $tRestored === 0 && $tSkipped === 0 && $tFixed === 0) {
                 return;
             }
 
@@ -1099,6 +1172,7 @@ class BackupService
                 'restored' => $tRestored,
                 'skipped'  => $tSkipped,
                 'failed'   => $tFailed,
+                'fixed'    => $tFixed,
             ];
         } finally {
             fclose($fp);
@@ -1115,9 +1189,8 @@ class BackupService
             return true;
         }
 
-        $root = self::publicRoot();
-        $zip  = new ZipArchive();
-        $res  = $zip->open($zipPath);
+        $zip = new ZipArchive();
+        $res = $zip->open($zipPath);
 
         if ($res !== true) {
             throw new \RuntimeException('بازکردن ZIP ناموفق بود (' . self::zipErrText($res) . ').');
@@ -1141,12 +1214,30 @@ class BackupService
                     continue; // path traversal
                 }
 
-                $target = $root . '/' . $rel;
+                // پیشوند ریشه (فرمت جدید) یا فرمت قدیمی (زیر storage/app/public)
+                $slash     = strpos($rel, '/');
+                $prefix    = $slash === false ? '' : substr($rel, 0, $slash);
+                $targetRel = $slash === false ? $rel : substr($rel, $slash + 1);
+
+                $roots = self::fileRoots();
+
+                if ($prefix !== '' && $targetRel !== '' && isset($roots[$prefix])) {
+                    $base = $roots[$prefix];
+                } else {
+                    $base      = $roots['storage-app-public'];
+                    $targetRel = $rel;
+                }
+
+                if ($targetRel === '' || str_contains($targetRel, '..') || str_starts_with($targetRel, '/')) {
+                    continue; // path traversal
+                }
+
+                $target = $base . '/' . $targetRel;
                 $dir    = dirname($target);
 
-                // محافظت: مقصد باید داخل public root بماند
-                $realDir = realpath($dir) ?: '';
-                $realRoot = realpath($root) ?: '';
+                // محافظت: مقصد باید داخل ریشهٔ مربوط بماند
+                $realDir  = realpath($dir) ?: '';
+                $realRoot = realpath($base) ?: '';
                 if ($realDir === '' || $realRoot === '' || ! str_starts_with($realDir . DIRECTORY_SEPARATOR, $realRoot . DIRECTORY_SEPARATOR)) {
                     continue;
                 }
@@ -1210,6 +1301,7 @@ class BackupService
                     'restored_rows'  => (int) array_sum(array_column($tables, 'restored')),
                     'skipped_rows'   => (int) array_sum(array_column($tables, 'skipped')),
                     'failed_rows'    => (int) array_sum(array_column($tables, 'failed')),
+                    'fixed_values'   => (int) array_sum(array_column($tables, 'fixed')),
                     'tables_ok'      => count($tables),
                     'restored_files' => (int) ($stats['restored_files'] ?? 0),
                     'skipped_files'  => (int) ($stats['skipped_files'] ?? 0),
@@ -1327,8 +1419,11 @@ class BackupService
         }
     }
 
-    /** ساخت manifest فایل‌های رسانه‌ای (مسیر نسبی زیر public root) */
-    protected static function buildManifest(string $root, string $targetPath): int
+    /**
+     * ساخت manifest فایل‌ها — هر خط: {prefix}/{rel}
+     * (prefix کلید ریشه در fileRoots است؛ فرمت قدیمیِ بدون پیشوند در resolveManifestLine پشتیبانی می‌شود)
+     */
+    protected static function buildManifest(string $targetPath): int
     {
         $count = 0;
         $fp = fopen($targetPath, 'w');
@@ -1338,7 +1433,11 @@ class BackupService
         }
 
         try {
-            if (is_dir($root)) {
+            foreach (self::fileRoots() as $prefix => $root) {
+                if (! is_dir($root)) {
+                    continue;
+                }
+
                 $iterator = new RecursiveIteratorIterator(
                     new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
                     RecursiveIteratorIterator::LEAVES_ONLY
@@ -1357,7 +1456,12 @@ class BackupService
                     }
 
                     $rel = str_replace('\\', '/', ltrim(substr($path, strlen($root)), '/\\'));
-                    fwrite($fp, $rel . "\n");
+
+                    if ($rel === '') {
+                        continue;
+                    }
+
+                    fwrite($fp, $prefix . '/' . $rel . "\n");
                     $count++;
                 }
             }
@@ -1366,6 +1470,23 @@ class BackupService
         }
 
         return $count;
+    }
+
+    /** تبدیل خط manifest به [مسیر فیزیکی, نام ورودی ZIP] — با پشتیبانی از فرمت قدیمی بدون پیشوند */
+    protected static function resolveManifestLine(string $line): array
+    {
+        $slash  = strpos($line, '/');
+        $prefix = $slash === false ? '' : substr($line, 0, $slash);
+        $rest   = $slash === false ? '' : substr($line, $slash + 1);
+
+        $roots = self::fileRoots();
+
+        if ($prefix !== '' && $rest !== '' && isset($roots[$prefix])) {
+            return [$roots[$prefix] . '/' . $rest, 'files/' . $prefix . '/' . $rest];
+        }
+
+        // فرمت قدیمی: مسیر نسبی زیر storage/app/public
+        return [$roots['storage-app-public'] . '/' . $line, 'files/' . $line];
     }
 
     /** حذف بازگشتی یک پوشه */

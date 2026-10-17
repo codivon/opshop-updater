@@ -270,6 +270,11 @@
                     <x-badge variant="success" icon="check-circle">
                         {{ fa_num($summary['restored_rows'] ?? 0) }} رکورد افزوده شد
                     </x-badge>
+                    @if(($summary['fixed_values'] ?? 0) > 0)
+                        <x-badge variant="warning" icon="settings">
+                            {{ fa_num($summary['fixed_values'] ?? 0) }} مقدار ناسازگار اصلاح شد
+                        </x-badge>
+                    @endif
                     <x-badge variant="neutral" icon="clock">
                         {{ fa_num($summary['skipped_rows'] ?? 0) }} رکورد از قبل موجود (رد شد)
                     </x-badge>
@@ -298,6 +303,7 @@
                                 <th class="px-3 py-2 text-start font-bold">جدول</th>
                                 <th class="px-3 py-2 text-center font-bold">افزوده‌شده</th>
                                 <th class="px-3 py-2 text-center font-bold">ردشده (موجود)</th>
+                                <th class="px-3 py-2 text-center font-bold">اصلاح‌شده</th>
                                 <th class="px-3 py-2 text-center font-bold">ناموفق</th>
                             </tr>
                         </thead>
@@ -307,6 +313,7 @@
                                     <td dir="ltr" class="px-3 py-2 text-start font-mono">{{ $table }}</td>
                                     <td class="px-3 py-2 text-center font-bold text-emerald-600 dark:text-emerald-400">{{ fa_num($row['restored'] ?? 0) }}</td>
                                     <td class="px-3 py-2 text-center text-zinc-400">{{ fa_num($row['skipped'] ?? 0) }}</td>
+                                    <td class="px-3 py-2 text-center {{ ($row['fixed'] ?? 0) > 0 ? 'font-bold text-amber-600 dark:text-amber-400' : 'text-zinc-400' }}">{{ fa_num($row['fixed'] ?? 0) }}</td>
                                     <td class="px-3 py-2 text-center {{ ($row['failed'] ?? 0) > 0 ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-zinc-400' }}">{{ fa_num($row['failed'] ?? 0) }}</td>
                                 </tr>
                             @endforeach
