@@ -210,7 +210,6 @@
             <x-stat label="پکیج فعال" :value="fa_num($this->stats['packages'])" icon="package" variant="info" />
             <x-stat label="نسخه فعال" :value="fa_num($this->stats['versions'])" icon="layers" variant="neutral" />
             <x-stat label="طرح اشتراک فعال" :value="fa_num($this->stats['plans'])" icon="crown" variant="warning" />
-            <x-stat label="خرید موفق" :value="fa_num($this->stats['customers'])" icon="check-circle" variant="neutral" />
         </section>
 
         {{-- ================================================================ --}}
@@ -232,16 +231,16 @@
                     </div>
                 </div>
 
-                <div class="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div class="mt-5 space-y-6">
 
-                    {{-- ---------- پکیج‌ها ---------- --}}
+                    {{-- ---------- پکیج‌ها (تمام‌عرض، ۴ ستون) ---------- --}}
                     @if($packageNodes->count())
                         <div>
                             <h3 class="flex items-center gap-1.5 text-sm font-black text-zinc-700 dark:text-zinc-200">
                                 <x-icon name="package" class="size-4 text-brand-600" />
                                 پکیج‌ها
                             </h3>
-                            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                 @foreach($packageNodes as $node)
                                     @php($root = $node['model'])
                                     <div class="group rounded-2xl bg-white p-4 ring-1 ring-zinc-200/80 transition-all hover:-translate-y-0.5 hover:shadow-card-lg dark:bg-zinc-900 dark:ring-zinc-700/60"
@@ -275,14 +274,14 @@
                         </div>
                     @endif
 
-                    {{-- ---------- پروژه‌های آماده ---------- --}}
+                    {{-- ---------- پروژه‌های آماده (تمام‌عرض، ۴ ستون) ---------- --}}
                     @if($productNodes->count())
                         <div>
                             <h3 class="flex items-center gap-1.5 text-sm font-black text-zinc-700 dark:text-zinc-200">
                                 <x-icon name="rocket" class="size-4 text-brand-600" />
                                 پروژه‌های آماده
                             </h3>
-                            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                 @foreach($productNodes as $node)
                                     @php($root = $node['model'])
                                     <div class="group rounded-2xl bg-white p-4 ring-1 ring-zinc-200/80 transition-all hover:-translate-y-0.5 hover:shadow-card-lg dark:bg-zinc-900 dark:ring-zinc-700/60"

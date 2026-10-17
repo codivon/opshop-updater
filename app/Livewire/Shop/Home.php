@@ -219,7 +219,6 @@ class Home extends Component
             'packages'  => Package::where('status', Package::STATUS_ACTIVE)->count(),
             'versions'  => \App\Models\PackageVersion::where('status', \App\Models\PackageVersion::STATUS_ACTIVE)->count(),
             'plans'     => \App\Models\SubscriptionPlan::where('is_active', true)->count(),
-            'customers' => \App\Models\PackagePurchase::where('status', 'paid')->distinct('customer_id')->count('customer_id'),
         ];
     }
 

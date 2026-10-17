@@ -136,6 +136,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
     Route::get('settings', \App\Livewire\Settings\Index::class)->name('settings.index');
     Route::get('settings/gateways', \App\Livewire\Gateways::class)->name('settings.gateways');
     Route::get('users', \App\Livewire\Users\Index::class)->name('users.index');
+    Route::get('backup', \App\Livewire\Tools\Backup::class)->name('tools.backup');
 
     // پیامک (قالب‌ها + لاگ ارسال)
     Route::get('sms-templates', \App\Livewire\Sms\Templates::class)->name('sms.templates');

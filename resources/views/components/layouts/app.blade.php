@@ -45,6 +45,7 @@
             'items' => [
                 ['route' => 'admin.reports.index', 'title' => 'گزارش‌ها', 'icon' => 'bar-chart', 'match' => ['admin.reports*']],
                 ['route' => 'admin.logs.index', 'title' => 'لاگ‌ها', 'icon' => 'terminal', 'match' => ['admin.logs*']],
+                ['route' => 'admin.tools.backup', 'title' => 'پشتیبان‌گیری', 'icon' => 'archive', 'match' => ['admin.tools*']],
                 ['route' => 'admin.settings.index', 'title' => 'تنظیمات', 'icon' => 'settings', 'match' => ['admin.settings*']],
                 ['route' => 'admin.users.index', 'title' => 'کاربران', 'icon' => 'shield-check', 'match' => ['admin.users*']],
             ],
