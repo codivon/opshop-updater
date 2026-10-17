@@ -15,6 +15,27 @@
         </div>
     </div>
 
+    {{-- ============ هشدار جداول غیرقابل‌خواندن (مثلاً جدول خراب در لوکال) ============ --}}
+    @if(! empty($this->stats['broken']))
+        <div class="flex flex-col gap-2 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-500/20 dark:bg-amber-500/10 dark:ring-amber-400/20">
+            <div class="flex items-start gap-2.5 text-sm font-black text-amber-800 dark:text-amber-300">
+                <x-icon name="alert-triangle" class="mt-0.5 size-4.5 shrink-0" />
+                {{ fa_num(count($this->stats['broken'])) }} جدول غیرقابل‌خواندن است و از پشتیبان‌گیری رد می‌شود:
+            </div>
+            <div class="flex flex-col gap-1.5 ps-7">
+                @foreach($this->stats['broken'] as $table => $message)
+                    <div class="text-xs leading-6 text-amber-700 dark:text-amber-300/80">
+                        <span dir="ltr" class="rounded-lg bg-white px-2 py-0.5 font-mono font-bold text-amber-800 ring-1 ring-amber-500/20 dark:bg-amber-500/15 dark:text-amber-200">{{ $table }}</span>
+                        <span dir="ltr" class="font-mono opacity-80">{{ \Illuminate\Support\Str::limit($message, 140) }}</span>
+                    </div>
+                @endforeach
+                <p class="mt-1 text-[11px] leading-5 text-amber-700/80 dark:text-amber-300/60">
+                    این جداول معمولاً میراث نسخه‌های قدیمی‌اند و کد فعلی استفاده‌شان نمی‌کند؛ برای رفع کامل، جدول خراب را در دیتابیس DROP و در صورت نیاز دوباره بسازید.
+                </p>
+            </div>
+        </div>
+    @endif
+
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
         {{-- ============================================================ --}}

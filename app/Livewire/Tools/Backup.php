@@ -54,15 +54,23 @@ class Backup extends Component
     {
         $tables = BackupService::tableNames();
         $rows   = 0;
+        $broken = [];
 
         foreach ($tables as $table) {
-            $rows += (int) DB::table($table)->count();
+            try {
+                $rows += (int) DB::table($table)->count();
+            } catch (Throwable $e) {
+                // جدول خراب/غیرقابل‌خواندن (مثلاً tablespace گم‌شده در لوکال)
+                // → نباید کل صفحه را ببَرد؛ فقط گزارش می‌شود.
+                $broken[$table] = $e->getMessage();
+            }
         }
 
         return [
             'tables' => count($tables),
             'rows'   => $rows,
             'driver' => (string) DB::getDriverName(),
+            'broken' => $broken,
         ];
     }
 
@@ -80,7 +88,8 @@ class Backup extends Component
     public function download()
     {
         try {
-            $json = BackupService::exportToJson();
+            $payload = BackupService::export();
+            $json    = (string) json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         } catch (Throwable $e) {
             report($e);
             $this->toast('ایجاد نسخه پشتیبان ناموفق بود: ' . $e->getMessage(), 'error');
@@ -88,7 +97,16 @@ class Backup extends Component
             return null;
         }
 
-        $this->toast('نسخه پشتیبان ساخته شد و دانلود آغاز شد.');
+        $errors = $payload['meta']['errors'] ?? [];
+
+        if ($errors !== []) {
+            $this->toast(
+                'بک‌آپ ساخته شد، اما ' . fa_num(count($errors)) . ' جدول غیرقابل‌خواندن رد شد: ' . implode('، ', array_keys($errors)),
+                'warning'
+            );
+        } else {
+            $this->toast('نسخه پشتیبان ساخته شد و دانلود آغاز شد.');
+        }
 
         return response()->streamDownload(
             fn () => print $json,

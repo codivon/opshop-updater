@@ -91,16 +91,22 @@ class BackupService
         ];
 
         foreach (self::tableNames() as $table) {
-            $query = DB::table($table);
+            try {
+                $query = DB::table($table);
 
-            // مرتب‌سازی بر اساس id (اگر ستونش باشد) تا در بازیابی هم والد قبل از فرزند درج شود
-            if (Schema::hasColumn($table, 'id')) {
-                $query->orderBy('id');
+                // مرتب‌سازی بر اساس id (اگر ستونش باشد) تا در بازیابی هم والد قبل از فرزند درج شود
+                if (Schema::hasColumn($table, 'id')) {
+                    $query->orderBy('id');
+                }
+
+                $payload['tables'][$table] = $query->get()
+                    ->map(fn ($row) => (array) $row)
+                    ->all();
+            } catch (Throwable $e) {
+                // جدول خراب/غیرقابل‌خواندن (مثلاً Tablespace is missing) → کل بک‌آپ نباید بشکند؛
+                // جدول رد و خطایش در متای فایل ثبت می‌شود تا مدیر در جریان باشد.
+                $payload['meta']['errors'][$table] = $e->getMessage();
             }
-
-            $payload['tables'][$table] = $query->get()
-                ->map(fn ($row) => (array) $row)
-                ->all();
         }
 
         return $payload;
@@ -189,26 +195,33 @@ class BackupService
                 $inserted = 0;
                 $skipped  = 0;
 
-                foreach ($rows as $row) {
-                    if (! is_array($row) || ! array_key_exists('id', $row)) {
-                        $skipped++;
-                        continue;
-                    }
+                try {
+                    foreach ($rows as $row) {
+                        if (! is_array($row) || ! array_key_exists('id', $row)) {
+                            $skipped++;
+                            continue;
+                        }
 
-                    // شرط اصلی: اگر از قبل وجود دارد، رد شو (بدون بازنویسی)
-                    if (DB::table($table)->where('id', (int) $row['id'])->exists()) {
-                        $skipped++;
-                        continue;
-                    }
+                        // شرط اصلی: اگر از قبل وجود دارد، رد شو (بدون بازنویسی)
+                        if (DB::table($table)->where('id', (int) $row['id'])->exists()) {
+                            $skipped++;
+                            continue;
+                        }
 
-                    try {
-                        DB::table($table)->insert($row);
-                        $inserted++;
-                    } catch (Throwable) {
-                        // کلید یکتای تکراری (slug/email/…) یا ناسازگاری ستون‌ها → رد شدن، نه توقف
-                        $skipped++;
-                        $summary['errors'][$table] = ($summary['errors'][$table] ?? 0) + 1;
+                        try {
+                            DB::table($table)->insert($row);
+                            $inserted++;
+                        } catch (Throwable) {
+                            // کلید یکتای تکراری (slug/email/…) یا ناسازگاری ستون‌ها → رد شدن، نه توقف
+                            $skipped++;
+                            $summary['errors'][$table] = ($summary['errors'][$table] ?? 0) + 1;
+                        }
                     }
+                } catch (Throwable) {
+                    // خطای سطح جدول (مثلاً جدولِ مقصدِ خراب با Tablespace is missing)
+                    // → این جدول کلاً رد می‌شود اما بقیه جداول بازیابی می‌شوند.
+                    $summary['skipped_tables'][] = $table;
+                    continue;
                 }
 
                 $summary['restored'] += $inserted;
