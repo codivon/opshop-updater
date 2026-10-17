@@ -3,7 +3,7 @@
 namespace App\Livewire\Tools;
 
 use App\Livewire\Concerns\WithToasts;
-use App\Models\Backup;
+use App\Models\Backup as BackupModel;
 use App\Services\BackupService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -65,25 +65,25 @@ class Backup extends Component
 
     /** عملیات در جریان (اگر باشد نوار پیشرفت + poll نمایش داده می‌شود) */
     #[Computed]
-    public function active(): ?Backup
+    public function active(): ?BackupModel
     {
-        return Backup::query()->active()->orderBy('id')->first();
+        return BackupModel::query()->active()->orderBy('id')->first();
     }
 
     /** فایل‌های پشتیبان ساخته‌شده + عملیات انجام‌شده */
     #[Computed]
     public function records()
     {
-        return Backup::query()->latest('id')->limit(50)->get();
+        return BackupModel::query()->latest('id')->limit(50)->get();
     }
 
     /** آخرین بازیابی تکمیل‌شده (برای نمایش گزارش کامل) */
     #[Computed]
-    public function latestRestore(): ?Backup
+    public function latestRestore(): ?BackupModel
     {
-        return Backup::query()
-            ->where('type', Backup::TYPE_RESTORE)
-            ->where('status', Backup::STATUS_COMPLETED)
+        return BackupModel::query()
+            ->where('type', BackupModel::TYPE_RESTORE)
+            ->where('status', BackupModel::STATUS_COMPLETED)
             ->whereNotNull('report')
             ->latest('id')
             ->first();
@@ -146,17 +146,17 @@ class Backup extends Component
 
         // عملیات تمام شده — یک‌بار اعلان بده
         if ($this->lastActiveId !== null) {
-            $record = Backup::find($this->lastActiveId);
+            $record = BackupModel::find($this->lastActiveId);
             $this->lastActiveId = null;
 
             if ($record !== null && $record->id !== $this->notifiedId) {
                 $this->notifiedId = $record->id;
 
-                if ($record->status === Backup::STATUS_COMPLETED) {
+                if ($record->status === BackupModel::STATUS_COMPLETED) {
                     $this->toast($record->isBackup()
                         ? 'نسخه پشتیبان «' . $record->name . '.zip» با موفقیت ساخته شد.'
                         : 'بازیابی تکمیل شد؛ گزارش کامل در همین صفحه نمایش داده شده است.', 'success');
-                } elseif ($record->status === Backup::STATUS_FAILED) {
+                } elseif ($record->status === BackupModel::STATUS_FAILED) {
                     $this->toast('عملیات ناموفق بود: ' . ($record->error ?: 'خطای نامشخص'), 'error');
                 }
             }
@@ -185,7 +185,7 @@ class Backup extends Component
     /** دانلود فایل ZIP پشتیبان */
     public function download(int $id)
     {
-        $record = Backup::query()->where('type', Backup::TYPE_BACKUP)->find($id);
+        $record = BackupModel::query()->where('type', BackupModel::TYPE_BACKUP)->find($id);
 
         if ($record === null) {
             $this->toast('این نسخه پشتیبان یافت نشد.', 'error');
@@ -195,7 +195,7 @@ class Backup extends Component
 
         $path = $record->filePath();
 
-        if ($record->status !== Backup::STATUS_COMPLETED || $path === null) {
+        if ($record->status !== BackupModel::STATUS_COMPLETED || $path === null) {
             $this->toast('فایل این نسخه پشتیبان موجود نیست.', 'warning');
 
             return;
@@ -295,7 +295,7 @@ class Backup extends Component
 
         try {
             if ($kind === 'backup') {
-                $record = Backup::find((int) $value);
+                $record = BackupModel::find((int) $value);
 
                 if ($record === null) {
                     $this->toast('نسخه پشتیبان یافت نشد.', 'error');
