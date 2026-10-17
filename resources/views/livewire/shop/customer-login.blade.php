@@ -1,4 +1,4 @@
-<div class="mx-auto w-full max-w-md px-4 py-12 sm:px-6">
+<div class="mx-auto w-full max-w-md px-4 pt-12 sm:px-6">
 
     <div class="card overflow-hidden">
         {{-- header --}}

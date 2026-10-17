@@ -177,7 +177,9 @@ class ProductShow extends Component
                 'paid_at'          => now(),
             ]);
 
-            // مسیر رایگان از markAsPaid عبور نمی‌کند → مصرف شمارنده کد اینجا انجام می‌شود
+            // مسیر رایگان از markAsPaid عبور نمی‌کند → شمارنده‌ها اینجا دستی:
+            // فروش محصول (رایگان هم فروش است) + مصرف شمارنده کد تخفیف
+            $this->product->incrementSales();
             $coupon?->recordUsage();
 
             $this->toast($couponDiscount > 0

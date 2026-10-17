@@ -38,7 +38,14 @@ class PackagePricingPlan extends Model
 
     public function getFinalPriceAttribute(): int
     {
-        return $this->discount_price ?? $this->price;
+        // FIX (طرح رایگان با discount_price=0): مقدار صفر یعنی «بدون تخفیف» نه «رایگان»؛
+        // ادمین برای بدون‌تخفیف null ذخیره می‌کند ولی اگر جایی صفر ذخیره شود، قبلاً
+        // final_price=0 (رایگان) نمایش داده می‌شد. حالا فقط تخفیفِ معتبر (>۰ و <قیمت) اعمال می‌شود.
+        if ($this->discount_price !== null && $this->discount_price > 0 && $this->discount_price < $this->price) {
+            return (int) $this->discount_price;
+        }
+
+        return (int) $this->price;
     }
 
     public function getHasDiscountAttribute(): bool

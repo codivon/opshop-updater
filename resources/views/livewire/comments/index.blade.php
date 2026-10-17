@@ -71,11 +71,28 @@
                                 @endif
                             </div>
                             <p class="mt-1.5 whitespace-pre-line text-sm leading-6 text-zinc-600 dark:text-zinc-300">{{ $comment->body }}</p>
+
+                            {{-- پاسخ مدیر --}}
+                            @if($comment->hasReply())
+                                <div class="mt-2 flex items-start gap-2 rounded-xl bg-brand-50 p-3 ring-1 ring-brand-100 dark:bg-brand-500/10 dark:ring-brand-400/20" wire:key="cmreply-{{ $comment->id }}">
+                                    <x-icon name="corner-up-left" class="mt-0.5 size-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                                    <div class="min-w-0">
+                                        <p class="text-[11px] font-black text-brand-700 dark:text-brand-300">پاسخ شما @if($comment->replied_at)<span class="font-normal text-brand-600/70 dark:text-brand-400/70">· {{ verta_date($comment->replied_at) }}</span>@endif</p>
+                                        <p class="mt-1 whitespace-pre-line text-xs leading-6 text-brand-800/90 dark:text-brand-200/80">{{ $comment->reply }}</p>
+                                    </div>
+                                </div>
+                            @endif
+
                             <p class="mt-1.5 text-xs text-zinc-400">{{ verta_date($comment->created_at) }}@if($comment->email) · {{ $comment->email }}@endif</p>
                         </div>
                     </div>
 
                     <div class="flex items-center gap-1">
+                        <button wire:click="replyTo({{ $comment->id }})"
+                                class="rounded-lg p-2 transition-colors {{ $comment->hasReply() ? 'text-brand-600 dark:text-brand-400' : 'text-zinc-500' }} hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10"
+                                title="{{ $comment->hasReply() ? 'ویرایش پاسخ' : 'پاسخ مدیر' }}" aria-label="پاسخ مدیر به دیدگاه">
+                            <x-icon name="corner-up-left" class="size-4" />
+                        </button>
                         @if(!$comment->isApproved())
                             <button wire:click="approve({{ $comment->id }})"
                                     class="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10"
@@ -107,4 +124,35 @@
     </div>
 
     <div>{{ $this->records->links() }}</div>
+
+    {{-- ============ Reply Modal ============ --}}
+    <x-modal wire:model="showReplyModal" title="پاسخ مدیر">
+        @php($replying = $replyingId ? \App\Models\Comment::find($replyingId) : null)
+        @if($replying)
+            <div class="mb-4 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
+                <p class="flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-700 dark:text-zinc-200">
+                    {{ $replying->name }}
+                    <span class="text-zinc-400">{{ verta_date($replying->created_at) }}</span>
+                </p>
+                <p class="mt-1.5 line-clamp-3 whitespace-pre-line text-xs leading-6 text-zinc-500 dark:text-zinc-400">{{ $replying->body }}</p>
+            </div>
+        @endif
+
+        <form wire:submit="saveReply" class="space-y-4">
+            <x-field label="متن پاسخ" for="replyText" required hint="این پاسخ زیر دیدگاهِ تأییدشده در فروشگاه نمایش داده می‌شود">
+                <x-textarea id="replyText" wire:model="replyText" rows="4" placeholder="پاسخ خود را بنویسید…" />
+                @error('replyText') <p class="mt-1 text-xs font-bold text-rose-600 dark:text-rose-400">{{ $message }}</p> @enderror
+            </x-field>
+
+            <div class="flex items-center justify-between gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-700/50">
+                @if($replying?->hasReply())
+                    <x-btn variant="danger-soft" type="button" icon="trash" wire:click="removeReply({{ $replying->id }})" wire:confirm="حذف پاسخ مدیر؟">حذف پاسخ</x-btn>
+                @endif
+                <div class="flex items-center gap-2">
+                    <x-btn variant="secondary" type="button" wire:click="$set('showReplyModal', false)">انصراف</x-btn>
+                    <x-btn icon="send" type="submit" :loading="true">ذخیره پاسخ</x-btn>
+                </div>
+            </div>
+        </form>
+    </x-modal>
 </div>

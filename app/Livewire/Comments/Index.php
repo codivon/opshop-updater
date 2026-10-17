@@ -20,6 +20,11 @@ class Index extends Component
     public string $statusFilter = '';
     public string $typeFilter = '';   // product | package
 
+    /** مودال پاسخ مدیر */
+    public bool $showReplyModal = false;
+    public ?int $replyingId = null;
+    public string $replyText = '';
+
     public function updatingSearch(): void
     {
         $this->resetPage();
@@ -51,6 +56,50 @@ class Index extends Component
     {
         Comment::findOrFail($id)->delete();
         $this->toast('دیدگاه حذف شد.');
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  پاسخ مدیر                                                        */
+    /* ---------------------------------------------------------------- */
+
+    /** باز کردن مودال پاسخ برای یک دیدگاه */
+    public function replyTo(int $id): void
+    {
+        $comment = Comment::findOrFail($id);
+
+        $this->resetErrorBag();
+        $this->replyingId = $comment->id;
+        $this->replyText  = (string) ($comment->reply ?? '');
+        $this->showReplyModal = true;
+    }
+
+    /** ذخیره/به‌روزرسانی پاسخ مدیر */
+    public function saveReply(): void
+    {
+        $this->validate([
+            'replyText' => ['required', 'string', 'min:2', 'max:2000'],
+        ], [
+            'replyText.required' => 'متن پاسخ الزامی است.',
+            'replyText.min'      => 'متن پاسخ خیلی کوتاه است.',
+            'replyText.max'      => 'متن پاسخ حداکثر ۲٬۰۰۰ کاراکتر است.',
+        ]);
+
+        $comment = Comment::findOrFail($this->replyingId);
+        $hadReply = $comment->hasReply();
+        $comment->saveReply($this->replyText);
+
+        $this->showReplyModal = false;
+        $this->replyingId = null;
+        $this->replyText  = '';
+
+        $this->toast($hadReply ? 'پاسخ مدیر به‌روزرسانی شد.' : 'پاسخ مدیر ثبت شد.');
+    }
+
+    /** حذف پاسخ مدیر */
+    public function removeReply(int $id): void
+    {
+        Comment::findOrFail($id)->removeReply();
+        $this->toast('پاسخ مدیر حذف شد.');
     }
 
     public function getTypesProperty(): array
