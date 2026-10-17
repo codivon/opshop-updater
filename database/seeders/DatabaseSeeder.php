@@ -21,5 +21,8 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // دسته‌بندی‌های پیش‌فرض فروشگاه (پکیج + محصول، درختی و idempotent)
+        $this->call(CategorySeeder::class);
     }
 }

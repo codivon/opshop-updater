@@ -3,10 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Category extends Model
 {
@@ -78,7 +79,7 @@ class Category extends Model
      *
      * @return Collection<int, int>
      */
-    public static function subtreeIds(int $rootId, ?Collection $pool = null): Collection
+    public static function subtreeIds(int $rootId, ?EloquentCollection $pool = null): Collection
     {
         $pool ??= static::query()->get(['id', 'parent_id']);
 
@@ -172,6 +173,9 @@ class Category extends Model
      * درختِ فروشگاه: دسته‌های فعال یک نوع، مرتب‌شده سلسله‌مراتبی با:
      *  - shop_count       → تعداد تجمیعی (خود دسته + همه زیردسته‌ها)
      *  - hierarchy_label  → برچسب با مسیر والد برای چیپ‌های فیلتر
+     *
+     * توجه: خروجی Support\Collection است (نه Eloquent) چون فهرستِ دست‌سازِ
+     * مرتب‌سازی‌شدهٔ سلسله‌مراتبی برمی‌گردانیم.
      */
     public static function shopTree(string $type): Collection
     {

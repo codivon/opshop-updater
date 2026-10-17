@@ -175,24 +175,40 @@ class Home extends Component
             ->get();
     }
 
+    /**
+     * گره‌های درخت دسته‌بندی برای بخش «دسته‌بندی فروشگاه» صفحه اصلی.
+     * خروجی: [ ['model' => Category ریشه, 'children' => Collection زیردسته‌ها], … ]
+     * هر گره shop_count (تعداد تجمیعی خود + زیردرخت) دارد.
+     */
     #[Computed]
-    public function packageCategories()
+    public function packageCategoryTree(): \Illuminate\Support\Collection
     {
-        return Category::query()
-            ->ofType(Category::TYPE_PACKAGE)
-            ->active()
-            ->ordered()
-            ->get();
+        return $this->homeCategoryTree(Category::TYPE_PACKAGE);
     }
 
     #[Computed]
-    public function productCategories()
+    public function productCategoryTree(): \Illuminate\Support\Collection
     {
-        return Category::query()
-            ->ofType(Category::TYPE_PRODUCT)
-            ->active()
-            ->ordered()
-            ->get();
+        return $this->homeCategoryTree(Category::TYPE_PRODUCT);
+    }
+
+    private function homeCategoryTree(string $type): \Illuminate\Support\Collection
+    {
+        $flat = Category::shopTree($type);
+
+        if ($flat->isEmpty()) {
+            return collect();
+        }
+
+        $ids = $flat->pluck('id');
+
+        return $flat
+            ->filter(fn ($cat) => $cat->parent_id === null || ! $ids->contains($cat->parent_id))
+            ->values()
+            ->map(fn ($root) => [
+                'model'    => $root,
+                'children' => $flat->where('parent_id', (int) $root->id)->values(),
+            ]);
     }
 
     #[Computed]
