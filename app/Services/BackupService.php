@@ -254,6 +254,9 @@ class BackupService
                 'phase'  => 'متوقف شد',
                 'error'  => Str::limit($e->getMessage(), 900),
             ]);
+
+            // پاک‌سازی فایل‌های موقت عملیات ناموفق (آزادسازی فضا)
+            try { self::deleteTree(self::tmpDir($record->id)); } catch (Throwable) { /* بی‌اهمیت */ }
         } finally {
             try { $lock?->release(); } catch (Throwable) { /* بی‌اهمیت */ }
         }
@@ -265,6 +268,13 @@ class BackupService
 
     public static function startBackup(bool $includeFiles = true): Backup
     {
+        // هشدار زودهنگام: کوتای هاست پر شده باشد خطای مبهم وسط کار نمی‌گیریم
+        $free = function_exists('disk_free_space') ? @disk_free_space(storage_path('app')) : false;
+
+        if (is_float($free) && $free > 0 && $free < 100 * 1024 * 1024) {
+            throw new \RuntimeException('فضای خالی دیسک حدود ' . (int) round($free / 1048576) . ' مگابایت است؛ برای پشتیبان‌گیری کامل (دیتابیس + فایل‌ها) فضای بیشتری آزاد کنید.');
+        }
+
         $name = 'backup-' . now()->format('Ymd-His');
         $i    = 2;
         while (is_file(self::baseDir() . '/' . $name . '.zip')) {
@@ -322,10 +332,15 @@ class BackupService
                 : 'tables';
 
             $zip = new ZipArchive();
-            if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-                throw new \RuntimeException('ساخت فایل ZIP ممکن نیست — سطح دسترسی پوشه storage را بررسی کنید.');
+            $res = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+            if ($res !== true) {
+                throw new \RuntimeException('ساخت فایل ZIP ممکن نیست (' . self::zipErrText($res) . ') — سطح دسترسی پوشهٔ storage را بررسی کنید.');
             }
-            $zip->close();
+
+            if (! $zip->close()) {
+                throw new \RuntimeException('ساخت اولیهٔ فایل ZIP ناموفق بود — فضای دیسک/دسترسی پوشهٔ storage را بررسی کنید.');
+            }
 
             $rec->update([
                 'cursor'   => $cursor,
@@ -435,7 +450,10 @@ class BackupService
             $cursor['rows_done'] = ($cursor['rows_done'] ?? 0) + count($rows);
 
             foreach ($rows as $row) {
-                fwrite($fp, json_encode((array) $row, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . "\n");
+                if (@fwrite($fp, json_encode((array) $row, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) . "\n") === false) {
+                    fclose($fp);
+                    throw new \RuntimeException("نوشتن داده‌های جدول {$table} روی دیسک ناموفق بود — فضای دیسک (کوتای هاست) پر است.");
+                }
             }
 
             $rec->update(['cursor' => $cursor]);
@@ -472,9 +490,25 @@ class BackupService
 
         $zipPath = $cursor['zip'];
         $zip = new ZipArchive();
-        if ($zip->open($zipPath) !== true) {
-            fclose($fh);
-            throw new \RuntimeException('بازکردن فایل ZIP در حال ساخت ناموفق بود.');
+        $res = $zip->open($zipPath, ZipArchive::CREATE);
+
+        if ($res !== true) {
+            // بایگانی وسط کار خراب شده (مثلاً پر شدن کوتای هاست در تیک قبلی)
+            // → از فایل‌های jsonl موجود در tmp از نو ساخته می‌شود و ادامه می‌دهیم
+            self::rebuildWorkingZip($zipPath, self::tmpDir($rec->id));
+
+            $cursor['file_index'] = 0;
+            $cursor['file_byte']  = 0;
+            $cursor['files_done'] = 0;
+            $cursor['errors']['_zip'] = 'بایگانی ZIP خراب شده بود و بازسازی شد (' . self::zipErrText($res) . ')';
+
+            $zip = new ZipArchive();
+            $res = $zip->open($zipPath, ZipArchive::CREATE);
+
+            if ($res !== true) {
+                fclose($fh);
+                throw new \RuntimeException('بازکردن فایل ZIP در حال ساخت ناموفق بود (' . self::zipErrText($res) . ').');
+            }
         }
 
         $perSlice = max(10, (int) ($cursor['files_per_slice'] ?? self::CHUNK_FILES));
@@ -482,6 +516,7 @@ class BackupService
         $byte     = (int) ($cursor['file_byte'] ?? 0);
         $added    = 0;
         $eof      = false;
+        $closed   = false;
         $started  = microtime(true);
 
         try {
@@ -503,7 +538,7 @@ class BackupService
                 $index++;
                 $abs = self::publicRoot() . '/' . $rel;
 
-                if (! is_file($abs)) {
+                if (! is_file($abs) || ! is_readable($abs)) {
                     $cursor['files_errors'] = ($cursor['files_errors'] ?? 0) + 1;
                     continue;
                 }
@@ -515,9 +550,18 @@ class BackupService
                 $cursor['files_done'] = ($cursor['files_done'] ?? 0) + 1;
                 $added++;
             }
+
+            $closed = $zip->close();
         } finally {
-            $zip->close();
+            if (! $closed) {
+                try { $zip->close(); } catch (Throwable) { /* تخلیهٔ دستگیره */ }
+            }
+
             fclose($fh);
+        }
+
+        if (! $closed) {
+            throw new \RuntimeException('نوشتن بایگانی ZIP ناموفق بود — معمولاً یعنی فضای دیسک (کوتای هاست) پر شده است.');
         }
 
         $cursor['file_index'] = $index;
@@ -571,7 +615,7 @@ class BackupService
 
         if (! @rename($cursor['zip'], $final)) {
             if (! @copy($cursor['zip'], $final)) {
-                throw new \RuntimeException('انتقال فایل ZIP به مقصد نهایی ناموفق بود.');
+                throw new \RuntimeException('انتقال فایل ZIP به مقصد نهایی (storage/app/backups) ناموفق بود — فضای دیسک/دسترسی را بررسی کنید.');
             }
             @unlink($cursor['zip']);
         }
@@ -727,8 +771,10 @@ class BackupService
         }
 
         $zip = new ZipArchive();
-        if ($zip->open($zipPath) !== true) {
-            throw new \RuntimeException('فایل ZIP قابل بازکردن نیست (خراب یا ناقص).');
+        $res = $zip->open($zipPath);
+
+        if ($res !== true) {
+            throw new \RuntimeException('فایل ZIP قابل بازکردن نیست (' . self::zipErrText($res) . ') — خراب یا ناقص.');
         }
 
         try {
@@ -921,8 +967,10 @@ class BackupService
             $fp = fopen($source, 'r');
         } else {
             $zip = new ZipArchive();
-            if ($zip->open($zipPath) !== true) {
-                throw new \RuntimeException('بازکردن ZIP ناموفق بود.');
+            $res = $zip->open($zipPath);
+
+            if ($res !== true) {
+                throw new \RuntimeException('بازکردن ZIP ناموفق بود (' . self::zipErrText($res) . ').');
             }
 
             $entry = 'database/' . $table . '.jsonl';
@@ -1069,9 +1117,10 @@ class BackupService
 
         $root = self::publicRoot();
         $zip  = new ZipArchive();
+        $res  = $zip->open($zipPath);
 
-        if ($zip->open($zipPath) !== true) {
-            throw new \RuntimeException('بازکردن ZIP ناموفق بود.');
+        if ($res !== true) {
+            throw new \RuntimeException('بازکردن ZIP ناموفق بود (' . self::zipErrText($res) . ').');
         }
 
         $i   = (int) ($cursor['zip_entry_index'] ?? 0);
@@ -1177,19 +1226,104 @@ class BackupService
      *  ابزارها
      * ================================================================ */
 
-    /** افزودن یک فایل به ZIP موجود (باز/بسته کردن درجا) */
+    /** متن فارسی خطای ZipArchive بر اساس کد بازگشتی */
+    protected static function zipErrText(int|bool $result): string
+    {
+        if ($result === true) {
+            return 'نامشخص';
+        }
+
+        return match ((int) $result) {
+            ZipArchive::ER_MULTIDISK  => 'بایگانی چنددیسکی',
+            ZipArchive::ER_RENAME     => 'تغییرنام فایل موقت ناموفق',
+            ZipArchive::ER_CLOSE      => 'بستن بایگانی ناموفق',
+            ZipArchive::ER_SEEK       => 'جابه‌جایی در فایل ناموفق',
+            ZipArchive::ER_READ       => 'خواندن ناموفق',
+            ZipArchive::ER_WRITE      => 'نوشتن ناموفق (فضای دیسک/دسترسی)',
+            ZipArchive::ER_CRC        => 'خطای CRC — فایل خراب است',
+            ZipArchive::ER_ZIPCLOSED  => 'بایگانی بسته شده',
+            ZipArchive::ER_NOENT      => 'فایل یافت نشد',
+            ZipArchive::ER_EXISTS     => 'فایل از قبل موجود است',
+            ZipArchive::ER_OPEN       => 'بازکردن ناموفق (دسترسی)',
+            ZipArchive::ER_TMPOPEN    => 'ساخت فایل موقت ناموفق (فضای دیسک)',
+            ZipArchive::ER_ZLIB       => 'خطای فشرده‌سازی',
+            ZipArchive::ER_MEMORY     => 'کمبود حافظه',
+            ZipArchive::ER_CHANGED    => 'آیتم تغییر کرده',
+            ZipArchive::ER_COMPNOTSUP => 'روش فشرده‌سازی پشتیبانی نمی‌شود',
+            ZipArchive::ER_EOF        => 'پایان ناگهانی فایل',
+            ZipArchive::ER_NOZIP      => 'ZIP معتبر نیست (خراب یا صفر بایت)',
+            ZipArchive::ER_INTERNAL   => 'خطای داخلی libzip',
+            ZipArchive::ER_INCONS     => 'بایگانی ناسازگار/خراب',
+            ZipArchive::ER_REMOVE     => 'حذف ناموفق',
+            ZipArchive::ER_DELETED    => 'بایگانی حذف شده',
+            default                   => 'خطای ناشناخته (کد ' . (int) $result . ')',
+        };
+    }
+
+    /**
+     * بازسازی بایگانی در حال ساخت از فایل‌های jsonl موجود در tmp.
+     * بعد از خرابی (مثلاً پر شدن کوتا در تیک قبلی) همهٔ جدول‌های کامل‌شده
+     * دوباره به بایگانی اضافه می‌شوند؛ ورودی جدول در حال dump با اتمامش جایگزین می‌شود.
+     */
+    protected static function rebuildWorkingZip(string $zipPath, string $tmpDir): void
+    {
+        @unlink($zipPath);
+
+        $zip = new ZipArchive();
+        $res = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+        if ($res !== true) {
+            throw new \RuntimeException('ساخت مجدد فایل ZIP ناموفق بود (' . self::zipErrText($res) . ') — معمولاً یعنی فضای دیسک (کوتای هاست) پر است.');
+        }
+
+        foreach (glob($tmpDir . '/*.jsonl') ?: [] as $jsonl) {
+            $entry = 'database/' . basename((string) $jsonl, '.jsonl') . '.jsonl';
+
+            if (! $zip->addFile((string) $jsonl, $entry)) {
+                $zip->close();
+                throw new \RuntimeException("افزودن «{$entry}» به بایگانی بازساخته ناموفق بود.");
+            }
+        }
+
+        if (! $zip->close()) {
+            throw new \RuntimeException('نوشتن بایگانی بازساخته ناموفق بود — فضای دیسک (کوتای هاست) پر است.');
+        }
+    }
+
+    /**
+     * افزودن یک فایل به بایگانی در حال ساخت (باز/بسته کردن درجا).
+     * اگر بایگانی خراب/بازنشدنی باشد، از فایل‌های jsonl موجود در همان پوشه بازسازی می‌شود.
+     */
     protected static function zipAddFile(string $zipPath, string $filePath, string $entryName): void
     {
         $zip = new ZipArchive();
+        $res = $zip->open($zipPath, ZipArchive::CREATE);
 
-        if ($zip->open($zipPath) !== true) {
-            throw new \RuntimeException('بازکردن فایل ZIP ناموفق بود.');
+        if ($res !== true) {
+            self::rebuildWorkingZip($zipPath, dirname($zipPath));
+
+            $zip = new ZipArchive();
+            $res = $zip->open($zipPath, ZipArchive::CREATE);
+
+            if ($res !== true) {
+                throw new \RuntimeException('بازکردن مجدد فایل ZIP ناموفق بود (' . self::zipErrText($res) . ').');
+            }
         }
 
         try {
-            $zip->addFile($filePath, $entryName);
+            // ورودی هم‌نام (مثلاً بعد از بازسازی بایگانی) جایگزین می‌شود
+            if ($zip->locateName($entryName) !== false) {
+                $zip->deleteName($entryName);
+            }
+
+            if (! $zip->addFile($filePath, $entryName)) {
+                throw new \RuntimeException("افزودن «{$entryName}» به بایگانی ZIP ناموفق بود.");
+            }
         } finally {
-            $zip->close();
+            if (! $zip->close()) {
+                // بستن ناموفق = نوشتن ناموفق (معمولاً کوتای هاست) — تیک بعدی بایگانی را بازسازی می‌کند
+                throw new \RuntimeException('نوشتن بایگانی ZIP ناموفق بود — معمولاً یعنی فضای دیسک (کوتای هاست) پر شده است.');
+            }
         }
     }
 
