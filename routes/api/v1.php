@@ -18,6 +18,9 @@ Route::prefix('v1')->name('api.')->group(function () {
         Route::get('/my-subscriptions', [ApiSubscriptionController::class, 'mySubscriptions'])->name('mine');
     });
 
+    // --- دسته‌بندی‌های درختی (برای انتخاب دسته فروشگاه هنگام نصب پکیج در پروژه خریدار) ---
+    Route::get('/categories', [ApiPackageController::class, 'categories'])->name('categories.index');
+
     Route::name('packages.')->group(function () {
 
 

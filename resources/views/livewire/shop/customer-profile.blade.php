@@ -68,12 +68,18 @@
                         $tab === 'purchases' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400'])
                     aria-current="{{ $tab === 'purchases' ? 'true' : 'false' }}">
                 <x-icon name="package" class="size-4" /> پکیج‌های من
+                @if($this->purchases->total())
+                    <span class="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] tabular-nums text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">{{ fa_num($this->purchases->total()) }}</span>
+                @endif
             </button>
             <button type="button" wire:click="switchTab('licenses')" role="tab"
                     @class(['flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition-all',
                         $tab === 'licenses' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400'])
                     aria-current="{{ $tab === 'licenses' ? 'true' : 'false' }}">
                 <x-icon name="shield-check" class="size-4" /> لایسنس‌ها
+                @if($this->stats['licenses_total'])
+                    <span class="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] tabular-nums text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">{{ fa_num($this->stats['licenses_total']) }}</span>
+                @endif
             </button>
             <button type="button" wire:click="switchTab('info')" role="tab"
                     @class(['flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition-all',
@@ -173,6 +179,22 @@
 
     {{-- ==================== TAB: لایسنس‌ها ==================== --}}
     @elseif($tab === 'licenses')
+
+        {{-- فیلترها: جستجو + وضعیت --}}
+        <div class="card flex flex-col gap-3 p-4 lg:flex-row lg:items-center">
+            <div class="relative flex-1">
+                <x-icon name="search" class="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
+                <input type="search" wire:model.live.debounce.400ms="licenseSearch"
+                       placeholder="جستجوی نام پکیج یا کلید لایسنس…" class="input ps-10" aria-label="جستجوی لایسنس" />
+            </div>
+            <select wire:model.live="licenseStatus" class="input lg:w-44" aria-label="فیلتر وضعیت لایسنس">
+                <option value="">همه وضعیت‌ها</option>
+                <option value="active">فعال</option>
+                <option value="expired">منقضی</option>
+                <option value="revoked">لغو شده</option>
+            </select>
+        </div>
+
         @if($this->licenses->count())
             <div class="card overflow-hidden p-0">
                 <div class="overflow-x-auto">
@@ -212,7 +234,9 @@
             <div>{{ $this->licenses->links() }}</div>
         @else
             <div class="card">
-                <x-empty icon="shield-check" title="لایسنسی یافت نشد" description="پس از خرید پکیج، لایسنس آن در این بخش نمایش داده می‌شود." />
+                <x-empty icon="shield-check"
+                         title="لایسنسی یافت نشد"
+                         description="{{ ($licenseSearch !== '' || $licenseStatus !== '') ? 'با این فیلترها لایسنسی یافت نشد؛ فیلترها را تغییر دهید.' : 'پس از خرید پکیج، لایسنس آن در این بخش نمایش داده می‌شود.' }}" />
             </div>
         @endif
 

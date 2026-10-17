@@ -51,7 +51,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($records as $log)
+                        @foreach($this->records as $log)
                             <tr>
                                 <td class="font-mono text-xs tabular-nums" dir="ltr">{{ $log->mobile }}</td>
                                 <td>

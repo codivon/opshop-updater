@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Package;
 use App\Models\PackageLicense;
@@ -52,7 +53,7 @@ class ApiPackageController extends Controller
                 ->pluck('project_id')
                 ->unique();
 
-            $packages = Package::with(['latestVersion', 'activePricingPlans', 'images'])
+            $packages = Package::with(['latestVersion', 'activePricingPlans', 'images', 'categoryModel.parent'])
                 ->whereIn('project_id', $projectIds)
                 ->where('status', Package::STATUS_ACTIVE)
                 ->when($request->filled('search'), function ($q) use ($request) {
@@ -109,7 +110,7 @@ class ApiPackageController extends Controller
         try {
             $customer = $this->authService->authenticate($request);
 
-            $package = Package::with(['activeVersions', 'activePricingPlans', 'project', 'images'])
+            $package = Package::with(['activeVersions', 'activePricingPlans', 'project', 'images', 'categoryModel.parent'])
                 ->where('slug', $slug)
                 ->where('status', Package::STATUS_ACTIVE)
                 ->first();
@@ -673,7 +674,100 @@ class ApiPackageController extends Controller
             ] : null,
             // پکیجِ رایگانِ طرحِ اشتراک فعال (null = پوشش داده نمی‌شود)
             'subscription' => $subscriptionInfo,
+            // دسته‌بندی ساختاریافته با زنجیره والدین — برای انتخاب/ساخت دسته درختی در فروشگاه خریدار (مثلاً ووکامرس)
+            'category_details' => $this->categoryDetailsFor($package),
         ]);
+    }
+
+    /**
+     * دسته‌بندی پکیج با زنجیره کامل والدین:
+     *  - parents     → از ریشه تا والدِ مستقیم (برای ساخت درخت دسته در فروشگاه)
+     *  - path        → برچسب نمایشی «والد › فرزند»
+     *  - path_slugs  → مسیر نامک‌ها از ریشه (مشابه term path وردپرس)
+     */
+    private function categoryDetailsFor(Package $package): ?array
+    {
+        $category = $package->categoryModel;
+
+        if (!$category) {
+            return null;
+        }
+
+        $chain = collect([$category]);
+        $current = $category;
+
+        for ($i = 0; $i < Category::MAX_DEPTH && $current->parent_id !== null; $i++) {
+            $parent = $current->parent;
+
+            if (!$parent) {
+                break;
+            }
+
+            $chain->unshift($parent);
+            $current = $parent;
+        }
+
+        $present = fn ($c) => ['id' => $c->id, 'name' => $c->name, 'slug' => $c->slug];
+
+        return [
+            'id'         => $category->id,
+            'name'       => $category->name,
+            'slug'       => $category->slug,
+            'parents'    => $chain->slice(0, -1)->values()->map($present)->all(),
+            'path'       => $chain->map(fn ($c) => $c->name)->implode(' › '),
+            'path_slugs' => $chain->map(fn ($c) => $c->slug)->values()->all(),
+        ];
+    }
+
+    /* ===================================================================
+     *  GET /api/v1/categories?type=package|product
+     *  درخت دسته‌بندی‌های فعال — برای اینکه پروژه خریدار (مثلاً افزونه وردپرس)
+     *  بتواند هنگام نصب پکیج، دسته فروشگاه را به‌صورت درختی انتخاب/بسازد.
+     * =================================================================== */
+    public function categories(Request $request): JsonResponse
+    {
+        try {
+            $this->authService->authenticate($request);
+
+            $type = $request->input('type', Category::TYPE_PACKAGE);
+
+            if (! in_array($type, [Category::TYPE_PACKAGE, Category::TYPE_PRODUCT], true)) {
+                return response()->json(['error' => 'نوع دسته‌بندی نامعتبر است.'], 422);
+            }
+
+            $categories = Category::query()
+                ->ofType($type)
+                ->active()
+                ->ordered()
+                ->get(['id', 'parent_id', 'name', 'slug', 'description']);
+
+            $ids = $categories->pluck('id');
+
+            // گروه‌بندی بر اساس والدِ معتبر؛ یتیم‌ها ریشه محسوب می‌شوند
+            $byParent = $categories->groupBy(
+                fn ($c) => ($c->parent_id !== null && $ids->contains($c->parent_id)) ? (int) $c->parent_id : 0
+            );
+
+            $build = null;
+            $build = function (int $parentId) use (&$build, $byParent): array {
+                return $byParent->get($parentId, collect())
+                    ->map(fn ($c) => [
+                        'id'          => $c->id,
+                        'name'        => $c->name,
+                        'slug'        => $c->slug,
+                        'description' => $c->description,
+                        'children'    => $build((int) $c->id),
+                    ])
+                    ->values()
+                    ->all();
+            };
+
+            return response()->json([
+                'data' => $build(0),
+            ]);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], exception_status($e, 403));
+        }
     }
 
     /* ===================================================================

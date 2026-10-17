@@ -129,16 +129,11 @@ class Show extends Component
         return \App\Models\Project::query()->orderBy('name')->get(['id', 'name']);
     }
 
-    /** دسته‌بندی‌های ساختاریافته پکیج (جدول categories) */
+    /** دسته‌بندی‌های ساختاریافته پکیج (جدول categories) — سلسله‌مراتبی برای سلکت */
     #[Computed]
     public function categories()
     {
-        return \App\Models\Category::query()
-            ->ofType(\App\Models\Category::TYPE_PACKAGE)
-            ->ordered()
-            ->get()
-            ->mapWithKeys(fn ($cat) => [$cat->id => $cat->name])
-            ->all();
+        return \App\Models\Category::flatOptions(\App\Models\Category::TYPE_PACKAGE);
     }
 
     /* ---------------------------------------------------------------- */

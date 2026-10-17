@@ -107,17 +107,6 @@
         {{-- LEFT --}}
         <div class="space-y-6 lg:col-span-2">
 
-            {{-- description --}}
-            <x-card title="توضیحات پکیج" subtitle="معرفی کامل امکانات و جزئیات">
-                @if($package->description)
-                    <div class="rich-content text-sm leading-7 text-zinc-600 dark:text-zinc-300">
-                        {!! $package->description !!}
-                    </div>
-                @else
-                    <p class="text-sm text-zinc-500">توضیحی برای این پکیج ثبت نشده است.</p>
-                @endif
-            </x-card>
-
             {{-- versions timeline --}}
             <x-card title="نسخه‌ها" subtitle="آخرین نسخه‌های منتشرشده">
                 @if($this->versions->isNotEmpty())
@@ -363,8 +352,55 @@
         </aside>
     </section>
 
-    {{-- ============ Comments ============ --}}
-    <section class="mx-auto w-full max-w-7xl px-4 sm:px-6">
-        <livewire:shop.comment-section :model="$package" label="پکیج" :key="'cs-package-'.$package->id" />
+    {{-- ============ Tabs: توضیحات / دیدگاه‌ها ============ --}}
+    {{-- توضیحات ممکن است طولانی باشد؛ دیدگاه‌ها هم تب جدا با شمارنده تأییدشده‌ها --}}
+    @php($approvedCommentsCount = $package->approvedCommentsCount())
+    <section class="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6">
+        <div class="card overflow-hidden" x-data="{ shopTab: 'description' }">
+            <div class="flex items-center gap-1 overflow-x-auto border-b border-zinc-100 px-2 dark:border-zinc-800 sm:px-4" role="tablist" aria-label="توضیحات و دیدگاه‌ها">
+                <button type="button" @click="shopTab = 'description'" role="tab"
+                        :aria-selected="(shopTab === 'description').toString()"
+                        class="-mb-px cursor-pointer whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-black transition-colors"
+                        :class="shopTab === 'description'
+                            ? 'border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400'
+                            : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'">
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-icon name="file-text" class="size-4" />
+                        توضیحات پکیج
+                    </span>
+                </button>
+                <button type="button" @click="shopTab = 'comments'" role="tab"
+                        :aria-selected="(shopTab === 'comments').toString()"
+                        class="-mb-px cursor-pointer whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-black transition-colors"
+                        :class="shopTab === 'comments'
+                            ? 'border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400'
+                            : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'">
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-icon name="message-square" class="size-4" />
+                        دیدگاه‌ها
+                        <span class="rounded-full px-2 py-0.5 text-[11px] tabular-nums transition-colors"
+                              :class="shopTab === 'comments'
+                                  ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400'
+                                  : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'">{{ fa_num($approvedCommentsCount) }}</span>
+                    </span>
+                </button>
+            </div>
+
+            {{-- panel: توضیحات --}}
+            <div x-show="shopTab === 'description'" role="tabpanel" class="p-5 sm:p-6">
+                @if($package->description)
+                    <div class="rich-content text-sm leading-7 text-zinc-600 dark:text-zinc-300">
+                        {!! $package->description !!}
+                    </div>
+                @else
+                    <p class="text-sm text-zinc-500">توضیحی برای این پکیج ثبت نشده است.</p>
+                @endif
+            </div>
+
+            {{-- panel: دیدگاه‌ها --}}
+            <div x-show="shopTab === 'comments'" x-cloak role="tabpanel" class="p-5 sm:p-6">
+                <livewire:shop.comment-section :model="$package" label="پکیج" :key="'cs-package-'.$package->id" />
+            </div>
+        </div>
     </section>
 </div>

@@ -29,6 +29,12 @@ class CustomerProfile extends Component
     /** تب فعال: purchases | licenses | info */
     public string $tab = 'purchases';
 
+    /* ---- فیلتر بخش لایسنس‌ها ---- */
+    public string $licenseSearch = '';
+
+    /** '' | active | expired | revoked */
+    public string $licenseStatus = '';
+
     /* ---- form: مشخصات ---- */
     public array $form = [
         'name'        => '',
@@ -69,6 +75,16 @@ class CustomerProfile extends Component
     public function switchTab(string $tab): void
     {
         $this->tab = in_array($tab, ['purchases', 'licenses', 'info'], true) ? $tab : 'purchases';
+    }
+
+    public function updatedLicenseSearch(): void
+    {
+        $this->resetPage('licensesPage');
+    }
+
+    public function updatedLicenseStatus(): void
+    {
+        $this->resetPage('licensesPage');
     }
 
     /* ---------------------------------------------------------------- */
@@ -122,25 +138,48 @@ class CustomerProfile extends Component
     /*  Computed                                                         */
     /* ---------------------------------------------------------------- */
 
-    /** خریدهای موفق پکیج (به‌همراه پکیج و نسخه) */
+    /**
+     * خریدهای موفق پکیج (به‌همراه پکیج و نسخه)
+     * بدون تکرار: اگر مشتری یک پکیج را چند بار خریده/تمدید کرده،
+     * فقط آخرین خریدِ هر پکیج نمایش داده می‌شود.
+     */
     #[Computed]
     public function purchases()
     {
-        return $this->customer()
-            ?->purchases()
-            ->with(['package:id,name,slug,thumbnail,is_free', 'version:id,version', 'pricingPlan:id,name,duration_months,is_one_time'])
+        $customer = $this->customer();
+
+        if (!$customer) {
+            return PackagePurchase::query()->whereRaw('1 = 0')->paginate(10, pageName: 'purchasesPage');
+        }
+
+        // آخرین خریدِ موفق هر پکیج (MAX(id) per package)
+        $latestIds = PackagePurchase::query()
+            ->where('customer_id', $customer->id)
             ->where('status', PackagePurchase::STATUS_PAID)
+            ->groupBy('package_id')
+            ->selectRaw('MAX(id) as id')
+            ->pluck('id');
+
+        return PackagePurchase::query()
+            ->with(['package:id,name,slug,thumbnail,is_free', 'version:id,version', 'pricingPlan:id,name,duration_months,is_one_time'])
+            ->whereIn('id', $latestIds)
             ->orderByDesc('id')
             ->paginate(10, pageName: 'purchasesPage');
     }
 
-    /** لایسنس‌های فعال/منقضی مشتری */
+    /** لایسنس‌های مشتری با فیلتر جستجو و وضعیت */
     #[Computed]
     public function licenses()
     {
+        $search = trim($this->licenseSearch);
+
         return $this->customer()
             ?->licenses()
             ->with('package:id,name,slug')
+            ->when($this->licenseStatus !== '', fn ($q) => $q->where('status', $this->licenseStatus))
+            ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->where('license_key', 'like', "%{$search}%")
+                ->orWhereHas('package', fn ($p) => $p->where('name', 'like', "%{$search}%"))))
             ->orderByDesc('id')
             ->paginate(10, pageName: 'licensesPage');
     }
@@ -157,13 +196,18 @@ class CustomerProfile extends Component
         $customer = $this->customer();
 
         if (!$customer) {
-            return ['purchases' => 0, 'licenses' => 0, 'spent' => 0];
+            return ['purchases' => 0, 'licenses' => 0, 'licenses_total' => 0, 'spent' => 0];
         }
 
         return [
-            'purchases' => $customer->purchases()->where('status', PackagePurchase::STATUS_PAID)->count(),
-            'licenses'  => $customer->licenses()->where('status', PackageLicense::STATUS_ACTIVE)->count(),
-            'spent'     => (int) $customer->purchases()->where('status', PackagePurchase::STATUS_PAID)->sum('amount'),
+            // تعداد پکیج‌های متمایز خریده‌شده (بدون تکرار خریدهای مجدد یک پکیج)
+            'purchases'      => $customer->purchases()
+                ->where('status', PackagePurchase::STATUS_PAID)
+                ->distinct('package_id')
+                ->count('package_id'),
+            'licenses'       => $customer->licenses()->where('status', PackageLicense::STATUS_ACTIVE)->count(),
+            'licenses_total' => $customer->licenses()->count(),
+            'spent'          => (int) $customer->purchases()->where('status', PackagePurchase::STATUS_PAID)->sum('amount'),
         ];
     }
 

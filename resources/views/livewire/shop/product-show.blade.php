@@ -133,21 +133,54 @@
         </div>
     </section>
 
-    {{-- ============ Description ============ --}}
-    <section class="card p-5 sm:p-6" id="description">
-        <h2 class="flex items-center gap-2 text-lg font-black text-zinc-900 dark:text-zinc-50">
-            <x-icon name="file-text" class="size-5 text-brand-600" />
-            توضیحات پروژه
-        </h2>
-        @if($product->description)
-            <div class="rich-content mt-4 text-sm leading-8 text-zinc-700 dark:text-zinc-300">
-                {!! $product->description !!}
-            </div>
-        @else
-            <div class="mt-4">
+    {{-- ============ Tabs: توضیحات / دیدگاه‌ها ============ --}}
+    {{-- توضیحات و دیدگاه‌ها هرکدام در تب جدا + شمارنده دیدگاه‌های تأییدشده روی تب --}}
+    @php($approvedCommentsCount = $product->approvedCommentsCount())
+    <section class="card overflow-hidden" id="description" x-data="{ shopTab: 'description' }">
+        <div class="flex items-center gap-1 overflow-x-auto border-b border-zinc-100 px-2 dark:border-zinc-800 sm:px-4" role="tablist" aria-label="توضیحات و دیدگاه‌ها">
+            <button type="button" @click="shopTab = 'description'" role="tab"
+                    :aria-selected="(shopTab === 'description').toString()"
+                    class="-mb-px cursor-pointer whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-black transition-colors"
+                    :class="shopTab === 'description'
+                        ? 'border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400'
+                        : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'">
+                <span class="inline-flex items-center gap-1.5">
+                    <x-icon name="file-text" class="size-4" />
+                    توضیحات پروژه
+                </span>
+            </button>
+            <button type="button" @click="shopTab = 'comments'" role="tab"
+                    :aria-selected="(shopTab === 'comments').toString()"
+                    class="-mb-px cursor-pointer whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-black transition-colors"
+                    :class="shopTab === 'comments'
+                        ? 'border-brand-500 text-brand-600 dark:border-brand-400 dark:text-brand-400'
+                        : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'">
+                <span class="inline-flex items-center gap-1.5">
+                    <x-icon name="message-square" class="size-4" />
+                    دیدگاه‌ها
+                    <span class="rounded-full px-2 py-0.5 text-[11px] tabular-nums transition-colors"
+                          :class="shopTab === 'comments'
+                              ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-400'
+                              : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'">{{ fa_num($approvedCommentsCount) }}</span>
+                </span>
+            </button>
+        </div>
+
+        {{-- panel: توضیحات --}}
+        <div x-show="shopTab === 'description'" role="tabpanel" class="p-5 sm:p-6">
+            @if($product->description)
+                <div class="rich-content text-sm leading-8 text-zinc-700 dark:text-zinc-300">
+                    {!! $product->description !!}
+                </div>
+            @else
                 <x-empty icon="file-text" title="توضیحاتی ثبت نشده" />
-            </div>
-        @endif
+            @endif
+        </div>
+
+        {{-- panel: دیدگاه‌ها --}}
+        <div x-show="shopTab === 'comments'" x-cloak role="tabpanel" class="p-5 sm:p-6">
+            <livewire:shop.comment-section :model="$product" label="محصول" :key="'cs-product-'.$product->id" />
+        </div>
     </section>
 
     {{-- ============ Versions ============ --}}
@@ -206,9 +239,4 @@
             </div>
         </section>
     @endif
-
-    {{-- ============ Comments ============ --}}
-    <section>
-        <livewire:shop.comment-section :model="$product" label="محصول" :key="'cs-product-'.$product->id" />
-    </section>
 </div>

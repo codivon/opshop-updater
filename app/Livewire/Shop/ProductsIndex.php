@@ -82,7 +82,11 @@ class ProductsIndex extends Component
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('slug', 'like', "%{$this->search}%")
                 ->orWhere('short_description', 'like', "%{$this->search}%")))
-            ->when($this->category !== '', fn ($q) => $q->where('category_id', $this->category))
+            ->when($this->category !== '', function ($q) {
+                // دسته والد + همه زیردسته‌هایش (فیلتر درختی)
+                $ids = Category::subtreeIds((int) $this->category)->all();
+                $q->whereIn('category_id', $ids);
+            })
             ->when($this->priceFilter === 'free', fn ($q) => $q->whereRaw("{$effective} <= 0"))
             ->when($this->priceFilter === 'paid', fn ($q) => $q->whereRaw("{$effective} > 0"))
             ->when($this->sort === 'newest', fn ($q) => $q->orderBy('sort_order')->orderByDesc('id'))
@@ -97,12 +101,7 @@ class ProductsIndex extends Component
     #[Computed]
     public function categories()
     {
-        return Category::query()
-            ->ofType(Category::TYPE_PRODUCT)
-            ->active()
-            ->ordered()
-            ->withCount(['products' => fn ($q) => $q->where('status', Product::STATUS_ACTIVE)])
-            ->get();
+        return Category::shopTree(Category::TYPE_PRODUCT);
     }
 
     public function getSortOptionsProperty(): array

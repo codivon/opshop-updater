@@ -90,10 +90,15 @@
                                 ? 'bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900'
                                 : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'])
                         aria-pressed="{{ $chipActive ? 'true' : 'false' }}">
+                    @if(filled($cat->hierarchy_label ?? null) && $cat->hierarchy_label !== $cat->name)
+                        {{-- زیردسته: نمایش مسیر والد + نام --}}
+                        <span class="opacity-60">{{ \Illuminate\Support\Str::beforeLast($cat->hierarchy_label, ' › ') }}</span>
+                        <x-icon name="corner-up-left" class="size-3 opacity-50" aria-hidden="true" />
+                    @endif
                     {{ $cat->name }}
                     <span @class(['rounded-full px-1.5 text-[10px] tabular-nums',
                             $chipActive ? 'bg-white/20 text-white/80' : 'bg-zinc-200/80 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400'
-                        ])>{{ fa_num($cat->$countKey) }}</span>
+                        ])>{{ fa_num($cat->shop_count ?? $cat->$countKey) }}</span>
                 </button>
             @endforeach
         </div>

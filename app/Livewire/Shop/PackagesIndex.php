@@ -116,7 +116,11 @@ class PackagesIndex extends Component
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('slug', 'like', "%{$this->search}%")
                 ->orWhere('short_description', 'like', "%{$this->search}%")))
-            ->when($this->category !== '', fn ($q) => $q->where('category_id', $this->category))
+            ->when($this->category !== '', function ($q) {
+                // دسته والد + همه زیردسته‌هایش (فیلتر درختی)
+                $ids = Category::subtreeIds((int) $this->category)->all();
+                $q->whereIn('category_id', $ids);
+            })
             ->when($this->priceFilter === 'free', fn ($q) => $q->whereRaw("{$effective} <= 0"))
             ->when($this->priceFilter === 'paid', fn ($q) => $q->whereRaw("{$effective} > 0"))
             ->when($this->sort === 'newest', fn ($q) => $q->latest())
@@ -127,16 +131,11 @@ class PackagesIndex extends Component
             ->paginate(12);
     }
 
-    /** دسته‌بندی‌های پکیج با تعداد */
+    /** دسته‌بندی‌های پکیج — درختی با تعداد تجمیعی (والد شامل زیردسته‌ها) */
     #[Computed]
     public function categories()
     {
-        return Category::query()
-            ->ofType(Category::TYPE_PACKAGE)
-            ->active()
-            ->ordered()
-            ->withCount(['packages' => fn ($q) => $q->where('status', Package::STATUS_ACTIVE)])
-            ->get();
+        return Category::shopTree(Category::TYPE_PACKAGE);
     }
 
     public function getSortOptionsProperty(): array

@@ -113,16 +113,11 @@ class Index extends Component
         return Project::query()->orderBy('name')->get(['id', 'name']);
     }
 
-    /** دسته‌بندی‌های ساختاریافته پکیج (جدول categories) */
+    /** دسته‌بندی‌های ساختاریافته پکیج (جدول categories) — سلسله‌مراتبی برای سلکت */
     #[Computed]
     public function categories()
     {
-        return Category::query()
-            ->ofType(Category::TYPE_PACKAGE)
-            ->ordered()
-            ->get()
-            ->mapWithKeys(fn ($cat) => [$cat->id => $cat->name])
-            ->all();
+        return Category::flatOptions(Category::TYPE_PACKAGE);
     }
 
     /* ---------------------------------------------------------------- */

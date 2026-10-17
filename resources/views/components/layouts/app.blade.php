@@ -104,7 +104,12 @@
         </div>
 
         {{-- nav --}}
-        <nav class="flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-3 py-4">
+        {{-- FIX (اسکرول منو روی آیتم فعال): با wire:navigate دام پر می‌شود و x-init دوباره اجرا می‌شود؛
+             بنابراین بعد از هر ناوبری، منو اسکرول می‌خورد تا آیتم فعال (aria-current) در دید باشد. --}}
+        <nav x-data
+             x-init="$nextTick(() => $el.querySelector('a[aria-current]')?.scrollIntoView({ block: 'center' }))"
+             class="flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-3 py-4"
+             aria-label="منوی مدیریت">
             @foreach($nav as $group)
                 <div>
                     @if($group['label'])

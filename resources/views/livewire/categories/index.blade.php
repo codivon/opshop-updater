@@ -33,6 +33,7 @@
                 <thead>
                     <tr class="border-b border-zinc-200 bg-zinc-50 text-start text-xs text-zinc-500 dark:border-zinc-700/60 dark:bg-zinc-800/60 dark:text-zinc-400">
                         <th class="px-4 py-3 text-start font-bold">نام</th>
+                        <th class="px-4 py-3 text-start font-bold">والد</th>
                         <th class="px-4 py-3 text-start font-bold">نوع</th>
                         <th class="px-4 py-3 text-start font-bold">استفاده</th>
                         <th class="px-4 py-3 text-start font-bold">ترتیب</th>
@@ -44,8 +45,22 @@
                     @forelse($this->records as $category)
                         <tr wire:key="cat-{{ $category->id }}" class="border-b border-zinc-100 transition-colors last:border-0 hover:bg-zinc-50/70 dark:border-zinc-700/40 dark:hover:bg-zinc-800/40">
                             <td class="px-4 py-3">
-                                <div class="font-bold text-zinc-900 dark:text-zinc-50">{{ $category->name }}</div>
-                                <div class="mt-0.5 font-mono text-xs text-zinc-400" dir="ltr">{{ $category->slug }}</div>
+                                <div @class(['flex items-center gap-1.5', 'ps-5' => filled($category->parent_id)])>
+                                    @if(filled($category->parent_id))
+                                        <x-icon name="corner-up-left" class="size-3.5 shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden="true" />
+                                    @endif
+                                    <div>
+                                        <div class="font-bold text-zinc-900 dark:text-zinc-50">{{ $category->name }}</div>
+                                        <div class="mt-0.5 font-mono text-xs text-zinc-400" dir="ltr">{{ $category->slug }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+                                @if($category->parent)
+                                    {{ $category->parent->name }}
+                                @else
+                                    <span class="text-zinc-300 dark:text-zinc-600">—</span>
+                                @endif
                             </td>
                             <td class="px-4 py-3">
                                 @if($category->type === \App\Models\Category::TYPE_PRODUCT)
@@ -90,7 +105,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-10">
+                            <td colspan="7" class="px-4 py-10">
                                 <x-empty icon="tag" title="دسته‌بندی‌ای یافت نشد" description="با دکمه «دسته‌بندی جدید» اولین دسته را بسازید." />
                             </td>
                         </tr>
@@ -116,12 +131,17 @@
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <x-field label="نوع" for="form.type" required>
-                    <x-select id="form.type" wire:model="form.type" :options="$this->types" />
+                    <x-select id="form.type" wire:model.live="form.type" :options="$this->types" />
                 </x-field>
                 <x-field label="ترتیب نمایش" for="form.sort_order">
                     <x-input id="form.sort_order" type="number" min="0" wire:model="form.sort_order" />
                 </x-field>
             </div>
+
+            <x-field label="دسته والد" for="form.parent_id" hint="اختیاری — برای ساخت دسته‌بندی درختی (والد باید هم‌نوع باشد)">
+                <x-select id="form.parent_id" wire:model="form.parent_id" :options="$this->parentOptions" placeholder="بدون والد (دسته اصلی)" />
+                @error('form.parent_id') <p class="mt-1 text-xs font-bold text-rose-500">{{ $message }}</p> @enderror
+            </x-field>
 
             <x-field label="توضیح" for="form.description">
                 <x-textarea id="form.description" wire:model="form.description" rows="2" placeholder="اختیاری…" />

@@ -100,6 +100,12 @@ class Package extends Model
         return $this->morphMany(Comment::class, 'commentable');
     }
 
+    /** تعداد دیدگاه‌های تأییدشده (برای شمارنده تب دیدگاه‌ها) */
+    public function approvedCommentsCount(): int
+    {
+        return $this->comments()->where('status', Comment::STATUS_APPROVED)->count();
+    }
+
     /* ---------------- Helpers ---------------- */
 
     public function isActive(): bool

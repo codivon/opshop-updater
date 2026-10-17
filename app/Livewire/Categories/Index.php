@@ -26,6 +26,7 @@ class Index extends Component
         'name'        => '',
         'slug'        => '',
         'type'        => Category::TYPE_PRODUCT,
+        'parent_id'   => '',
         'description' => '',
         'is_active'   => true,
         'sort_order'  => 0,
@@ -37,6 +38,7 @@ class Index extends Component
             'form.name'        => ['required', 'string', 'max:120'],
             'form.slug'        => ['nullable', 'string', 'max:120', 'alpha_dash:ascii'],
             'form.type'        => ['required', 'in:product,package'],
+            'form.parent_id'   => ['nullable', 'integer', 'exists:categories,id'],
             'form.description' => ['nullable', 'string', 'max:500'],
             'form.is_active'   => ['boolean'],
             'form.sort_order'  => ['nullable', 'integer', 'min:0', 'max:9999'],
@@ -58,6 +60,12 @@ class Index extends Component
         $this->resetPage();
     }
 
+    /** با تغییر نوع دسته، والدِ انتخاب‌شده نامعتبر می‌شود */
+    public function updatedFormType(): void
+    {
+        $this->form['parent_id'] = '';
+    }
+
     /* ---------------------------------------------------------------- */
     /*  CRUD                                                             */
     /* ---------------------------------------------------------------- */
@@ -70,6 +78,7 @@ class Index extends Component
             'name'        => '',
             'slug'        => '',
             'type'        => $this->typeFilter !== '' ? $this->typeFilter : Category::TYPE_PRODUCT,
+            'parent_id'   => '',
             'description' => '',
             'is_active'   => true,
             'sort_order'  => 0,
@@ -87,6 +96,7 @@ class Index extends Component
             'name'        => $category->name,
             'slug'        => $category->slug,
             'type'        => $category->type,
+            'parent_id'   => $category->parent_id ?? '',
             'description' => (string) $category->description,
             'is_active'   => $category->is_active,
             'sort_order'  => $category->sort_order,
@@ -115,6 +125,23 @@ class Index extends Component
             }
         }
 
+        /* ---- اعتبارسنجی سلسله‌مراتب (دسته والد) ---- */
+        $parentId = filled($data['form']['parent_id'] ?? '') ? (int) $data['form']['parent_id'] : null;
+
+        if ($parentId !== null) {
+            $parent = Category::find($parentId);
+
+            if (!$parent || $parent->type !== $data['form']['type']) {
+                $this->addError('form.parent_id', 'دسته والد باید از همان نوع این دسته باشد.');
+                return;
+            }
+
+            if ($this->editingId && Category::inSubtree($this->editingId, $parentId)) {
+                $this->addError('form.parent_id', 'نمی‌توان خود دسته یا زیردسته‌هایش را به‌عنوان والد انتخاب کرد.');
+                return;
+            }
+        }
+
         $id = $this->editingId;
 
         Category::updateOrCreate(
@@ -123,6 +150,7 @@ class Index extends Component
                 'name'        => $name,
                 'slug'        => $slug,
                 'type'        => $data['form']['type'],
+                'parent_id'   => $parentId,
                 'description' => $data['form']['description'] ?: null,
                 'is_active'   => (bool) $data['form']['is_active'],
                 'sort_order'  => (int) ($data['form']['sort_order'] ?? 0),
@@ -144,6 +172,14 @@ class Index extends Component
     public function delete(int $id): void
     {
         $category = Category::findOrFail($id);
+
+        // دسته دارای زیردسته قابل حذف نیست (زیردسته‌ها باید اول جابه‌جا شوند)
+        $childrenCount = $category->children()->count();
+
+        if ($childrenCount > 0) {
+            $this->toast('این دسته‌بندی دارای ' . fa_num($childrenCount) . ' زیردسته است؛ ابتدا زیردسته‌ها را حذف یا جابه‌جا کنید.', 'error');
+            return;
+        }
 
         $usage = $category->usageCount();
 
@@ -190,15 +226,24 @@ class Index extends Component
     public function records()
     {
         return Category::query()
-            ->withCount(['products', 'packages'])
+            ->with('parent:id,name')
+            ->withCount(['products', 'packages', 'children'])
             ->when($this->search, fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('slug', 'like', "%{$this->search}%")))
             ->when($this->typeFilter !== '', fn ($q) => $q->where('type', $this->typeFilter))
             ->orderBy('type')
+            ->orderByRaw('COALESCE(parent_id, id)')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->paginate(20);
+    }
+
+    /** گزینه‌های دسته والد برای مودال (فقط هم‌نوع، بدون خود دسته و زیردرختش) */
+    #[Computed]
+    public function parentOptions(): array
+    {
+        return Category::flatOptions($this->form['type'] ?: Category::TYPE_PRODUCT, $this->editingId);
     }
 
     public function render()

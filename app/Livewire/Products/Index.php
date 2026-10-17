@@ -243,12 +243,7 @@ class Index extends Component
     #[Computed]
     public function categories()
     {
-        return Category::query()
-            ->ofType(Category::TYPE_PRODUCT)
-            ->active()
-            ->ordered()
-            ->pluck('name', 'id')
-            ->all();
+        return Category::flatOptions(Category::TYPE_PRODUCT);
     }
 
     #[Computed]
