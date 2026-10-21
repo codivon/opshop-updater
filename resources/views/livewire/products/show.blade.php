@@ -301,6 +301,7 @@
             <x-field label="فایل ZIP محصول">
                 <div wire:key="pver-file-{{ (int) $editingVersionId }}" wire:ignore x-data class="space-y-2">
                     <input type="file" accept=".zip,application/zip" wire:model="versionFile" class="input" />
+                    <x-upload-progress target="versionFile" label="در حال آپلود فایل ZIP" />
                     <p class="text-xs text-zinc-500 dark:text-zinc-400">
                         @if($editingVersionId)
                             اگر فایل جدید انتخاب نکنید، فایل فعلی حفظ می‌شود.

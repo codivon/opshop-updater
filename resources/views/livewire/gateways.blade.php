@@ -135,6 +135,7 @@
                                     <input type="file" wire:model="logoUploads.{{ $gw['id'] }}" accept="image/*,.svg"
                                            class="block w-full text-xs text-zinc-500 file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-zinc-600 hover:file:bg-zinc-200 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-300"
                                            aria-label="آپلود لوگوی درگاه {{ $gw['name'] }}" />
+                                    <x-upload-progress target="logoUploads.{{ $gw['id'] }}" label="در حال آپلود لوگو" class="w-full" />
                                     @if($gw['logo'])
                                         <button type="button" wire:click="removeLogo({{ $gw['id'] }})"
                                                 class="rounded-lg px-2.5 py-1.5 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">

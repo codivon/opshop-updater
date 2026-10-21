@@ -5,26 +5,44 @@ namespace App\Livewire\Templates;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Comment;
 use App\Models\Template;
+use App\Models\TemplateImage;
+use App\Models\TemplateLicense;
 use App\Models\TemplateVersion;
+use App\Services\ImageUploadService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Livewire\WithPagination;
+use RuntimeException;
 
 #[Layout('components.layouts.app')]
 #[Title('جزئیات قالب')]
 class Show extends Component
 {
-    use WithToasts, WithFileUploads;
+    use WithToasts, WithFileUploads, WithPagination;
 
     public Template $template;
 
-    /** تب فعال: info | versions | comments */
+    /** تب فعال: info | versions | gallery | purchases | licenses | comments */
     public string $tab = 'info';
+
+    /* ================= Template edit modal (مثل Packages\Show) ================= */
+    public bool $showModal = false;
+    public array $form = [];
+    public bool $removeThumbnail = false;
+    public $thumbnailFile = null;
+
+    /** شمارنده برای رندر مجدد input تصویر (رفع باگ «تصویر قالب تغییر نمی‌کند») */
+    public int $thumbNonce = 0;
+
+    /** تصاویر گالری جدید (چندتایی) */
+    public array $newImages = [];
+    public ?int $deleteImageId = null;
 
     /* ================= Version form ================= */
     public bool $showVersionModal = false;
@@ -54,7 +72,7 @@ class Show extends Component
             'versionForm.is_mandatory' => ['boolean'],
             'versionForm.status'       => ['required', 'in:draft,active,archived'],
             'versionForm.release_date' => ['nullable', 'date'],
-            'versionFile'              => [$this->editingVersionId ? 'nullable' : 'nullable', 'file', 'mimes:zip', 'max:327680'],
+            'versionFile'              => ['nullable', 'file', 'mimes:zip', 'max:327680'],
         ];
     }
 
@@ -73,10 +91,187 @@ class Show extends Component
 
     public function switchTab(string $tab): void
     {
-        $this->tab = in_array($tab, ['info', 'versions', 'comments']) ? $tab : 'info';
+        $this->tab = in_array($tab, ['info', 'versions', 'gallery', 'purchases', 'licenses', 'comments']) ? $tab : 'info';
     }
 
-    /* ================= Versions CRUD ================= */
+    /* ================================================================
+     *  ویرایش قالب (اطلاعات + قیمت‌گذاری دوگانه + تصویر شاخص)
+     * ================================================================ */
+
+    public function openEditTemplate(ImageUploadService $uploader): void
+    {
+        $this->resetValidation();
+        $this->form = $this->template->only([
+            'name', 'slug', 'short_description', 'description',
+            'price', 'discount', 'exclusive_price', 'exclusive_discount',
+            'exclusive_note', 'is_free', 'status', 'sort_order',
+        ]);
+        $this->form['category_id'] = (string) ($this->template->category_id ?? '');
+        $this->thumbnailFile = null;
+        $this->removeThumbnail = false;
+        $this->thumbNonce++;
+        $this->showModal = true;
+    }
+
+    public function saveTemplate(ImageUploadService $uploader): void
+    {
+        $validated = $this->validate([
+            'form.name'               => ['required', 'string', 'max:190'],
+            'form.slug'               => ['nullable', 'string', 'max:190', 'alpha_dash:ascii', 'unique:templates,slug,' . $this->template->id],
+            'form.category_id'        => ['nullable', 'exists:categories,id'],
+            'form.short_description'  => ['nullable', 'string', 'max:10000'],
+            'form.description'        => ['nullable', 'string', 'max:100000'],
+            'form.price'              => ['nullable', 'integer', 'min:0'],
+            'form.discount'           => ['nullable', 'integer', 'min:0', 'max:100'],
+            'form.exclusive_price'    => ['nullable', 'integer', 'min:0'],
+            'form.exclusive_discount' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'form.exclusive_note'     => ['nullable', 'string', 'max:2000'],
+            'form.is_free'            => ['nullable', 'boolean'],
+            'form.status'             => ['required', 'in:draft,active,archived'],
+            'form.sort_order'         => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'thumbnailFile'           => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
+            'newImages'               => ['nullable', 'array', 'max:10'],
+            'newImages.*'             => ['image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
+        ], [
+            'form.name.required' => 'نام قالب الزامی است.',
+            'form.slug.unique'   => 'این نامک قبلاً استفاده شده است.',
+            'form.status.required' => 'وضعیت را انتخاب کنید.',
+        ]);
+
+        $form = $validated['form'];
+
+        // تولید slug اگر خالی باشد
+        if (blank($form['slug'] ?? null)) {
+            $form['slug'] = Template::generateSlug($form['name'], $this->template->id);
+        }
+
+        $form['is_free'] = (bool) ($form['is_free'] ?? false);
+        $form['price'] = (int) ($form['price'] ?? 0);
+        $form['discount'] = (int) ($form['discount'] ?? 0);
+        $form['exclusive_price'] = (int) ($form['exclusive_price'] ?? 0);
+        $form['exclusive_discount'] = (int) ($form['exclusive_discount'] ?? 0);
+        $form['exclusive_note'] = ($form['exclusive_note'] ?? '') ?: null;
+        $form['sort_order'] = (int) ($form['sort_order'] ?? 0);
+        $form['category_id'] = filled($form['category_id'] ?? '') ? (int) $form['category_id'] : null;
+
+        if ($form['is_free']) {
+            $form['price'] = 0;
+            $form['discount'] = 0;
+            $form['exclusive_price'] = 0;
+            $form['exclusive_discount'] = 0;
+        }
+
+        try {
+            // تصویر شاخص
+            if ($this->removeThumbnail) {
+                $uploader->deleteFile($this->template->thumbnail);
+                $form['thumbnail'] = null;
+            } elseif ($this->thumbnailFile) {
+                if ($this->template->thumbnail) {
+                    $uploader->deleteFile($this->template->thumbnail);
+                }
+                $form['thumbnail'] = $uploader->uploadThumbnailTemplate($this->thumbnailFile, $form['slug']);
+            }
+
+            $this->template->update($form);
+
+            // گالری جدید (به گالری موجود اضافه می‌شود)
+            if ($this->newImages) {
+                $uploader->uploadTemplateGalleryImages($this->newImages, $this->template);
+            }
+        } catch (RuntimeException $e) {
+            $this->toast($e->getMessage(), 'error');
+            return;
+        }
+
+        $this->template->refresh();
+
+        // رفع باگ «تصویر قالب تغییر نمی‌کند» — پاک‌سازی کامل فایل از state
+        $this->thumbnailFile = null;
+        $this->newImages = [];
+        $this->removeThumbnail = false;
+        $this->thumbNonce++;
+        $this->showModal = false;
+        $this->toast('قالب با موفقیت به‌روزرسانی شد.');
+    }
+
+    /* ================================================================
+     *  گالری تصاویر
+     * ================================================================ */
+
+    public function uploadImages(ImageUploadService $uploader): void
+    {
+        $this->validate([
+            'newImages'   => ['required', 'array', 'max:10'],
+            'newImages.*' => ['image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
+        ], [
+            'newImages.required' => 'ابتدا تصاویر را انتخاب کنید.',
+            'newImages.max'      => 'حداکثر ۱۰ تصویر در هر بار.',
+        ]);
+
+        try {
+            $uploader->uploadTemplateGalleryImages($this->newImages, $this->template);
+        } catch (RuntimeException $e) {
+            $this->toast($e->getMessage(), 'error');
+            return;
+        }
+
+        $count = count($this->newImages);
+        $this->newImages = [];
+        $this->toast('تعداد ' . fa_num($count) . ' تصویر به گالری اضافه شد.');
+    }
+
+    public function deleteImage(ImageUploadService $uploader): void
+    {
+        $image = TemplateImage::where('template_id', $this->template->id)->findOrFail($this->deleteImageId ?? 0);
+        $uploader->deleteTemplateGalleryImage($image);
+        $this->deleteImageId = null;
+        $this->toast('تصویر حذف شد.');
+    }
+
+    /** جابه‌جایی تصویر با همسایه بالا/پایین */
+    public function moveImage(int $id, string $direction): void
+    {
+        $ids = $this->template->images()->orderBy('sort_order')->pluck('id')->values()->all();
+        $index = array_search($id, $ids, true);
+
+        if ($index === false) {
+            return;
+        }
+
+        $swapWith = $direction === 'up' ? $index - 1 : $index + 1;
+
+        if ($swapWith < 0 || $swapWith >= count($ids)) {
+            return;
+        }
+
+        [$ids[$index], $ids[$swapWith]] = [$ids[$swapWith], $ids[$index]];
+
+        app(ImageUploadService::class)->updateTemplateImageOrder(array_values($ids));
+        $this->template->refresh();
+    }
+
+    /* ================================================================
+     *  لایسنس‌های قالب
+     * ================================================================ */
+
+    public function revokeLicense(int $id): void
+    {
+        $license = TemplateLicense::where('template_id', $this->template->id)->findOrFail($id);
+        $license->revoke();
+        $this->toast('لایسنس باطل شد.');
+    }
+
+    public function restoreLicense(int $id): void
+    {
+        $license = TemplateLicense::where('template_id', $this->template->id)->findOrFail($id);
+        $license->restore();
+        $this->toast('لایسنس دوباره فعال شد.');
+    }
+
+    /* ================================================================
+     *  نسخه‌ها
+     * ================================================================ */
 
     public function createVersion(): void
     {
@@ -276,13 +471,27 @@ class Show extends Component
     }
 
     #[Computed]
+    public function images()
+    {
+        return $this->template->images()->orderBy('sort_order')->get();
+    }
+
+    #[Computed]
     public function purchases()
     {
         return $this->template->purchases()
-            ->with(['customer:id,name,phone', 'version:id,template_id,version'])
+            ->with(['customer:id,name,phone', 'version:id,template_id,version', 'discountCode:id,code', 'license:id,license_key'])
             ->orderByDesc('id')
-            ->limit(50)
-            ->get();
+            ->paginate(10, ['*'], 'purchasesPage');
+    }
+
+    #[Computed]
+    public function licenses()
+    {
+        return $this->template->licenses()
+            ->with(['customer:id,name,phone', 'purchase:id,transaction_id,purchase_type'])
+            ->orderByDesc('id')
+            ->paginate(10, ['*'], 'licensesPage');
     }
 
     #[Computed]
@@ -291,6 +500,20 @@ class Show extends Component
         return $this->template->comments()
             ->latest('id')
             ->paginate(15, pageName: 'commentsPage');
+    }
+
+    /** آمار تب اطلاعات */
+    #[Computed]
+    public function stats(): array
+    {
+        $paid = $this->template->purchases()->where('status', 'paid');
+
+        return [
+            'normal_sales'    => (clone $paid)->where('purchase_type', 'normal')->count(),
+            'exclusive_sales' => (clone $paid)->where('purchase_type', 'exclusive')->count(),
+            'revenue'         => (int) $paid->sum('amount'),
+            'licenses'        => $this->template->licenses()->where('status', TemplateLicense::STATUS_ACTIVE)->count(),
+        ];
     }
 
     public function render()

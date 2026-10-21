@@ -352,3 +352,15 @@ admin-panel/
 - (۳۶) 🆕 در `sms/logs.blade.php` و بقیه ویوهای Livewire، پراپرتی‌های `#[Computed]` باید با `$this->property` صدا زده شوند نه متغیر خام — با متغیر خام فقط وقتی لیست پر است «Undefined variable» می‌دهد.
 
 *آخرین به‌روزرسانی: بعد از Task 26 (تب توضیحات/دیدگاه‌ها با شمارنده + دسته‌بندی درختی برای انتخاب دسته فروشگاه وردپرس + API درخت دسته‌ها + فیلتر لایسنس پروفایل + dedupe پکیج‌ها + رفع باگ لاگ پیامک + اسکرول منوی پنل روی آیتم فعال). جزئیات: README-TASK26-FA.md*
+
+**گاتچای Task 34/35 (قالب‌ها + گزارش‌ها)**:
+- (۳۷) 🆕 تداخل import/class در `app/Livewire/Tools/Backup.php` (Task 31): `use App\Models\Backup;` + `class Backup` در یک فایل = خطای مهلک → الگوی درست: `use App\Models\Backup as BackupModel;`.
+- (۳۸) 🆕 فروش دوگانه قالب‌ها: هر قالب دو قیمت دارد — `price/discount` (خرید معمولی) و `exclusive_price/exclusive_discount` (خرید اختصاصی). پس از نخستین خرید اختصاصی موفق (`TemplatePurchase::markAsPaid`)، ستون `is_sold_exclusively` ست می‌شود و قالب از فهرست فروشگاه/صفحه اصلی/API حذف می‌شود (`where('is_sold_exclusively', false)`). فهرست API پکیج‌ها کد تخفیف ندارد → API قالب‌ها هم ندارد (عیناً همان محدودیت)؛ فروشگاه مهمان کد تخفیف دارد.
+- (۳۹) 🆕 لایسنس قالب (`TemplateLicense`): بعد از `markAsPaid` با `TemplateLicense::issueFor($purchase)` idempotent صادر می‌شود (دائمی، expires_at=null). صفحه نتیجه پرداخت قالب کلید TMP- را نشان می‌دهد؛ تب «لایسنس‌ها» در Templates\Show و تب دوم صفحه لایسنس‌های پنل هم هست.
+- (۴۰) 🆕 باگ «تصویر قالب تغییر نمی‌کند» — دو ریشه: (الف) بعد از ذخیره، `$thumbnailFile` از state پاک نمی‌شد و با input قدیمیِ `wire:ignore` در مودال تداخل داشت → حالا بعد از save پاک + `thumbNonce` در wire:key باعث رندر مجدد input می‌شود؛ (ب) `template_asset_url()` helper جدید: اگر فایل نه در public و نه در fallback بود، تصویر پیش‌فرض برمی‌گرداند (نه URL شکسته ۴۰۴)؛ برای فایل fallback کش‌بریک می‌گذارد.
+- (۴۱) 🆕 نوار پیشرفت آپلود: کامپوننت `<x-upload-progress target="propertyName" label="…"/>` با رویدادهای window فایروال (upload-progress/finished/error از `detail.name`) — روی همه ورودی‌های فایل (قالب/پکیج/محصول/پشتیبان‌گیری/لوگوی درگاه) نصب شده. با wire:ignore تداخلی ندارد.
+- (۴۲) 🆕 گزارش‌ها: تب «فروش» بازه‌محور شد — `period` (today/week/month/year/custom/all) + بازه شمسی دلخواه با helper `jalali_to_carbon()` (سال ۱۳۰۰..۱۵۰۰ = شمسی؛ وگرنه میلادی). ردیف‌های فروش از ۴ منبع یکپارچه می‌شوند (PackagePurchase/ProductPurchase/TemplatePurchase/SubscriptionOrder) و با LengthAwarePaginator دستی صفحه‌بندی می‌شوند (`resolveCurrentPage('salesPage')`). خروجی CSV با BOM UTF-8 برای اکسل.
+- (۴۳) 🆕 badge کامپوننت حالا واریانت `violet` دارد؛ آیکون‌های `zoom-in`/`layout-template`/`palette` در Icon.php موجودند — قبل از استفاده از آیکون جدید حتماً به Icon.php اضافه شود وگرنه رندر خالی می‌شود.
+- (۴۴) 🆕 دسته‌بندی‌های پیش‌فرض قالب‌ها هم در مایگریشن 2026_10_22_000005 و هم در `CategorySeeder::seedTemplates()` (idempotent با firstOrCreate بر type+slug).
+
+*آخرین به‌روزرسانی: بعد از Task 35 (تکمیل قالب‌ها: دو قیمت/گالری/لایسنس/رفع باگ تصویر + داشبورد قالب‌محور + گزارش‌های بازه‌ای با تاریخ شمسی و CSV + نوار پیشرفت آپلود + دسته‌بندی‌های پیش‌فرض قالب). جزئیات: README-TASK35-FA.md*

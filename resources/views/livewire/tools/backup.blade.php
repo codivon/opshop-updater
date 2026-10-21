@@ -176,6 +176,8 @@
                        wire:model="backupFile"
                        class="input file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-zinc-600 dark:file:bg-zinc-800 dark:file:text-zinc-300" />
 
+                <x-upload-progress target="backupFile" label="در حال آپلود فایل پشتیبان" />
+
                 @error('backupFile')
                     <p class="mt-1.5 text-xs font-bold text-rose-600 dark:text-rose-400">{{ $message }}</p>
                 @enderror

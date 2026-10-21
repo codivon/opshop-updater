@@ -76,59 +76,134 @@
 
             {{-- ============ Buy box ============ --}}
             <div class="card space-y-4 p-5 sm:p-6">
-                <div class="flex items-end justify-between">
-                    <div>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400">قیمت قالب</p>
-                        <div class="mt-1 flex flex-wrap items-baseline gap-2">
-                            @if($template->is_effectively_free)
-                                <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">رایگان</span>
-                            @elseif($this->appliedDiscount)
-                                @php($applied = $this->appliedDiscount)
-                                @if($template->discount > 0)
-                                    <span class="text-sm text-zinc-400 line-through">{{ money($template->price) }}</span>
-                                @endif
-                                <span class="text-sm text-zinc-400 line-through">{{ money($template->final_price) }}</span>
-                                @if($applied['final'] <= 0)
-                                    <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">رایگان با کد تخفیف</span>
-                                @else
-                                    <span class="text-2xl font-black tabular-nums text-emerald-600 dark:text-emerald-400">{{ money($applied['final']) }}</span>
-                                @endif
-                            @else
-                                @if($template->discount > 0)
-                                    <span class="text-sm text-zinc-400 line-through">{{ money($template->price) }}</span>
-                                @endif
-                                <span class="text-2xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($template->final_price) }}</span>
+
+                @if($template->is_sold_exclusively)
+                    {{-- ==== واگذارشده (اختصاصی) ==== --}}
+                    <div class="flex flex-col items-center gap-3 rounded-2xl bg-violet-50 px-4 py-6 text-center ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-500/20">
+                        <x-icon name="crown" class="size-8 text-violet-500" />
+                        <p class="text-sm font-black text-violet-800 dark:text-violet-300">این قالب به‌صورت اختصاصی واگذار شده است</p>
+                        <p class="text-xs leading-6 text-zinc-500 dark:text-zinc-400">مالکیت کامل این قالب به یک خریدار منتقل شده و دیگر قابل خرید نیست.</p>
+                    </div>
+                @else
+                    {{-- ==== انتخاب نوع خرید (معمولی / اختصاصی) ==== --}}
+                    @if($template->is_effectively_free)
+                        <div class="flex items-end justify-between">
+                            <div>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400">قیمت قالب</p>
+                                <span class="mt-1 inline-block text-2xl font-black text-emerald-600 dark:text-emerald-400">رایگان</span>
+                            </div>
+                            <span class="inline-flex items-center gap-1 rounded-xl bg-zinc-100 px-2.5 py-1 text-[11px] font-bold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                                <x-icon name="shield-check" class="size-3.5" />
+                                بدون نیاز به ثبت‌نام
+                            </span>
+                        </div>
+                    @else
+                        <p class="text-xs font-bold text-zinc-500 dark:text-zinc-400">نوع خرید را انتخاب کنید:</p>
+
+                        <div class="grid grid-cols-1 gap-3" role="radiogroup" aria-label="نوع خرید">
+                            {{-- خرید معمولی --}}
+                            <button type="button" wire:click="$set('purchaseType', 'normal')"
+                                    class="relative cursor-pointer rounded-2xl p-4 text-start transition-all"
+                                    :class="purchaseType === 'normal'
+                                        ? 'bg-brand-50 ring-2 ring-brand-500 dark:bg-brand-500/10 dark:ring-brand-400'
+                                        : 'bg-white ring-1 ring-zinc-200 hover:ring-brand-300 dark:bg-zinc-900 dark:ring-zinc-700'"
+                                    role="radio" :aria-checked="(purchaseType === 'normal').toString()">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex size-5 items-center justify-center rounded-full border-2 transition-colors"
+                                              :class="purchaseType === 'normal' ? 'border-brand-500 bg-brand-500' : 'border-zinc-300 dark:border-zinc-600'">
+                                            <span class="size-2 rounded-full bg-white transition-opacity" :class="purchaseType === 'normal' ? 'opacity-100' : 'opacity-0'"></span>
+                                        </span>
+                                        <p class="text-sm font-black text-zinc-900 dark:text-zinc-50">خرید معمولی</p>
+                                    </div>
+                                    <div class="text-end">
+                                        @if($template->discount > 0)
+                                            <span class="block text-[11px] text-zinc-400 line-through">{{ money($template->price) }}</span>
+                                        @endif
+                                        <span class="text-lg font-black tabular-nums text-brand-600 dark:text-brand-400">{{ money($template->final_price) }}</span>
+                                    </div>
+                                </div>
+                                <p class="mt-1.5 ps-7 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                                    استفاده از قالب برای یک پروژه — دانلود تمام نسخه‌ها و آپدیت‌ها
+                                </p>
+                            </button>
+
+                            {{-- خرید اختصاصی --}}
+                            @if($template->has_exclusive_offer)
+                                <button type="button" wire:click="$set('purchaseType', 'exclusive')"
+                                        class="relative cursor-pointer rounded-2xl p-4 text-start transition-all"
+                                        :class="purchaseType === 'exclusive'
+                                            ? 'bg-violet-50 ring-2 ring-violet-500 dark:bg-violet-500/10 dark:ring-violet-400'
+                                            : 'bg-white ring-1 ring-zinc-200 hover:ring-violet-300 dark:bg-zinc-900 dark:ring-zinc-700'"
+                                        role="radio" :aria-checked="(purchaseType === 'exclusive').toString()">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex size-5 items-center justify-center rounded-full border-2 transition-colors"
+                                                  :class="purchaseType === 'exclusive' ? 'border-violet-500 bg-violet-500' : 'border-zinc-300 dark:border-zinc-600'">
+                                                <span class="size-2 rounded-full bg-white transition-opacity" :class="purchaseType === 'exclusive' ? 'opacity-100' : 'opacity-0'"></span>
+                                            </span>
+                                            <p class="flex items-center gap-1 text-sm font-black text-zinc-900 dark:text-zinc-50">
+                                                <x-icon name="crown" class="size-4 text-violet-500" />
+                                                خرید اختصاصی
+                                            </p>
+                                        </div>
+                                        <div class="text-end">
+                                            @if($template->exclusive_discount > 0)
+                                                <span class="block text-[11px] text-zinc-400 line-through">{{ money($template->exclusive_price) }}</span>
+                                            @endif
+                                            <span class="text-lg font-black tabular-nums text-violet-600 dark:text-violet-400">{{ money($template->exclusive_final_price) }}</span>
+                                        </div>
+                                    </div>
+                                    <p class="mt-1.5 ps-7 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                                        @if($template->exclusive_note)
+                                            {{ $template->exclusive_note }}
+                                        @else
+                                            واگذاری کامل و انحصاری قالب — پس از خرید از فروشگاه برداشته می‌شود
+                                        @endif
+                                    </p>
+                                </button>
                             @endif
                         </div>
-                    </div>
-                    <span class="inline-flex items-center gap-1 rounded-xl bg-zinc-100 px-2.5 py-1 text-[11px] font-bold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                        <x-icon name="shield-check" class="size-3.5" />
-                        بدون نیاز به ثبت‌نام
-                    </span>
-                </div>
 
-                @php($appliedDiscount = $this->appliedDiscount)
-                @php($templateFree = $template->is_effectively_free || ($appliedDiscount !== null && $appliedDiscount['final'] <= 0))
+                        @php($appliedDiscount = $this->appliedDiscount)
+                        @php($baseAmount = (int) ($purchaseType === 'exclusive' ? $template->exclusive_final_price : $template->final_price))
 
-                {{-- کد تخفیف --}}
-                @include('livewire.shop.partials.discount-field', ['baseAmount' => (int) $template->final_price])
+                        {{-- نمایش قیمت با تخفیف کد --}}
+                        @if($appliedDiscount)
+                            <div class="flex items-center justify-between rounded-xl bg-emerald-50 px-4 py-3 text-sm dark:bg-emerald-500/10">
+                                <span class="font-bold text-emerald-700 dark:text-emerald-400">مبلغ قابل پرداخت</span>
+                                <span class="font-black tabular-nums text-emerald-700 dark:text-emerald-400">
+                                    {{ money($appliedDiscount['final']) }}
+                                    <span class="text-xs font-normal text-emerald-600/70">({{ money($appliedDiscount['discount'], false) }} تخفیف)</span>
+                                </span>
+                            </div>
+                        @endif
 
-                @unless($templateFree)
-                    @include('livewire.shop.partials.gateway-picker', ['gateways' => $this->gateways])
-                @endunless
+                        {{-- کد تخفیف --}}
+                        @include('livewire.shop.partials.discount-field', ['baseAmount' => $baseAmount])
 
-                <x-btn wire:click="buy" :loading="true" size="lg" class="w-full"
-                       :icon="$templateFree ? 'download' : 'credit-card'">
-                    @if($templateFree)
-                        {{ $appliedDiscount !== null ? 'دریافت رایگان با کد تخفیف' : 'دریافت رایگان و دانلود' }}
-                    @else
-                        خرید و دانلود فوری
+                        @unless($appliedDiscount && $appliedDiscount['final'] <= 0)
+                            @include('livewire.shop.partials.gateway-picker', ['gateways' => $this->gateways])
+                        @endunless
                     @endif
-                </x-btn>
 
-                <p class="text-center text-[11px] leading-5 text-zinc-400">
-                    پس از پرداخت، مستقیماً به صفحه دانلود هدایت می‌شوید.
-                </p>
+                    <x-btn wire:click="buy" :loading="true" size="lg" class="w-full"
+                           :icon="($template->is_effectively_free || ($this->appliedDiscount && $this->appliedDiscount['final'] <= 0)) ? 'download' : 'credit-card'">
+                        @if($template->is_effectively_free)
+                            دریافت رایگان و دانلود
+                        @elseif($this->appliedDiscount && $this->appliedDiscount['final'] <= 0)
+                            دریافت رایگان با کد تخفیف
+                        @elseif($purchaseType === 'exclusive')
+                            خرید اختصاصی و پرداخت
+                        @else
+                            خرید و دانلود فوری
+                        @endif
+                    </x-btn>
+
+                    <p class="text-center text-[11px] leading-5 text-zinc-400">
+                        پس از پرداخت، لایسنس خرید صادر و به صفحه دانلود هدایت می‌شوید.
+                    </p>
+                @endif
             </div>
         </div>
     </section>
@@ -182,6 +257,39 @@
             <livewire:shop.comment-section :model="$template" label="قالب" :key="'cs-template-'.$template->id" />
         </div>
     </section>
+
+    {{-- ============ Gallery ============ --}}
+    @if($template->activeImages->count())
+        <section class="card p-5 sm:p-6" id="gallery">
+            <h2 class="flex items-center gap-2 text-lg font-black text-zinc-900 dark:text-zinc-50">
+                <x-icon name="image" class="size-5 text-brand-600" />
+                گالری پیش‌نمایش
+            </h2>
+
+            <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2" x-data="{ lightbox: null }">
+                @foreach($template->activeImages as $image)
+                    <button type="button" @click="lightbox = '{{ $image->url }}'"
+                            class="group relative overflow-hidden rounded-2xl bg-zinc-100 ring-1 ring-zinc-200/80 dark:bg-zinc-800 dark:ring-zinc-700/60"
+                            wire:key="shp-timg-{{ $image->id }}" aria-label="بزرگ‌نمایی تصویر {{ $loop->iteration }}">
+                        <img src="{{ $image->url }}" alt="{{ $image->original_name ?: 'پیش‌نمایش قالب ' . $loop->iteration }}"
+                             class="aspect-video size-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                        <span class="absolute inset-0 flex items-center justify-center bg-zinc-950/0 opacity-0 transition-all group-hover:bg-zinc-950/30 group-hover:opacity-100">
+                            <x-icon name="zoom-in" class="size-6 text-white" />
+                        </span>
+                    </button>
+                @endforeach
+
+                {{-- Lightbox --}}
+                <div x-show="lightbox" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center bg-zinc-950/90 p-6"
+                     @click="lightbox = null" @keydown.escape.window="lightbox = null" role="dialog" aria-modal="true" aria-label="نمایش تصویر">
+                    <img :src="lightbox" alt="پیش‌نمایش قالب" class="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" />
+                    <button type="button" class="absolute top-5 end-5 rounded-xl bg-white/10 p-2 text-white transition-colors hover:bg-white/20" aria-label="بستن">
+                        <x-icon name="x" class="size-5" />
+                    </button>
+                </div>
+            </div>
+        </section>
+    @endif
 
     {{-- ============ Versions ============ --}}
     @if($this->versions->count())

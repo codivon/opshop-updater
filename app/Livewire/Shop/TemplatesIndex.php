@@ -78,6 +78,8 @@ class TemplatesIndex extends Component
             ->with(['category:id,name', 'latestVersion:id,template_id,version'])
             ->withCount(['comments' => fn ($q) => $q->where('status', 'approved')])
             ->where('status', Template::STATUS_ACTIVE)
+            // قالب‌های واگذارشده (خرید اختصاصی موفق) از فروشگاه حذف می‌شوند
+            ->where('is_sold_exclusively', false)
             ->when($this->search, fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('slug', 'like', "%{$this->search}%")

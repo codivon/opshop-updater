@@ -145,7 +145,35 @@
                     <dd class="text-zinc-700 dark:text-zinc-300">{{ verta_date($purchase->paid_at) }}</dd>
                 </div>
             @endif
+            @if($purchase->purchase_type === \App\Models\TemplatePurchase::TYPE_EXCLUSIVE)
+                <div class="flex items-center justify-between gap-4">
+                    <dt class="shrink-0 flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
+                        <x-icon name="crown" class="size-3.5 text-violet-500" />
+                        نوع خرید
+                    </dt>
+                    <dd><x-badge variant="violet" icon="crown">اختصاصی (واگذاری کامل)</x-badge></dd>
+                </div>
+            @endif
         </dl>
+
+        {{-- لایسنس خرید (پس از پرداخت موفق) --}}
+        @if($purchase->isPaid() && $this->license)
+            <div class="mt-4 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-4 text-white shadow-lg shadow-brand-500/20">
+                <div class="flex items-center justify-between gap-2">
+                    <p class="flex items-center gap-1.5 text-xs font-bold text-brand-50/90">
+                        <x-icon name="key" class="size-4" />
+                        کلید لایسنس قالب شما
+                    </p>
+                    <x-badge variant="neutral" icon="shield-check">دائمی</x-badge>
+                </div>
+                <p class="mt-2 select-all rounded-xl bg-white/10 px-4 py-3 text-center font-mono text-lg font-black tracking-widest backdrop-blur" dir="ltr">
+                    {{ $this->license->license_key }}
+                </p>
+                <p class="mt-2 text-center text-[11px] leading-5 text-brand-50/80">
+                    این کلید گواهی مالکیت خرید شماست — برای پشتیبانی و پیگیری‌های بعدی آن را نگه دارید.
+                </p>
+            </div>
+        @endif
 
         <div class="mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-700/50">
             <p class="text-[11px] leading-5 text-zinc-400">

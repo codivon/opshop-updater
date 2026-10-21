@@ -426,6 +426,7 @@
                             <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" wire:model="newImages" class="input w-full sm:flex-1" />
                             <x-btn icon="upload" wire:click="uploadImages" :loading="true">آپلود</x-btn>
                         </div>
+                        <x-upload-progress target="newImages" label="در حال آپلود تصاویر گالری" />
                     </div>
                     @if(count($this->newImages))
                         <p class="mt-3 text-xs font-medium text-brand-600 dark:text-brand-400">
@@ -550,6 +551,7 @@
                     {{-- wire:ignore keeps the generated preview nodes alive across Livewire morphs --}}
                     <div wire:key="ck-thumb-preview" wire:ignore x-data="filePreview()" class="space-y-2">
                         <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
+                        <x-upload-progress target="thumbnailFile" label="در حال آپلود تصویر شاخص" />
                         <template x-for="(preview, i) in previews" :key="i">
                             <div class="flex items-center gap-3">
                                 <img :src="preview.url" :alt="preview.name"
@@ -581,6 +583,7 @@
                 {{-- wire:ignore keeps the generated preview grid alive across Livewire morphs --}}
                 <div wire:key="ck-gallery-preview" wire:ignore x-data="filePreview({ multiple: true })" class="space-y-2">
                     <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" wire:model="newGallery" x-ref="input" class="input" />
+                    <x-upload-progress target="newGallery" label="در حال آپلود گالری" />
                     <p class="text-xs text-zinc-500 dark:text-zinc-400">حداکثر ۱۰ تصویر؛ به گالری فعلی اضافه می‌شود.</p>
                     <template x-if="previews.length">
                         <div class="grid grid-cols-6 gap-2">
@@ -671,6 +674,7 @@
                     @endif
                 @endif
                 <input type="file" accept=".zip,application/zip" wire:model="versionFile" class="input" />
+                <x-upload-progress target="versionFile" label="در حال آپلود فایل ZIP" />
                 @php($vfErrBag = $errors ?? null)
                 @if($vfErrBag?->has('versionFile'))
                     <p class="flex items-center gap-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">

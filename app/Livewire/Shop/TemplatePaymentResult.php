@@ -22,9 +22,16 @@ class TemplatePaymentResult extends Component
 
     public function mount(TemplatePurchase $purchase): void
     {
-        $purchase->load(['template:id,name,slug,thumbnail', 'version:id,template_id,version,file_size']);
+        $purchase->load(['template:id,name,slug,thumbnail', 'version:id,template_id,version,file_size', 'license:id,purchase_id,license_key,status,purchase_type']);
 
         $this->purchase = $purchase;
+    }
+
+    /** لایسنس خرید (پس از پرداخت موفق صادر می‌شود) */
+    #[Livewire\Attributes\Computed]
+    public function license(): ?\App\Models\TemplateLicense
+    {
+        return $this->purchase->license;
     }
 
     /**

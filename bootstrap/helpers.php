@@ -345,3 +345,86 @@ if (! function_exists('bytes_human')) {
         return round($size, $precision) . ' ' . $units[$index];
     }
 }
+
+if (! function_exists('template_asset_url')) {
+    /**
+     * URL تصویر/فایل آپلودشده (الگوی «uploads/…») با پشتیبانی هر دو محل ذخیره‌سازی:
+     *
+     *  ۱) public/uploads/…            → سرو مستقیم وب‌سرور
+     *  ۲) storage/app/public/uploads/… → سرو با روت uploads.serve (public غیرقابل‌نوشتن)
+     *  ۳) هیچ‌کدام نبود               → تصویر پیش‌فرض (جلوگیری از آیکون شکسته)
+     *
+     * ریشه‌یابی باگ «تصویر قالب تغییر نمی‌کند»: وقتی فایل روی دیسک نیست،
+     * قبلاً URL به‌اصطلاح معتبر ساخته می‌شد که 404 می‌داد و مرورگر تصویر را
+     * نشان نمی‌داد؛ حالا مسیر واقعی فایل بررسی و URL درست ساخته می‌شود.
+     */
+    function template_asset_url(?string $path, ?string $default = null): ?string
+    {
+        $path = trim((string) $path);
+
+        if ($path === '') {
+            return $default ?? asset('images/package-default.png');
+        }
+
+        // URL کامل (خارجی) — دست‌نخورده
+        if (preg_match('#^https?://#', $path)) {
+            return $path;
+        }
+
+        // ۱) در public وجود دارد → asset مستقیم
+        if (is_file(public_path($path))) {
+            return asset($path);
+        }
+
+        // ۲) fallback داخل storage/app/public → همان URL اما با کش‌بریک تا
+        //    مرورگر نسخه تازه را بگیرد (رفع «تصویر عوض نمی‌شود»)
+        $fallback = storage_path('app/public/' . $path);
+
+        if (is_file($fallback)) {
+            return asset($path) . '?v=' . substr(md5($path . '|' . filemtime($fallback)), 0, 10);
+        }
+
+        // ۳) فایل فیزیکی یافت نشد → تصویر پیش‌فرض
+        return $default ?? asset('images/package-default.png');
+    }
+}
+
+if (! function_exists('jalali_to_carbon')) {
+    /**
+     * تبدیل ورودی تاریخ شمسی یا میلادی به Carbon — برای فیلتر بازه تاریخ در گزارش‌ها.
+     *
+     * پشتیبانی از: ۱۴۰۴/۰۷/۰۱ , 1404-07-01 , 2025-09-23 , 2025/09/23 (با ارقام فارسی هم)
+     * اگر سال بین ۱۳۰۰ تا ۱۵۰۰ باشد → شمسی؛ در غیر این صورت → میلادی.
+     *
+     * @return \Carbon\Carbon|null تاریخ شروع/پایان (پایان = آخرِ روز)
+     */
+    function jalali_to_carbon(?string $input, bool $endOfDay = false): ?\Carbon\Carbon
+    {
+        $input = trim((string) en_num((string) $input));
+
+        if ($input === '') {
+            return null;
+        }
+
+        try {
+            if (preg_match('/^(\d{4})\s*[\/\-]\s*(\d{1,2})\s*[\/\-]\s*(\d{1,2})$/', $input, $m)) {
+                $year = (int) $m[1];
+
+                // سال شمسی → Jalalian
+                if ($year >= 1300 && $year <= 1500) {
+                    $jalali = \Morilog\Jalali\Jalalian::fromFormat('Y/n/j', "{$year}/" . (int) $m[2] . '/' . (int) $m[3]);
+                    $carbon = $jalali->toCarbon();
+                } else {
+                    $carbon = \Carbon\Carbon::createFromDate($year, (int) $m[2], (int) $m[3]);
+                }
+            } else {
+                // فرمت‌های دیگر میلادی
+                $carbon = \Carbon\Carbon::parse($input);
+            }
+
+            return $endOfDay ? $carbon->copy()->endOfDay() : $carbon->copy()->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+}

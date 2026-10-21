@@ -6,6 +6,8 @@ use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Package;
 use App\Models\PackageLicense;
+use App\Models\Template;
+use App\Models\TemplateLicense;
 use App\Services\LicenseService;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -32,6 +34,10 @@ class Index extends Component
     /** فیلتر نمایش/ترتیب: جدیدترین، قدیمی‌ترین، شناسه، تاریخ انقضا و… */
     #[Url]
     public string $sort = 'newest';
+
+    /** نوع لایسنس: package | template (تب) */
+    #[Url]
+    public string $type = 'package';
 
     public ?int $revokeId = null;
 
@@ -83,6 +89,77 @@ class Index extends Component
     public function packages()
     {
         return Package::query()->orderBy('name')->get(['id', 'name']);
+    }
+
+    /** سوییچ تب لایسنس‌ها */
+    public function switchType(string $type): void
+    {
+        if (!in_array($type, ['package', 'template'], true)) {
+            return;
+        }
+
+        $this->type = $type;
+        $this->resetPage();
+    }
+
+    /** لایسنس‌های قالب (تب دوم) */
+    #[Computed]
+    public function templateRecords()
+    {
+        return TemplateLicense::query()
+            ->with(['template:id,name,slug', 'customer:id,name,phone', 'purchase:id,transaction_id,purchase_type'])
+            ->when($this->search, fn ($q) => $q->where(fn ($w) => $w
+                ->where('license_key', 'like', "%{$this->search}%")
+                ->orWhereHas('customer', fn ($cq) => $cq
+                    ->where('name', 'like', "%{$this->search}%")
+                    ->orWhere('phone', 'like', "%{$this->search}%"))
+                ->orWhereHas('template', fn ($tq) => $tq
+                    ->where('name', 'like', "%{$this->search}%"))))
+            ->when($this->status, fn ($q) => $q->where('status', $this->status))
+            ->when($this->sort === 'newest', fn ($q) => $q->latest())
+            ->when($this->sort === 'oldest', fn ($q) => $q->oldest())
+            ->when($this->sort === 'id_desc', fn ($q) => $q->orderByDesc('id'))
+            ->when($this->sort === 'id_asc', fn ($q) => $q->orderBy('id'))
+            ->paginate(12);
+    }
+
+    /** پرفروش‌ترین قالب‌ها برای فیلتر (فهرست ساده) */
+    #[Computed]
+    public function templates()
+    {
+        return Template::query()->orderBy('name')->get(['id', 'name']);
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  Actions — لایسنس‌های قالب                                        */
+    /* ---------------------------------------------------------------- */
+
+    public function revokeTemplateLicense(): void
+    {
+        $license = TemplateLicense::findOrFail($this->revokeId ?? 0);
+        $license->revoke();
+
+        $this->revokeId = null;
+        $this->toast('لایسنس قالب باطل شد.');
+    }
+
+    public function activateTemplateLicense(int $id): void
+    {
+        $license = TemplateLicense::findOrFail($id);
+        $license->restore();
+
+        $this->toast('لایسنس قالب فعال شد.');
+    }
+
+    public function deleteTemplateLicense(): void
+    {
+        $license = TemplateLicense::findOrFail($this->deleteId ?? 0);
+
+        $key = $license->license_key;
+        $license->delete();
+
+        $this->deleteId = null;
+        $this->toast("لایسنس «{$key}» حذف شد.");
     }
 
     /* ---------------------------------------------------------------- */

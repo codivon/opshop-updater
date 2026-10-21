@@ -43,6 +43,8 @@ class ApiTemplateController extends Controller
 
             $templates = Template::with(['latestVersion', 'category.parent'])
                 ->where('status', Template::STATUS_ACTIVE)
+                // قالب‌های واگذارشده (خرید اختصاصی) از فهرست API حذف می‌شوند — مثل فروشگاه
+                ->where('is_sold_exclusively', false)
                 ->when($request->filled('search'), function ($q) use ($request) {
                     $search = $request->search;
                     $q->where(fn ($sq) => $sq->where('name', 'like', "%{$search}%")
@@ -117,8 +119,9 @@ class ApiTemplateController extends Controller
     public function purchase(Request $request, string $slug): JsonResponse
     {
         $request->validate([
-            'callback_url' => 'nullable|url',
-            'gateway'      => 'nullable|string|max:32',
+            'callback_url'  => 'nullable|url',
+            'gateway'       => 'nullable|string|max:32',
+            'purchase_type' => 'nullable|in:normal,exclusive',
         ]);
 
         try {
@@ -141,6 +144,11 @@ class ApiTemplateController extends Controller
                 }
             }
 
+            // نوع خرید: normal (پیش‌فرض) | exclusive
+            $purchaseType = $request->input('purchase_type', Template::PURCHASE_NORMAL) === Template::PURCHASE_EXCLUSIVE
+                ? Template::PURCHASE_EXCLUSIVE
+                : Template::PURCHASE_NORMAL;
+
             $template = Template::where('slug', $slug)
                 ->where('status', Template::STATUS_ACTIVE)
                 ->first();
@@ -149,18 +157,39 @@ class ApiTemplateController extends Controller
                 return response()->json(['error' => 'قالب یافت نشد.'], 404);
             }
 
+            // خرید اختصاصی: گاردها
+            if ($purchaseType === Template::PURCHASE_EXCLUSIVE) {
+                if ($template->is_sold_exclusively) {
+                    return response()->json([
+                        'error' => 'این قالب قبلاً به‌صورت اختصاصی واگذار شده و دیگر قابل خرید نیست.',
+                    ], 422);
+                }
+
+                if ((int) $template->exclusive_price <= 0) {
+                    return response()->json([
+                        'error' => 'خرید اختصاصی برای این قالب فعال نشده است.',
+                    ], 422);
+                }
+            }
+
             $latestVersion = $template->latestVersion()->first();
 
             if (!$latestVersion) {
                 return response()->json(['error' => 'نسخه فعالی برای این قالب وجود ندارد.'], 422);
             }
 
-            // جلوگیری از خرید تکراری: اگر همین نسخه قبلاً برای این مشتری پرداخت شده
-            if ($template->purchases()
-                ->where('customer_id', $customer->id)
-                ->where('status', TemplatePurchase::STATUS_PAID)
-                ->where(fn ($q) => $q->whereNull('version_id')->orWhere('version_id', $latestVersion->id))
-                ->exists()) {
+            // مبلغ بر اساس نوع خرید
+            $amount = $purchaseType === Template::PURCHASE_EXCLUSIVE
+                ? $template->exclusive_final_price
+                : $template->final_price;
+
+            // جلوگیری از خرید تکراری (فقط برای خرید معمولی — اختصاصی همیشه خرید جدید است)
+            if ($purchaseType === Template::PURCHASE_NORMAL
+                && $template->purchases()
+                    ->where('customer_id', $customer->id)
+                    ->where('status', TemplatePurchase::STATUS_PAID)
+                    ->where(fn ($q) => $q->whereNull('version_id')->orWhere('version_id', $latestVersion->id))
+                    ->exists()) {
                 return response()->json([
                     'is_free'       => $template->is_effectively_free,
                     'is_purchased'  => true,
@@ -170,15 +199,16 @@ class ApiTemplateController extends Controller
                 ]);
             }
 
-            // ---------- مسیر رایگان: نیازی به پرداخت نیست ----------
-            if ($template->is_effectively_free) {
+            // ---------- مسیر رایگان: نیازی به پرداخت نیست (فقط خرید معمولی) ----------
+            if ($purchaseType === Template::PURCHASE_NORMAL && $template->is_effectively_free) {
                 $purchase = TemplatePurchase::create([
-                    'template_id' => $template->id,
-                    'version_id'  => $latestVersion->id,
-                    'customer_id' => $customer->id,
-                    'amount'      => 0,
-                    'status'      => TemplatePurchase::STATUS_PAID,
-                    'paid_at'     => now(),
+                    'template_id'   => $template->id,
+                    'version_id'    => $latestVersion->id,
+                    'customer_id'   => $customer->id,
+                    'purchase_type' => $purchaseType,
+                    'amount'        => 0,
+                    'status'        => TemplatePurchase::STATUS_PAID,
+                    'paid_at'       => now(),
                 ]);
 
                 return response()->json([
@@ -196,12 +226,13 @@ class ApiTemplateController extends Controller
 
             // ایجاد رکورد purchase
             $purchase = TemplatePurchase::create([
-                'template_id'  => $template->id,
-                'version_id'   => $latestVersion->id,
-                'customer_id'  => $customer->id,
-                'callback_url' => $request->callback_url,
-                'amount'       => $template->final_price,
-                'status'       => TemplatePurchase::STATUS_PENDING,
+                'template_id'   => $template->id,
+                'version_id'    => $latestVersion->id,
+                'customer_id'   => $customer->id,
+                'purchase_type' => $purchaseType,
+                'callback_url'  => $request->callback_url,
+                'amount'        => $amount,
+                'status'        => TemplatePurchase::STATUS_PENDING,
             ]);
 
             // ایجاد پرداخت در درگاه (gateway اختیاری کلاینت یا پیش‌فرض)

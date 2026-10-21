@@ -7,10 +7,14 @@ use App\Models\Customer;
 use App\Models\Package;
 use App\Models\PackageLicense;
 use App\Models\PackagePurchase;
+use App\Models\Product;
+use App\Models\ProductPurchase;
 use App\Models\Project;
 use App\Models\Subscription;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
+use App\Models\Template;
+use App\Models\TemplatePurchase;
 use App\Models\Update;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -50,6 +54,22 @@ class Dashboard extends Component
                 'variant' => 'info',
                 'hint' => Package::where('status', Package::STATUS_ACTIVE)->count() . ' منتشر شده',
                 'href' => route('admin.packages.index'),
+            ],
+            [
+                'label' => 'محصولات',
+                'value' => Product::count(),
+                'icon' => 'shopping-bag',
+                'variant' => 'violet',
+                'hint' => Product::where('status', Product::STATUS_ACTIVE)->count() . ' فعال در فروشگاه',
+                'href' => route('admin.products.index'),
+            ],
+            [
+                'label' => 'قالب‌ها',
+                'value' => Template::count(),
+                'icon' => 'layout-template',
+                'variant' => 'warning',
+                'hint' => Template::where('status', Template::STATUS_ACTIVE)->where('is_sold_exclusively', false)->count() . ' قابل فروش',
+                'href' => route('admin.templates.index'),
             ],
             [
                 'label' => 'لایسنس‌های فعال',
@@ -105,12 +125,16 @@ class Dashboard extends Component
     {
         $subscriptionsRevenue = $this->schemaHas('subscriptions', 'price') ? (int) Subscription::sum('price') : 0;
         $packageRevenue = (int) PackagePurchase::where('status', PackagePurchase::STATUS_PAID)->sum('amount');
+        $productRevenue = (int) ProductPurchase::where('status', ProductPurchase::STATUS_PAID)->sum('amount');
+        $templateRevenue = (int) TemplatePurchase::where('status', TemplatePurchase::STATUS_PAID)->sum('amount');
         $downloads = (int) Package::sum('downloads_count');
 
         return [
-            'total' => $subscriptionsRevenue + $packageRevenue,
+            'total' => $subscriptionsRevenue + $packageRevenue + $productRevenue + $templateRevenue,
             'subscriptions' => $subscriptionsRevenue,
             'packages' => $packageRevenue,
+            'products' => $productRevenue,
+            'templates' => $templateRevenue,
             'downloads' => $downloads,
             'paid_purchases' => PackagePurchase::where('status', PackagePurchase::STATUS_PAID)->count(),
             'pending_purchases' => PackagePurchase::where('status', PackagePurchase::STATUS_PENDING)->count(),
@@ -204,6 +228,38 @@ class Dashboard extends Component
         return ['title' => 'خرید پکیج‌ها (۶ ماه اخیر)', 'series' => $data->all(), 'color' => 'teal'];
     }
 
+    #[Computed]
+    public function templateSalesChart(): array
+    {
+        $data = collect(range(5, 0))->map(function ($i) {
+            $date = Carbon::now()->subMonths($i);
+            $month = TemplatePurchase::where('status', TemplatePurchase::STATUS_PAID)
+                ->whereYear('paid_at', $date->year)
+                ->whereMonth('paid_at', $date->month);
+
+            return [
+                'label' => verta_date($date, 'Y/m'),
+                'value' => $month->count(),
+                'secondary' => (int) $month->sum('amount'),
+            ];
+        });
+
+        return ['title' => 'فروش قالب‌ها (۶ ماه اخیر)', 'series' => $data->all(), 'color' => 'brand'];
+    }
+
+    #[Computed]
+    public function templateStats(): array
+    {
+        $paid = TemplatePurchase::where('status', TemplatePurchase::STATUS_PAID);
+
+        return [
+            'sales' => (clone $paid)->count(),
+            'revenue' => (int) (clone $paid)->sum('amount'),
+            'exclusive_sales' => (clone $paid)->where('purchase_type', TemplatePurchase::TYPE_EXCLUSIVE)->count(),
+            'active_templates' => Template::where('status', Template::STATUS_ACTIVE)->where('is_sold_exclusively', false)->count(),
+        ];
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Recent lists                                                       */
     /* ------------------------------------------------------------------ */
@@ -234,6 +290,30 @@ class Dashboard extends Component
             ->with(['package:id,name,slug', 'customer:id,name'])
             ->where('status', PackagePurchase::STATUS_PAID)
             ->orderByDesc('paid_at')->limit(6)->get();
+    }
+
+    /** آخرین فروش قالب‌ها (فروشگاه مهمان + API) */
+    #[Computed]
+    public function recentTemplateSales()
+    {
+        return TemplatePurchase::query()
+            ->with(['template:id,name,slug', 'customer:id,name'])
+            ->where('status', TemplatePurchase::STATUS_PAID)
+            ->orderByDesc('paid_at')->limit(6)->get();
+    }
+
+    /** پرفروش‌ترین قالب‌ها */
+    #[Computed]
+    public function topTemplates()
+    {
+        return Template::query()
+            ->select('id', 'name', 'slug', 'is_free', 'price', 'sales_count', 'is_sold_exclusively', 'status')
+            ->withCount(['purchases as paid_purchases_count' => fn ($q) => $q->where('status', TemplatePurchase::STATUS_PAID)])
+            ->withSum(['purchases as paid_revenue' => fn ($q) => $q->where('status', TemplatePurchase::STATUS_PAID)], 'amount')
+            ->orderByDesc('paid_purchases_count')
+            ->orderByDesc('sales_count')
+            ->limit(5)
+            ->get();
     }
 
     #[Computed]

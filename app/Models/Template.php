@@ -18,6 +18,15 @@ class Template extends Model
     public const STATUS_ACTIVE   = 'active';
     public const STATUS_ARCHIVED = 'archived';
 
+    /** انواع خرید — معمولی و اختصاصی */
+    public const PURCHASE_NORMAL    = 'normal';
+    public const PURCHASE_EXCLUSIVE = 'exclusive';
+
+    public const PURCHASE_LABELS = [
+        self::PURCHASE_NORMAL    => 'خرید معمولی',
+        self::PURCHASE_EXCLUSIVE => 'خرید اختصاصی',
+    ];
+
     public const STATUS_LABELS = [
         self::STATUS_DRAFT    => 'پیش‌نویس',
         self::STATUS_ACTIVE   => 'فعال',
@@ -26,17 +35,22 @@ class Template extends Model
 
     protected $fillable = [
         'category_id', 'name', 'slug', 'short_description', 'description',
-        'thumbnail', 'price', 'discount', 'is_free', 'status', 'sort_order',
+        'thumbnail', 'price', 'discount', 'exclusive_price', 'exclusive_discount',
+        'exclusive_note', 'is_free', 'status', 'sort_order',
     ];
 
     protected $casts = [
-        'price'           => 'integer',
-        'discount'        => 'integer',
-        'is_free'         => 'boolean',
-        'sort_order'      => 'integer',
-        'sales_count'     => 'integer',
-        'downloads_count' => 'integer',
-        'views_count'     => 'integer',
+        'price'                => 'integer',
+        'discount'             => 'integer',
+        'exclusive_price'      => 'integer',
+        'exclusive_discount'   => 'integer',
+        'is_free'              => 'boolean',
+        'is_sold_exclusively'  => 'boolean',
+        'sold_exclusively_at'  => 'datetime',
+        'sort_order'           => 'integer',
+        'sales_count'          => 'integer',
+        'downloads_count'      => 'integer',
+        'views_count'          => 'integer',
     ];
 
     /* ---------------- Relationships ---------------- */
@@ -59,6 +73,32 @@ class Template extends Model
     public function comments(): MorphMany
     {
         return $this->morphMany(Comment::class, 'commentable');
+    }
+
+    /** گالری تصاویر قالب */
+    public function images(): HasMany
+    {
+        return $this->hasMany(TemplateImage::class)->orderBy('sort_order');
+    }
+
+    public function activeImages(): HasMany
+    {
+        return $this->images()->where('is_active', true);
+    }
+
+    /** لایسنس‌های صادرشده برای این قالب */
+    public function licenses(): HasMany
+    {
+        return $this->hasMany(TemplateLicense::class);
+    }
+
+    /** خریدار اختصاصی (آخرین خرید اختصاصی موفق) */
+    public function exclusivePurchase()
+    {
+        return $this->hasOne(TemplatePurchase::class)
+            ->where('purchase_type', TemplatePurchase::TYPE_EXCLUSIVE)
+            ->where('status', TemplatePurchase::STATUS_PAID)
+            ->latest('id');
     }
 
     /* ---------------- Scopes ---------------- */
@@ -91,19 +131,67 @@ class Template extends Model
     /** قیمت نهایی پس از تخفیف (قالب رایگان = 0) */
     public function getFinalPriceAttribute(): int
     {
+        return $this->finalPriceFor(self::PURCHASE_NORMAL);
+    }
+
+    /** قیمت نهایی خرید اختصاصی پس از تخفیف */
+    public function getExclusiveFinalPriceAttribute(): int
+    {
+        return $this->finalPriceFor(self::PURCHASE_EXCLUSIVE);
+    }
+
+    /** آیا خرید اختصاصی برای این قالب فعال است؟ */
+    public function getHasExclusiveOfferAttribute(): bool
+    {
+        return ! $this->is_sold_exclusively && $this->exclusivePriceBase() > 0;
+    }
+
+    /** محاسبه یکسان برای هر دو نوع خرید */
+    public function finalPriceFor(string $purchaseType): int
+    {
         if ($this->is_free) {
             return 0;
         }
 
-        if ($this->price <= 0) {
+        if ($purchaseType === self::PURCHASE_EXCLUSIVE) {
+            $price    = $this->exclusive_price;
+            $discount = $this->exclusive_discount;
+        } else {
+            $price    = $this->price;
+            $discount = $this->discount;
+        }
+
+        if ($price <= 0) {
             return 0;
         }
 
-        if ($this->discount > 0 && $this->discount < 100) {
-            return (int) max(0, round($this->price * (100 - $this->discount) / 100));
+        if ($discount > 0 && $discount < 100) {
+            return (int) max(0, round($price * (100 - $discount) / 100));
         }
 
-        return $this->discount >= 100 ? 0 : (int) $this->price;
+        return $discount >= 100 ? 0 : (int) $price;
+    }
+
+    /** قیمت پایه هر نوع خرید (برای نمایش خط‌خورده) */
+    public function basePriceFor(string $purchaseType): int
+    {
+        if ($this->is_free) {
+            return 0;
+        }
+
+        return $purchaseType === self::PURCHASE_EXCLUSIVE ? (int) $this->exclusive_price : (int) $this->price;
+    }
+
+    /** آیا خرید اختصاصی مقدار پایه دارد؟ */
+    public function exclusivePriceBase(): int
+    {
+        return (int) $this->exclusive_price;
+    }
+
+    /** آیا قالب به‌صورت اختصاصی فروخته شده؟ */
+    public function getIsSoldOutAttribute(): bool
+    {
+        return $this->is_sold_exclusively;
     }
 
     /** آیا مسیر دانلود رایگان دارد؟ */
@@ -116,10 +204,19 @@ class Template extends Model
     {
         if ($this->thumbnail) {
             // مسیر public یا fallback storage (سرو با روت uploads.serve)
-            return asset($this->thumbnail);
+            return template_asset_url($this->thumbnail);
         }
 
         return asset('images/package-default.png');
+    }
+
+    /**
+     * وضعیت فروش اختصاصی: template پایه شمارش فروش «معمولی» را جدا نگه می‌دارد؛
+     * برای نمایش در کارت‌ها، «فروش» شامل خرید اختصاصی هم می‌شود (مثل مارکت‌پلیس‌ها).
+     */
+    public function getHasPurchasesAttribute(): bool
+    {
+        return $this->sales_count > 0 || $this->is_sold_exclusively;
     }
 
     /** میانگین امتیاز دیدگاه‌های تأییدشده */

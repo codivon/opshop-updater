@@ -31,10 +31,13 @@ class TemplateShow extends Component
     /** کد تخفیف اعمال‌شده (پس از اعتبارسنجی سمت سرور — کد نرمال‌شده) */
     public string $appliedCode = '';
 
+    /** نوع خرید انتخاب‌شده: normal | exclusive */
+    public string $purchaseType = Template::PURCHASE_NORMAL;
+
     public function mount(string $slug): void
     {
         $template = Template::query()
-            ->with(['category:id,name,slug', 'latestVersion'])
+            ->with(['category:id,name,slug', 'latestVersion', 'activeImages'])
             ->where('slug', $slug)
             ->where('status', Template::STATUS_ACTIVE)
             ->first();
@@ -45,6 +48,7 @@ class TemplateShow extends Component
 
         $this->template = $template;
         $this->gatewayKey = (string) (Gateway::query()->active()->orderBy('ordering')->first()?->key ?? '');
+        $this->purchaseType = Template::PURCHASE_NORMAL;
 
         // شمارش بازدید (هر بازدید کامل صفحه)
         $template->incrementViews();
@@ -68,6 +72,37 @@ class TemplateShow extends Component
     }
 
     /* ================================================================
+     *  نوع خرید (معمولی / اختصاصی)
+     * ================================================================ */
+
+    /** مقدار مجاز نوع خرید — ضد دستکاری کلاینت */
+    public function updatedPurchaseType(string $value): void
+    {
+        if (!in_array($value, [Template::PURCHASE_NORMAL, Template::PURCHASE_EXCLUSIVE], true)) {
+            $this->purchaseType = Template::PURCHASE_NORMAL;
+        }
+
+        // تغییر نوع خرید → کد تخفیف اعمال‌شده دیگر معتبر نیست (مبلغ پایه عوض شده)
+        $this->appliedCode = '';
+    }
+
+    /** قیمت پایه برای نوع خرید انتخاب‌شده */
+    public function currentBasePrice(): int
+    {
+        return $this->purchaseType === Template::PURCHASE_EXCLUSIVE
+            ? $this->template->exclusive_price
+            : $this->template->price;
+    }
+
+    /** قیمت نهایی برای نوع خرید انتخاب‌شده */
+    public function currentFinalPrice(): int
+    {
+        return $this->purchaseType === Template::PURCHASE_EXCLUSIVE
+            ? $this->template->exclusive_final_price
+            : $this->template->final_price;
+    }
+
+    /* ================================================================
      *  کد تخفیف
      * ================================================================ */
 
@@ -77,10 +112,15 @@ class TemplateShow extends Component
      */
     public function applyDiscount(DiscountService $discountService): void
     {
+        if ((int) $this->currentFinalPrice() <= 0) {
+            $this->toast('برای این نوع خرید نیازی به کد تخفیف نیست.', 'warning');
+            return;
+        }
+
         $result = $discountService->resolve(
             $this->discountCode,
             DiscountCode::CONTEXT_TEMPLATE,
-            (int) $this->template->final_price
+            (int) $this->currentFinalPrice()
         );
 
         if (!$result['ok']) {
@@ -117,20 +157,42 @@ class TemplateShow extends Component
             return null;
         }
 
+        if ((int) $this->currentFinalPrice() <= 0) {
+            return null;
+        }
+
         $result = app(DiscountService::class)->resolve(
             $this->appliedCode,
             DiscountCode::CONTEXT_TEMPLATE,
-            (int) $this->template->final_price
+            (int) $this->currentFinalPrice()
         );
 
         return $result['ok'] ? $result : null;
     }
 
     /* ================================================================
-     *  خرید (مهمان — بدون هیچ اطلاعات)
+     *  خرید (مهمان — بدون هیچ اطلاعات) — معمولی یا اختصاصی
      * ================================================================ */
     public function buy(PaymentService $paymentService, DiscountService $discountService): void
     {
+        // ---- نوع خرید معتبر؟ ----
+        $purchaseType = in_array($this->purchaseType, [Template::PURCHASE_NORMAL, Template::PURCHASE_EXCLUSIVE], true)
+            ? $this->purchaseType
+            : Template::PURCHASE_NORMAL;
+
+        // ---- خرید اختصاصی: شرایط ----
+        if ($purchaseType === Template::PURCHASE_EXCLUSIVE) {
+            if ($this->template->is_sold_exclusively) {
+                $this->toast('این قالب قبلاً به‌صورت اختصاصی واگذار شده و دیگر قابل خرید نیست.', 'error');
+                return;
+            }
+
+            if ((int) $this->template->exclusive_price <= 0) {
+                $this->toast('خرید اختصاصی برای این قالب فعال نشده است.', 'error');
+                return;
+            }
+        }
+
         // ---- نسخه ----
         $latestVersion = $this->template->latestVersion()->first();
 
@@ -139,13 +201,20 @@ class TemplateShow extends Component
             return;
         }
 
+        // ---- مبالغ بر اساس نوع خرید ----
+        // مبلغ مبنا = قیمت نهایی «پس از تخفیف خود قالب»؛ کد تخفیف روی همین اعمال می‌شود
+        // (هماهنگ با پیش‌نمایش فیلد کد تخفیف در Blade)
+        $baseAmount = $purchaseType === Template::PURCHASE_EXCLUSIVE
+            ? (int) $this->template->exclusive_final_price
+            : (int) $this->template->final_price;
+
         // ---- کد تخفیف (راستی‌آزمایی مجدد سمت سرور) ----
-        // در قالب رایگان مبلغی وجود ندارد → کد نادیده گرفته می‌شود (نباید جلوی دریافت را بگیرد)
-        if ((int) $this->template->final_price > 0) {
+        // مبلغ صفر (رایگان) → کد نادیده گرفته می‌شود (نباید جلوی دریافت را بگیرد)
+        if ($baseAmount > 0) {
             $couponResult = $discountService->resolve(
                 $this->appliedCode !== '' ? $this->appliedCode : $this->discountCode,
                 DiscountCode::CONTEXT_TEMPLATE,
-                (int) $this->template->final_price
+                $baseAmount
             );
 
             if (!$couponResult['ok']) {
@@ -165,14 +234,21 @@ class TemplateShow extends Component
         }
 
         // ---- مسیر رایگان (قالب رایگان یا کد تخفیفِ پوشش‌دهنده‌ی کامل مبلغ) ----
-        if ($this->template->is_effectively_free || $finalPrice <= 0) {
+        if ($baseAmount <= 0 || $finalPrice <= 0) {
+            if ($purchaseType === Template::PURCHASE_EXCLUSIVE) {
+                // خرید اختصاصی رایگان بی‌معناست — واگذاری کامل حقوق بدون پول مجاز نیست
+                $this->toast('خرید اختصاصی باید با پرداخت کامل انجام شود؛ کد تخفیف کامل برای آن مجاز نیست.', 'error');
+                return;
+            }
+
             $purchase = TemplatePurchase::create([
                 'template_id'      => $this->template->id,
                 'version_id'       => $latestVersion->id,
                 'discount_code_id' => $coupon?->id,
-                'original_amount'  => $this->template->final_price,
+                'original_amount'  => $baseAmount,
                 'amount'           => 0,
                 'discount_amount'  => $couponDiscount,
+                'purchase_type'    => $purchaseType,
                 'status'           => TemplatePurchase::STATUS_PAID,
                 'paid_at'          => now(),
             ]);
@@ -201,9 +277,10 @@ class TemplateShow extends Component
             'version_id'       => $latestVersion->id,
             'discount_code_id' => $coupon?->id,
             'callback_url'     => route('payment.callback'),
-            'original_amount'  => $this->template->final_price,
+            'original_amount'  => $baseAmount,
             'amount'           => $finalPrice,
             'discount_amount'  => $couponDiscount,
+            'purchase_type'    => $purchaseType,
             'gateway'          => $this->gatewayKey,
             'status'           => TemplatePurchase::STATUS_PENDING,
         ]);

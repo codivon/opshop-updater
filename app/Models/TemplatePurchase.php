@@ -25,10 +25,19 @@ class TemplatePurchase extends Model
         self::STATUS_REFUNDED => 'بازپرداخت',
     ];
 
+    /** نوع خرید — معمولی یا اختصاصی */
+    public const TYPE_NORMAL    = 'normal';
+    public const TYPE_EXCLUSIVE = 'exclusive';
+
+    public const TYPE_LABELS = [
+        self::TYPE_NORMAL    => 'معمولی',
+        self::TYPE_EXCLUSIVE => 'اختصاصی',
+    ];
+
     protected $fillable = [
         'template_id', 'version_id', 'customer_id', 'transaction_id', 'discount_code_id',
-        'original_amount', 'amount', 'discount_amount', 'gateway',
-        'payment_url', 'callback_url', 'status', 'paid_at', 'meta',
+        'original_amount', 'amount', 'discount_amount', 'purchase_type', 'license_id',
+        'gateway', 'payment_url', 'callback_url', 'status', 'paid_at', 'meta',
     ];
 
     protected $casts = [
@@ -59,6 +68,11 @@ class TemplatePurchase extends Model
         return $this->belongsTo(DiscountCode::class);
     }
 
+    public function license(): BelongsTo
+    {
+        return $this->belongsTo(TemplateLicense::class);
+    }
+
     /* ---------------- Helpers ---------------- */
 
     public function isPaid(): bool
@@ -86,7 +100,18 @@ class TemplatePurchase extends Model
 
         if ($this->template) {
             $this->template->incrementSales();
+
+            // خرید اختصاصی → قالب دیگر قابل فروش نیست (واگذاری کامل)
+            if ($this->purchase_type === self::TYPE_EXCLUSIVE && ! $this->template->is_sold_exclusively) {
+                $this->template->update([
+                    'is_sold_exclusively' => true,
+                    'sold_exclusively_at' => now(),
+                ]);
+            }
         }
+
+        // صدور لایسنس (گواهی خرید) — درون issueFor گارد تکرار وجود دارد
+        TemplateLicense::issueFor($this);
 
         // شمارنده استفاده از کد تخفیف فقط یک‌بار (همزمان با تأیید پرداخت) مصرف می‌شود
         $this->discountCode?->recordUsage();

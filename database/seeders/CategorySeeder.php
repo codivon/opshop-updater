@@ -30,6 +30,20 @@ class CategorySeeder extends Seeder
         foreach ($this->productTree() as $root) {
             $this->createBranch(Category::TYPE_PRODUCT, $root);
         }
+
+        $this->seedTemplates();
+    }
+
+    /**
+     * دسته‌بندی‌های پیش‌فرض قالب‌ها (type=template) — همان درخت مایگریشن
+     * 2026_10_22_000005. اجرای مستقل:
+     *   php artisan db:seed --class=CategorySeeder
+     */
+    public function seedTemplates(): void
+    {
+        foreach ($this->templateTree() as $root) {
+            $this->createBranch(Category::TYPE_TEMPLATE, $root);
+        }
     }
 
     /**
@@ -53,6 +67,67 @@ class CategorySeeder extends Seeder
         }
 
         return $category;
+    }
+
+    /* ================================================================
+     *  قالب‌ها (Templates) — ساختار پیش‌فرض فروش قالب
+     * ================================================================ */
+
+    private function templateTree(): array
+    {
+        return [
+            [
+                'slug'        => 'web-templates',
+                'name'        => 'قالب وب‌سایت',
+                'description' => 'قالب‌های آماده وب برای انواع پروژه',
+                'sort_order'  => 10,
+                'children'    => [
+                    ['slug' => 'corporate-templates',     'name' => 'قالب شرکتی و اداری', 'sort_order' => 10],
+                    ['slug' => 'shop-templates',          'name' => 'قالب فروشگاهی',      'sort_order' => 20],
+                    ['slug' => 'blog-magazine-templates', 'name' => 'قالب وبلاگ و مجله‌ای', 'sort_order' => 30],
+                    ['slug' => 'news-templates',          'name' => 'قالب خبری',           'sort_order' => 40],
+                    ['slug' => 'personal-templates',      'name' => 'قالب شخصی و رزومه',   'sort_order' => 50],
+                ],
+            ],
+            [
+                'slug'        => 'landing-templates',
+                'name'        => 'لندینگ‌پیج',
+                'description' => 'صفحات فرود تک‌صفحه‌ای برای کمپین و معرفی محصول',
+                'sort_order'  => 20,
+                'children'    => [
+                    ['slug' => 'product-landing', 'name' => 'معرفی محصول',      'sort_order' => 10],
+                    ['slug' => 'event-landing',   'name' => 'رویداد و همایش',   'sort_order' => 20],
+                    ['slug' => 'app-landing',     'name' => 'معرفی اپلیکیشن',   'sort_order' => 30],
+                ],
+            ],
+            [
+                'slug'        => 'dashboard-templates',
+                'name'        => 'پنل و داشبورد',
+                'description' => 'قالب‌های ادمین‌پنل، داشبورد مدیریتی و CRM',
+                'sort_order'  => 30,
+                'children'    => [
+                    ['slug' => 'admin-dashboard', 'name' => 'داشبورد مدیریت',       'sort_order' => 10],
+                    ['slug' => 'crm-templates',   'name' => 'CRM و پنل سازمانی',   'sort_order' => 20],
+                ],
+            ],
+            [
+                'slug'        => 'html-ui-templates',
+                'name'        => 'HTML و UI کیت',
+                'description' => 'قالب‌های HTML خام، کامپوننت‌ها و کیت‌های رابط کاربری',
+                'sort_order'  => 40,
+                'children'    => [
+                    ['slug' => 'html-templates',  'name' => 'قالب HTML خام',            'sort_order' => 10],
+                    ['slug' => 'ui-kits',         'name' => 'کیت رابط کاربری (UI Kit)', 'sort_order' => 20],
+                    ['slug' => 'email-templates', 'name' => 'قالب ایمیل',               'sort_order' => 30],
+                ],
+            ],
+            [
+                'slug'        => 'special-templates',
+                'name'        => 'سایر قالب‌ها',
+                'description' => 'قالب‌های متفرقه و کاربردهای خاص',
+                'sort_order'  => 50,
+            ],
+        ];
     }
 
     /* ================================================================

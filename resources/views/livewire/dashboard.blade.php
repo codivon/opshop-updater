@@ -24,6 +24,7 @@
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <x-chart :title="$this->customerChart['title']" :series="$this->customerChart['series']" color="brand" />
                 <x-chart :title="$this->purchaseChart['title']" :series="$this->purchaseChart['series']" color="teal" />
+                <x-chart :title="$this->templateSalesChart['title']" :series="$this->templateSalesChart['series']" color="brand" class="lg:col-span-2" />
             </div>
 
             {{-- updates status pills --}}
@@ -55,6 +56,14 @@
                         <div class="rounded-xl bg-white/10 px-3 py-2.5 backdrop-blur">
                             <p class="text-brand-50/80">پکیج‌ها</p>
                             <p class="mt-0.5 font-bold tabular-nums">{{ money($this->revenue['packages'], false) }}</p>
+                        </div>
+                        <div class="rounded-xl bg-white/10 px-3 py-2.5 backdrop-blur">
+                            <p class="text-brand-50/80">محصولات</p>
+                            <p class="mt-0.5 font-bold tabular-nums">{{ money($this->revenue['products'], false) }}</p>
+                        </div>
+                        <div class="rounded-xl bg-white/10 px-3 py-2.5 backdrop-blur">
+                            <p class="text-brand-50/80">قالب‌ها</p>
+                            <p class="mt-0.5 font-bold tabular-nums">{{ money($this->revenue['templates'], false) }}</p>
                         </div>
                     </div>
                 </div>
@@ -150,6 +159,95 @@
                 @endforelse
             </div>
         </x-card>
+    </div>
+
+    {{-- templates section (فروش قالب‌ها) --}}
+    <div class="space-y-4">
+        {{-- section header --}}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="flex items-center gap-2.5 text-base font-black text-zinc-900 dark:text-zinc-50">
+                <span class="flex size-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400">
+                    <x-icon name="layout-template" class="size-4.5" />
+                </span>
+                فروش قالب‌ها
+            </h3>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ route('admin.templates.index') }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-brand-500/10 dark:hover:text-brand-400">
+                    <x-icon name="layout-template" class="size-3.5" />
+                    مدیریت قالب‌ها
+                </a>
+                <a href="{{ route('admin.reports.index') }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-brand-500/10 dark:hover:text-brand-400">
+                    <x-icon name="bar-chart" class="size-3.5" />
+                    گزارش فروش
+                </a>
+            </div>
+        </div>
+
+        {{-- template mini stats --}}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <x-stat label="فروش کل قالب‌ها" :value="fa_num($this->templateStats['sales'])" icon="receipt" variant="violet"
+                    :hint="fa_num($this->templateStats['exclusive_sales']) . ' خرید اختصاصی'" :href="route('admin.reports.index')" />
+            <x-stat label="درآمد قالب‌ها" :value="money($this->templateStats['revenue'], false)" icon="wallet" variant="success"
+                    hint="تومان — خریدهای پرداخت‌شده" :href="route('admin.reports.index')" />
+            <x-stat label="قالب‌های قابل فروش" :value="fa_num($this->templateStats['active_templates'])" icon="layout-template" variant="primary"
+                    hint="فعال و واگذارنشده" :href="route('admin.templates.index')" />
+            <x-stat label="پرفروش‌ترین قالب" :value="$this->topTemplates->first()?->name ?? '—'" icon="crown" variant="warning"
+                    :hint="$this->topTemplates->first() ? fa_num($this->topTemplates->first()->paid_purchases_count) . ' فروش' : 'هنوز فروشی ثبت نشده'" :href="route('admin.templates.index')" />
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            {{-- recent template sales --}}
+            <x-card title="آخرین فروش قالب‌ها" subtitle="خریدهای موفق فروشگاه و API">
+                <div class="-my-2 divide-y divide-zinc-100 dark:divide-zinc-800">
+                    @forelse($this->recentTemplateSales as $sale)
+                        <div class="flex items-center gap-3 py-2.5">
+                            <x-icon name="layout-template" class="size-4 shrink-0 text-zinc-400" />
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-semibold text-zinc-700 dark:text-zinc-200">{{ $sale->template?->name ?? '—' }}</p>
+                                <p class="truncate text-xs text-zinc-500">
+                                    {{ $sale->customer?->name ?? 'مهمان (فروشگاه)' }} · {{ verta_date($sale->paid_at) }}
+                                    @if($sale->purchase_type === \App\Models\TemplatePurchase::TYPE_EXCLUSIVE)
+                                        <span class="font-bold text-violet-600 dark:text-violet-400">· اختصاصی</span>
+                                    @endif
+                                </p>
+                            </div>
+                            <span class="shrink-0 text-xs font-bold tabular-nums text-brand-600 dark:text-brand-400">{{ money($sale->amount, false) }}</span>
+                        </div>
+                    @empty
+                        <x-empty icon="layout-template" title="هنوز قالبی فروخته نشده" description="فروش قالب‌ها از فروشگاه و API اینجا نمایش داده می‌شود." class="py-8" />
+                    @endforelse
+                </div>
+            </x-card>
+
+            {{-- top templates --}}
+            <x-card title="پرفروش‌ترین قالب‌ها">
+                <div class="-my-2 divide-y divide-zinc-100 dark:divide-zinc-800">
+                    @forelse($this->topTemplates as $template)
+                        <a href="{{ route('admin.templates.show', $template) }}" wire:navigate class="group flex items-center gap-3 py-2.5">
+                            <span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-xs font-black text-zinc-500 group-hover:bg-brand-50 group-hover:text-brand-600 dark:bg-zinc-800 dark:text-zinc-400 dark:group-hover:bg-brand-500/10 dark:group-hover:text-brand-400">
+                                {{ fa_num($loop->iteration) }}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-semibold text-zinc-700 group-hover:text-brand-600 dark:text-zinc-200 dark:group-hover:text-brand-400">{{ $template->name }}</p>
+                                <p class="flex items-center gap-2 text-xs text-zinc-500">
+                                    {{ fa_num($template->paid_purchases_count) }} فروش موفق
+                                    <span class="text-zinc-300 dark:text-zinc-600">·</span>
+                                    {{ money($template->paid_revenue, false) }} تومان
+                                </p>
+                            </div>
+                            @if($template->is_sold_exclusively)
+                                <x-badge variant="violet" icon="crown">اختصاصی</x-badge>
+                            @endif
+                            <x-icon name="chevron-left" class="size-4 shrink-0 text-zinc-300 transition-transform group-hover:-translate-x-0.5 group-hover:text-brand-500" />
+                        </a>
+                    @empty
+                        <x-empty icon="layout-template" title="قالبی ثبت نشده" class="py-8" />
+                    @endforelse
+                </div>
+            </x-card>
+        </div>
     </div>
 
     {{-- subscription plans --}}

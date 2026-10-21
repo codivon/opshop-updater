@@ -8,7 +8,7 @@
                 قالب‌ها
             </h1>
             <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                فروش مستقیم قالب‌های آماده به بازدیدکننده‌گان سایت — بدون کد آپدیت و بدون ثبت‌نام.
+                فروش قالب‌های آماده با دو نوع قیمت‌گذاری (معمولی + اختصاصی) — بدون کد آپدیت و بدون ثبت‌نام.
             </p>
         </div>
         <x-btn icon="plus" wire:click="create">قالب جدید</x-btn>
@@ -45,13 +45,11 @@
                                  onerror="this.style.display='none';this.parentElement.classList.add('shop-thumb')">
                         </a>
 
-                        @if($template->latestVersion)
-                            <span class="absolute bottom-2 start-2 inline-flex items-center gap-1 rounded-lg bg-zinc-950/70 px-2 py-1 font-mono text-xs font-bold text-white backdrop-blur" dir="ltr">
-                                v{{ $template->latestVersion->version }}
-                            </span>
-                        @endif
-
-                        @if($template->is_free || $template->final_price <= 0)
+                        @if($template->is_sold_exclusively)
+                            <div class="absolute top-2 end-2">
+                                <x-badge variant="violet" icon="crown">فروخته شد (اختصاصی)</x-badge>
+                            </div>
+                        @elseif($template->is_free || $template->final_price <= 0)
                             <div class="absolute bottom-2 end-2">
                                 <x-badge variant="success" icon="gift">رایگان</x-badge>
                             </div>
@@ -59,6 +57,12 @@
                             <div class="absolute bottom-2 end-2">
                                 <x-badge variant="danger" icon="tag">{{ fa_num($template->discount) }}٪ تخفیف</x-badge>
                             </div>
+                        @endif
+
+                        @if($template->latestVersion)
+                            <span class="absolute bottom-2 start-2 inline-flex items-center gap-1 rounded-lg bg-zinc-950/70 px-2 py-1 font-mono text-xs font-bold text-white backdrop-blur" dir="ltr">
+                                v{{ $template->latestVersion->version }}
+                            </span>
                         @endif
                     </div>
 
@@ -87,6 +91,23 @@
                             <span class="inline-flex items-center gap-1"><x-icon name="message-square" class="size-3.5" /> {{ fa_num($template->comments_count) }} دیدگاه</span>
                         </div>
 
+                        {{-- prices --}}
+                        <div class="flex flex-wrap items-center gap-3 text-xs">
+                            @if($template->is_free || $template->final_price <= 0)
+                                <span class="font-bold text-emerald-600 dark:text-emerald-400">رایگان</span>
+                            @else
+                                <span class="rounded-lg bg-brand-50 px-2 py-1 font-bold text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
+                                    معمولی: {{ money($template->final_price, false) }}
+                                </span>
+                            @endif
+
+                            @if($template->has_exclusive_offer)
+                                <span class="rounded-lg bg-violet-50 px-2 py-1 font-bold text-violet-700 dark:bg-violet-500/10 dark:text-violet-400">
+                                    اختصاصی: {{ money($template->exclusive_final_price, false) }}
+                                </span>
+                            @endif
+                        </div>
+
                         {{-- footer --}}
                         <div class="mt-auto flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-700/50">
                             <div class="flex items-center gap-2">
@@ -102,12 +123,6 @@
                             </div>
 
                             <div class="flex items-center gap-1">
-                                @if(!$template->is_free && $template->final_price > 0)
-                                    <span class="me-1 text-sm font-black tabular-nums text-zinc-900 dark:text-zinc-100">
-                                        {{ money($template->final_price) }}
-                                    </span>
-                                @endif
-
                                 <a href="{{ route('admin.templates.show', $template) }}" wire:navigate
                                    class="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10"
                                    title="مدیریت" aria-label="مدیریت {{ $template->name }}">
@@ -171,54 +186,98 @@
                 <x-ckeditor model="form.description" :value="$form['description'] ?? ''" />
             </x-field>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <x-field label="قیمت (تومان)" for="form.price">
-                    <x-input id="form.price" type="number" min="0" wire:model="form.price" />
+            {{-- ================= قیمت‌گذاری دوگانه ================= --}}
+            <div class="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-700/60">
+                <p class="mb-3 flex items-center gap-1.5 text-sm font-black text-zinc-800 dark:text-zinc-100">
+                    <x-icon name="wallet" class="size-4 text-brand-600" />
+                    قیمت‌گذاری
+                </p>
+
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {{-- خرید معمولی --}}
+                    <div class="rounded-xl bg-brand-50/60 p-3 ring-1 ring-brand-100 dark:bg-brand-500/5 dark:ring-brand-500/20">
+                        <p class="mb-2 text-xs font-black text-brand-700 dark:text-brand-400">۱) خرید معمولی</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <x-field label="قیمت (تومان)" for="form.price">
+                                <x-input id="form.price" type="number" min="0" wire:model="form.price" />
+                            </x-field>
+                            <x-field label="تخفیف (٪)" for="form.discount">
+                                <x-input id="form.discount" type="number" min="0" max="100" wire:model="form.discount" />
+                            </x-field>
+                        </div>
+                        @if(!$form['is_free'] && (int) $form['price'] > 0 && (int) $form['discount'] > 0)
+                            <div class="mt-2 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                                قیمت نهایی معمولی: {{ money($form['price'] - round($form['price'] * $form['discount'] / 100)) }}
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- خرید اختصاصی --}}
+                    <div class="rounded-xl bg-violet-50/60 p-3 ring-1 ring-violet-100 dark:bg-violet-500/5 dark:ring-violet-500/20">
+                        <p class="mb-2 flex items-center gap-1 text-xs font-black text-violet-700 dark:text-violet-400">
+                            <x-icon name="crown" class="size-3.5" />
+                            ۲) خرید اختصاصی (واگذاری کامل)
+                        </p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <x-field label="قیمت (تومان)" for="form.exclusive_price" hint="صفر = بدون فروش اختصاصی">
+                                <x-input id="form.exclusive_price" type="number" min="0" wire:model="form.exclusive_price" />
+                            </x-field>
+                            <x-field label="تخفیف (٪)" for="form.exclusive_discount">
+                                <x-input id="form.exclusive_discount" type="number" min="0" max="100" wire:model="form.exclusive_discount" />
+                            </x-field>
+                        </div>
+                        @if(!$form['is_free'] && (int) $form['exclusive_price'] > 0 && (int) $form['exclusive_discount'] > 0)
+                            <div class="mt-2 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                                قیمت نهایی اختصاصی: {{ money($form['exclusive_price'] - round($form['exclusive_price'] * $form['exclusive_discount'] / 100)) }}
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <x-field class="mt-3" label="توضیح خرید اختصاصی (نمایش به خریدار)" for="form.exclusive_note" hint="مثلاً: برداشتن کامل قالب از فروشگاه + انتقال کامل حقوق">
+                    <x-textarea id="form.exclusive_note" wire:model="form.exclusive_note" rows="2" placeholder="حقوق و شرایط خرید اختصاصی…" />
                 </x-field>
-                <x-field label="تخفیف (٪)" for="form.discount">
-                    <x-input id="form.discount" type="number" min="0" max="100" wire:model="form.discount" />
-                </x-field>
+
+                <p class="mt-2 flex items-start gap-1.5 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                    <x-icon name="info" class="mt-0.5 size-3.5 shrink-0 text-amber-500" />
+                    پس از نخستین «خرید اختصاصی» موفق، قالب به‌صورت خودکار از فروشگاه و API برداشته می‌شود و دیگر قابل فروش نیست.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <x-field label="ترتیب نمایش" for="form.sort_order">
                     <x-input id="form.sort_order" type="number" min="0" wire:model="form.sort_order" />
                 </x-field>
-            </div>
-
-            @if(!$form['is_free'] && (int) $form['price'] > 0 && (int) $form['discount'] > 0)
-                <div class="rounded-xl bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20">
-                    قیمت نهایی: {{ money($form['price'] - round($form['price'] * $form['discount'] / 100)) }} تومان
+                <div class="flex items-end pb-1">
+                    <x-toggle wire:model="form.is_free" label="این قالب رایگان است" />
                 </div>
-            @endif
-
-            <div class="flex flex-col gap-4">
-                <x-toggle wire:model="form.is_free" label="این قالب رایگان است" />
-
-                {{-- thumbnail --}}
-                <x-field label="تصویر شاخص">
-                    <div wire:key="template-thumb-preview" wire:ignore x-data="filePreview()" class="space-y-2">
-                        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
-                        <template x-for="(preview, i) in previews" :key="i">
-                            <div class="flex items-center gap-3">
-                                <img :src="preview.url" :alt="preview.name"
-                                     class="size-20 shrink-0 rounded-xl bg-zinc-100 object-cover ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700" />
-                                <div class="min-w-0">
-                                    <p class="truncate text-xs font-medium text-zinc-700 dark:text-zinc-200" x-text="preview.name"></p>
-                                    <p class="mt-0.5 text-[11px] text-zinc-400">پیش‌نمایش تصویر انتخاب‌شده — با ذخیره جایگزین می‌شود</p>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                    <div wire:loading wire:target="thumbnailFile" class="mt-2 flex items-center gap-2 text-xs text-brand-600 dark:text-brand-400">
-                        <x-icon name="loader" class="size-4 animate-spin" />
-                        در حال آپلود…
-                    </div>
-                    @error('thumbnailFile') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
-                    @if($editingId && !$thumbnailFile)
-                        <div class="mt-2">
-                            <x-toggle wire:model="removeThumbnail" label="حذف تصویر فعلی" />
-                        </div>
-                    @endif
-                </x-field>
             </div>
+
+            {{-- thumbnail --}}
+            <x-field label="تصویر شاخص">
+                <div wire:key="template-thumb-preview-{{ $thumbNonce }}" x-data="filePreview()" class="space-y-2">
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
+                    <template x-for="(preview, i) in previews" :key="i">
+                        <div class="flex items-center gap-3">
+                            <img :src="preview.url" :alt="preview.name"
+                                 class="size-20 shrink-0 rounded-xl bg-zinc-100 object-cover ring-1 ring-zinc-200 dark:bg-zinc-800 dark:ring-zinc-700" />
+                            <div class="min-w-0">
+                                <p class="truncate text-xs font-medium text-zinc-700 dark:text-zinc-200" x-text="preview.name"></p>
+                                <p class="mt-0.5 text-[11px] text-zinc-400">پیش‌نمایش تصویر انتخاب‌شده — با ذخیره جایگزین می‌شود</p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <x-upload-progress target="thumbnailFile" label="در حال آپلود تصویر شاخص" />
+
+                @error('thumbnailFile') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
+                @if($editingId && !$thumbnailFile)
+                    <div class="mt-2">
+                        <x-toggle wire:model="removeThumbnail" label="حذف تصویر فعلی" />
+                    </div>
+                @endif
+            </x-field>
 
             <div class="flex items-center justify-end gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-700/50">
                 <x-btn variant="secondary" type="button" wire:click="$set('showModal', false)">انصراف</x-btn>

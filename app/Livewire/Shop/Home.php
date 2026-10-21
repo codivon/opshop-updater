@@ -170,6 +170,8 @@ class Home extends Component
             ->with(['category:id,name', 'latestVersion:id,template_id,version'])
             ->withCount(['comments' => fn ($q) => $q->where('status', 'approved')])
             ->where('status', \App\Models\Template::STATUS_ACTIVE)
+            // قالب‌های واگذارشده (خرید اختصاصی) در صفحه اصلی نمایش داده نمی‌شوند
+            ->where('is_sold_exclusively', false)
             ->orderBy('sort_order')
             ->orderByDesc('id')
             ->limit(self::PREVIEW_LIMIT)

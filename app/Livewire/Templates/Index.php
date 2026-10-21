@@ -28,33 +28,43 @@ class Index extends Component
     public ?int $editingId = null;
     public $thumbnailFile; // UploadedFile (اختیاری — فقط هنگام تغییر)
     public bool $removeThumbnail = false;
+
+    /** شمارنده برای رندر مجدد اجباری input فایل پس از هر باز/بسته شدن مودال (رفع باگ تصویر) */
+    public int $thumbNonce = 0;
+
     public array $form = [
-        'name'              => '',
-        'slug'              => '',
-        'category_id'       => '',
-        'short_description' => '',
-        'description'       => '',
-        'price'             => 0,
-        'discount'          => 0,
-        'is_free'           => false,
-        'status'            => Template::STATUS_DRAFT,
-        'sort_order'        => 0,
+        'name'               => '',
+        'slug'               => '',
+        'category_id'        => '',
+        'short_description'  => '',
+        'description'        => '',
+        'price'              => 0,
+        'discount'           => 0,
+        'exclusive_price'    => 0,
+        'exclusive_discount' => 0,
+        'exclusive_note'     => '',
+        'is_free'            => false,
+        'status'             => Template::STATUS_DRAFT,
+        'sort_order'         => 0,
     ];
 
     protected function rules(): array
     {
         return [
-            'form.name'              => ['required', 'string', 'max:190'],
-            'form.slug'              => ['nullable', 'string', 'max:190', 'alpha_dash:ascii'],
-            'form.category_id'       => ['nullable', 'exists:categories,id'],
-            'form.short_description' => ['nullable', 'string', 'max:10000'],
-            'form.description'       => ['nullable', 'string', 'max:100000'],
-            'form.price'             => ['nullable', 'integer', 'min:0'],
-            'form.discount'          => ['nullable', 'integer', 'min:0', 'max:100'],
-            'form.is_free'           => ['boolean'],
-            'form.status'            => ['required', 'in:draft,active,archived'],
-            'form.sort_order'        => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'thumbnailFile'          => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
+            'form.name'               => ['required', 'string', 'max:190'],
+            'form.slug'               => ['nullable', 'string', 'max:190', 'alpha_dash:ascii'],
+            'form.category_id'        => ['nullable', 'exists:categories,id'],
+            'form.short_description'  => ['nullable', 'string', 'max:10000'],
+            'form.description'        => ['nullable', 'string', 'max:100000'],
+            'form.price'              => ['nullable', 'integer', 'min:0'],
+            'form.discount'           => ['nullable', 'integer', 'min:0', 'max:100'],
+            'form.exclusive_price'    => ['nullable', 'integer', 'min:0'],
+            'form.exclusive_discount' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'form.exclusive_note'     => ['nullable', 'string', 'max:2000'],
+            'form.is_free'            => ['boolean'],
+            'form.status'             => ['required', 'in:draft,active,archived'],
+            'form.sort_order'         => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'thumbnailFile'           => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
         ];
     }
 
@@ -87,44 +97,54 @@ class Index extends Component
     public function create(): void
     {
         $this->resetErrorBag();
+        $this->resetValidation();
         $this->editingId = null;
         $this->thumbnailFile = null;
         $this->removeThumbnail = false;
         $this->form = [
-            'name'              => '',
-            'slug'              => '',
-            'category_id'       => '',
-            'short_description' => '',
-            'description'       => '',
-            'price'             => 0,
-            'discount'          => 0,
-            'is_free'           => false,
-            'status'            => Template::STATUS_DRAFT,
-            'sort_order'        => 0,
+            'name'               => '',
+            'slug'               => '',
+            'category_id'        => '',
+            'short_description'  => '',
+            'description'        => '',
+            'price'              => 0,
+            'discount'           => 0,
+            'exclusive_price'    => 0,
+            'exclusive_discount' => 0,
+            'exclusive_note'     => '',
+            'is_free'            => false,
+            'status'             => Template::STATUS_DRAFT,
+            'sort_order'         => 0,
         ];
+        $this->thumbNonce++;
         $this->showModal = true;
     }
 
     public function edit(int $id): void
     {
         $this->resetErrorBag();
+        $this->resetValidation();
         $template = Template::findOrFail($id);
 
         $this->editingId = $template->id;
         $this->thumbnailFile = null;
         $this->removeThumbnail = false;
         $this->form = [
-            'name'              => $template->name,
-            'slug'              => $template->slug,
-            'category_id'       => (string) $template->category_id,
-            'short_description' => (string) $template->short_description,
-            'description'       => (string) $template->description,
-            'price'             => $template->price,
-            'discount'          => $template->discount,
-            'is_free'           => $template->is_free,
-            'status'            => $template->status,
-            'sort_order'        => $template->sort_order,
+            'name'               => $template->name,
+            'slug'               => $template->slug,
+            'category_id'        => (string) $template->category_id,
+            'short_description'  => (string) $template->short_description,
+            'description'        => (string) $template->description,
+            'price'              => $template->price,
+            'discount'           => $template->discount,
+            'exclusive_price'    => $template->exclusive_price,
+            'exclusive_discount' => $template->exclusive_discount,
+            'exclusive_note'     => (string) ($template->exclusive_note ?? ''),
+            'is_free'            => $template->is_free,
+            'status'             => $template->status,
+            'sort_order'         => $template->sort_order,
         ];
+        $this->thumbNonce++;
         $this->showModal = true;
     }
 
@@ -133,22 +153,27 @@ class Index extends Component
         $data = $this->validate();
 
         $payload = [
-            'name'              => trim($data['form']['name']),
-            'slug'              => trim((string) ($data['form']['slug'] ?? '')),
-            'category_id'       => $data['form']['category_id'] !== '' ? (int) $data['form']['category_id'] : null,
-            'short_description' => $data['form']['short_description'] ?: null,
-            'description'       => $data['form']['description'] ?: null,
-            'price'             => (int) ($data['form']['price'] ?? 0),
-            'discount'          => (int) ($data['form']['discount'] ?? 0),
-            'is_free'           => (bool) $data['form']['is_free'],
-            'status'            => $data['form']['status'],
-            'sort_order'        => (int) ($data['form']['sort_order'] ?? 0),
+            'name'               => trim($data['form']['name']),
+            'slug'               => trim((string) ($data['form']['slug'] ?? '')),
+            'category_id'        => $data['form']['category_id'] !== '' ? (int) $data['form']['category_id'] : null,
+            'short_description'  => $data['form']['short_description'] ?: null,
+            'description'        => $data['form']['description'] ?: null,
+            'price'              => (int) ($data['form']['price'] ?? 0),
+            'discount'           => (int) ($data['form']['discount'] ?? 0),
+            'exclusive_price'    => (int) ($data['form']['exclusive_price'] ?? 0),
+            'exclusive_discount' => (int) ($data['form']['exclusive_discount'] ?? 0),
+            'exclusive_note'     => ($data['form']['exclusive_note'] ?? '') ?: null,
+            'is_free'            => (bool) $data['form']['is_free'],
+            'status'             => $data['form']['status'],
+            'sort_order'         => (int) ($data['form']['sort_order'] ?? 0),
         ];
 
         // قالب رایگان قیمت ندارد
         if ($payload['is_free']) {
             $payload['price'] = 0;
             $payload['discount'] = 0;
+            $payload['exclusive_price'] = 0;
+            $payload['exclusive_discount'] = 0;
         }
 
         try {
@@ -206,6 +231,12 @@ class Index extends Component
             return;
         }
 
+        // رفع باگ «تصویر قالب تغییر نمی‌کند»:
+        // بعد از ذخیره، فایل آپلودی باید کاملاً از state پاک شود؛ وگرنه در باز
+        // شدن بعدی مودال، input قدیمی (wire:ignore) با state همگام دیده می‌شد.
+        $this->thumbnailFile = null;
+        $this->removeThumbnail = false;
+        $this->thumbNonce++;
         $this->showModal = false;
         $this->toast($message);
     }
@@ -223,13 +254,26 @@ class Index extends Component
             : 'قالب به پیش‌نویس برگشت.');
     }
 
-    public function delete(int $id): void
+    public function delete(int $id, ImageUploadService $uploader): void
     {
-        $template = Template::findOrFail($id);
+        $template = Template::with('images')->findOrFail($id);
 
         if ($template->purchases()->where('status', 'paid')->exists()) {
             $this->toast('این قالب خرید موفق دارد و قابل حذف نیست؛ آن را آرشیو کنید.', 'error');
             return;
+        }
+
+        // حذف تصویر شاخص + گالری
+        if ($template->thumbnail) {
+            $uploader->deleteFile($template->thumbnail);
+        }
+        $uploader->deleteAllTemplateGalleryImages($template);
+
+        // حذف فایل ZIP نسخه‌ها
+        foreach ($template->versions as $version) {
+            if ($version->file_path && \Illuminate\Support\Facades\Storage::disk('local')->exists($version->file_path)) {
+                \Illuminate\Support\Facades\Storage::disk('local')->delete($version->file_path);
+            }
         }
 
         $template->delete();

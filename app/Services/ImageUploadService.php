@@ -126,6 +126,80 @@ class ImageUploadService
     }
 
     /* ===================================================================
+     *  آپلود چندین تصویر گالری قالب (Template)
+     *  Returns: array of TemplateImage
+     * =================================================================== */
+    public function uploadTemplateGalleryImages(array $files, \App\Models\Template $template): array
+    {
+        $uploaded = [];
+
+        DB::transaction(function () use ($files, $template, &$uploaded) {
+            $nextOrder = $template->images()->max('sort_order') ?: 0;
+
+            foreach ($files as $file) {
+                if (!$file instanceof UploadedFile || !$file->isValid()) {
+                    continue;
+                }
+
+                $this->validateImage($file);
+
+                $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+                $filename  = $template->slug . '_gallery_' . time() . '_' . Str::random(6) . '.' . $extension;
+
+                // ذخیره اطلاعات قبل از انتقال
+                $originalName = $file->getClientOriginalName();
+                $fileSize     = $file->getSize();
+
+                $path = $this->storeFile($file, 'uploads/templates/gallery', $filename);
+
+                $nextOrder++;
+
+                $image = \App\Models\TemplateImage::create([
+                    'template_id'   => $template->id,
+                    'path'          => $path,
+                    'original_name' => $originalName,
+                    'size'          => $fileSize,
+                    'sort_order'    => $nextOrder,
+                    'is_active'     => true,
+                ]);
+
+                $uploaded[] = $image;
+            }
+        });
+
+        return $uploaded;
+    }
+
+    public function deleteTemplateGalleryImage(\App\Models\TemplateImage $image): void
+    {
+        $this->deleteFile($image->path);
+        $image->delete();
+    }
+
+    public function deleteAllTemplateGalleryImages(\App\Models\Template $template): int
+    {
+        $count = 0;
+
+        foreach ($template->images as $image) {
+            $this->deleteFile($image->path);
+            $image->delete();
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /** جابه‌جایی ترتیب تصاویر گالری قالب */
+    public function updateTemplateImageOrder(array $orderedIds): void
+    {
+        DB::transaction(function () use ($orderedIds) {
+            foreach ($orderedIds as $order => $id) {
+                \App\Models\TemplateImage::where('id', $id)->update(['sort_order' => $order + 1]);
+            }
+        });
+    }
+
+    /* ===================================================================
      *  هسته ذخیره‌سازی: public → در صورت عدم امکان، storage fallback
      *  استراتژی: copy + unlink (به‌جای move/rename)
      * =================================================================== */

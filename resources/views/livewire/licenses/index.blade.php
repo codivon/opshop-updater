@@ -3,9 +3,26 @@
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
             <h2 class="text-lg font-black text-zinc-900 dark:text-zinc-50">لایسنس‌ها</h2>
-            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">کلیدهای صدورشده برای پکیج‌ها به‌همراه وضعیت اعتبار و انقضا.</p>
+            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">کلیدهای صدورشده برای پکیج‌ها و قالب‌ها به‌همراه وضعیت اعتبار و انقضا.</p>
         </div>
-        <x-btn variant="secondary" icon="refresh-cw" wire:click="expireOld" :loading="true">منقضی کردن لایسن‌های قدیمی</x-btn>
+
+        <div class="flex items-center gap-2">
+            {{-- تب نوع لایسنس --}}
+            <div class="flex items-center gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+                <button type="button" wire:click="switchType('package')"
+                        class="cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-bold transition-colors @if($type === 'package') bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white @else text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 @endif">
+                    لایسنس پکیج‌ها
+                </button>
+                <button type="button" wire:click="switchType('template')"
+                        class="cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-bold transition-colors @if($type === 'template') bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white @else text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 @endif">
+                    لایسنس قالب‌ها
+                </button>
+            </div>
+
+            @if($type === 'package')
+                <x-btn variant="secondary" icon="refresh-cw" wire:click="expireOld" :loading="true">منقضی کردن لایسن‌های قدیمی</x-btn>
+            @endif
+        </div>
     </div>
 
     {{-- filters --}}
@@ -20,7 +37,7 @@
             <option value="revoked">باطل شده</option>
             <option value="expired">منقضی</option>
         </select>
-        <select wire:model.live="package_id" class="input lg:w-44">
+        <select wire:model.live="package_id" class="input lg:w-44" @if($type !== 'package') disabled @endif>
             <option value="">همه پکیج‌ها</option>
             @foreach($this->packages as $package)
                 <option value="{{ $package->id }}">{{ $package->name }}</option>
@@ -58,6 +75,108 @@
     @endif
 
     {{-- table --}}
+    @if($type === 'template')
+        {{-- ==================== لایسنس قالب‌ها ==================== --}}
+        <div class="card overflow-hidden">
+            @if($this->templateRecords->count())
+                <div class="table-wrap ring-0">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>کلید لایسنس</th>
+                                <th>خریدار</th>
+                                <th class="hidden md:table-cell">قالب</th>
+                                <th class="hidden lg:table-cell">نوع خرید</th>
+                                <th class="hidden lg:table-cell">صدور</th>
+                                <th>وضعیت</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($this->templateRecords as $license)
+                                <tr wire:key="tlicense-{{ $license->id }}">
+                                    <td>
+                                        <div class="flex items-center gap-1.5">
+                                            <span dir="ltr" class="font-mono text-xs font-bold text-brand-600 dark:text-brand-400">{{ $license->license_key }}</span>
+                                            <button x-data type="button"
+                                                    @click="navigator.clipboard.writeText('{{ $license->license_key }}'); $dispatch('toast', {message: 'کپی شد'})"
+                                                    class="rounded-md p-1 text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-500 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
+                                                    title="کپی کلید">
+                                                <x-icon name="copy" class="size-3.5" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="flex items-center gap-3">
+                                            <x-avatar :name="$license->customer?->name ?? 'مهمان'" size="sm" />
+                                            <span class="truncate text-sm font-medium text-zinc-700 dark:text-zinc-200">{{ $license->customer?->name ?? 'مهمان (فروشگاه)' }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="hidden md:table-cell">
+                                        <div class="flex items-center gap-2">
+                                            <x-icon name="layout-template" class="size-4 shrink-0 text-zinc-400" />
+                                            <span class="truncate text-sm text-zinc-600 dark:text-zinc-300">{{ $license->template?->name ?? '—' }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="hidden lg:table-cell">
+                                        @if($license->purchase_type === \App\Models\TemplatePurchase::TYPE_EXCLUSIVE)
+                                            <x-badge variant="violet" icon="crown">اختصاصی</x-badge>
+                                        @else
+                                            <x-badge variant="neutral">معمولی</x-badge>
+                                        @endif
+                                    </td>
+                                    <td class="hidden whitespace-nowrap text-xs tabular-nums text-zinc-500 dark:text-zinc-400 lg:table-cell">{{ $license->starts_at ? verta_date($license->starts_at) : '—' }}</td>
+                                    <td>
+                                        @php($variant = match($license->status) {
+                                            'active' => 'success',
+                                            'revoked' => 'danger',
+                                            'expired' => 'danger',
+                                            default => 'neutral',
+                                        })
+                                        @php($label = match($license->status) {
+                                            'active' => 'فعال',
+                                            'revoked' => 'باطل شده',
+                                            'expired' => 'منقضی',
+                                            default => $license->status,
+                                        })
+                                        <x-badge :variant="$variant" :icon="$license->status === 'active' ? 'check-circle' : null">{{ $label }}</x-badge>
+                                    </td>
+                                    <td>
+                                        <div class="flex items-center justify-end gap-1">
+                                            @if($license->status === \App\Models\TemplateLicense::STATUS_ACTIVE)
+                                                <button type="button" wire:click="$set('revokeId', {{ $license->id }})"
+                                                        class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                                                        title="ابطال لایسنس">
+                                                    <x-icon name="x-circle" class="size-4.5" />
+                                                </button>
+                                            @else
+                                                <button type="button" wire:click="activateTemplateLicense({{ $license->id }})"
+                                                        class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
+                                                        title="فعال‌سازی مجدد">
+                                                    <x-icon name="check-circle" class="size-4.5" />
+                                                </button>
+                                            @endif
+                                            <button type="button" wire:click="$set('deleteId', {{ $license->id }})"
+                                                    class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                                                    title="حذف لایسنس">
+                                                <x-icon name="trash" class="size-4.5" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="border-t border-zinc-100 px-4 py-3 dark:border-zinc-800">
+                    {{ $this->templateRecords->links() }}
+                </div>
+            @else
+                <x-empty icon="key" title="لایسنس قالبی یافت نشد" description="با اولین خرید موفق قالب (فروشگاه یا API)، لایسنس دائمی به‌صورت خودکار صادر می‌شود." />
+            @endif
+        </div>
+    @else
+    {{-- ==================== لایسنس پکیج‌ها (موجود) ==================== --}}
     <div class="card overflow-hidden">
         @if($this->records->count())
             <div class="table-wrap ring-0">
@@ -184,11 +303,16 @@
             <x-empty icon="key" title="لایسنسی یافت نشد" description="کلیدهای صادرشده پس از اولین خرید پکیج اینجا نمایش داده می‌شوند یا فیلترها را تغییر دهید." />
         @endif
     </div>
+    @endif
 
     {{-- revoke confirm --}}
     <x-modal wire:model="revokeId" title="ابطال لایسنس" size="sm">
         @if($revokeId)
-            @php($target = \App\Models\PackageLicense::find($revokeId))
+            @if($type === 'template')
+                @php($target = \App\Models\TemplateLicense::find($revokeId))
+            @else
+                @php($target = \App\Models\PackageLicense::find($revokeId))
+            @endif
             <div class="space-y-4">
                 <div class="flex items-center gap-3 rounded-xl bg-rose-50 p-4 text-rose-700 ring-1 ring-rose-600/10 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20">
                     <x-icon name="alert-triangle" class="size-6 shrink-0" />
@@ -198,7 +322,7 @@
                 </div>
                 <div class="flex items-center justify-end gap-2">
                     <x-btn variant="secondary" wire:click="$set('revokeId', null)">انصراف</x-btn>
-                    <x-btn variant="danger" icon="x-circle" wire:click="revoke" :loading="true">ابطال لایسنس</x-btn>
+                    <x-btn variant="danger" icon="x-circle" wire:click="{{ $type === 'template' ? 'revokeTemplateLicense' : 'revoke' }}" :loading="true">ابطال لایسنس</x-btn>
                 </div>
             </div>
         @endif
@@ -207,7 +331,11 @@
     {{-- single delete confirm --}}
     <x-modal wire:model="deleteId" title="حذف لایسنس" size="sm">
         @if($deleteId)
-            @php($target = \App\Models\PackageLicense::find($deleteId))
+            @if($type === 'template')
+                @php($target = \App\Models\TemplateLicense::find($deleteId))
+            @else
+                @php($target = \App\Models\PackageLicense::find($deleteId))
+            @endif
             <div class="space-y-4">
                 <div class="flex items-center gap-3 rounded-xl bg-rose-50 p-4 text-rose-700 ring-1 ring-rose-600/10 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20">
                     <x-icon name="trash" class="size-6 shrink-0" />
@@ -218,7 +346,7 @@
                 </div>
                 <div class="flex items-center justify-end gap-2">
                     <x-btn variant="secondary" wire:click="$set('deleteId', null)">انصراف</x-btn>
-                    <x-btn variant="danger" icon="trash" wire:click="delete" :loading="true">حذف قطعی</x-btn>
+                    <x-btn variant="danger" icon="trash" wire:click="{{ $type === 'template' ? 'deleteTemplateLicense' : 'delete' }}" :loading="true">حذف قطعی</x-btn>
                 </div>
             </div>
         @endif
