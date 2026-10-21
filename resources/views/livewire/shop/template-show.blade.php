@@ -82,6 +82,12 @@
                     <div class="flex flex-col items-center gap-3 rounded-2xl bg-violet-50 px-4 py-6 text-center ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-500/20">
                         <x-icon name="crown" class="size-8 text-violet-500" />
                         <p class="text-sm font-black text-violet-800 dark:text-violet-300">این قالب به‌صورت اختصاصی واگذار شده است</p>
+                        @if($buyerDisplay = $template->exclusiveBuyerDisplay())
+                            <p class="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-xs font-black text-violet-700 ring-1 ring-violet-200 dark:bg-zinc-900 dark:text-violet-300 dark:ring-violet-500/30">
+                                <x-icon name="badge-check" class="size-4" />
+                                واگذارشده به: {{ $buyerDisplay }}
+                            </p>
+                        @endif
                         <p class="text-xs leading-6 text-zinc-500 dark:text-zinc-400">مالکیت کامل این قالب به یک خریدار منتقل شده و دیگر قابل خرید نیست.</p>
                     </div>
                 @else

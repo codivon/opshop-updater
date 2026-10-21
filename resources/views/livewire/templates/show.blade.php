@@ -182,6 +182,71 @@
                 </div>
             </div>
 
+            {{-- کنترل واگذاری اختصاصی — قالب پس از خرید اختصاصی از فروشگاه/API حذف می‌شود --}}
+            <div class="mt-4 card p-5" wire:key="exclusive-control-{{ $template->id }}">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="flex items-center gap-1.5 text-sm font-black text-zinc-900 dark:text-zinc-50">
+                        <x-icon name="crown" class="size-4 text-violet-500" />
+                        وضعیت واگذاری اختصاصی
+                    </h2>
+                    @if($template->is_sold_exclusively)
+                        <x-badge variant="violet" icon="crown">فروخته شد (اختصاصی)</x-badge>
+                    @else
+                        <x-badge variant="success" icon="badge-check">عمومی — قابل خرید</x-badge>
+                    @endif
+                </div>
+
+                @if($template->is_sold_exclusively)
+                    <div class="mt-3 space-y-2 rounded-xl bg-violet-50/60 p-3 text-sm ring-1 ring-violet-100 dark:bg-violet-500/5 dark:ring-violet-500/20">
+                        <div class="flex items-center justify-between gap-4">
+                            <span class="text-zinc-500 dark:text-zinc-400">واگذارشده در</span>
+                            <span class="font-bold tabular-nums">{{ $template->sold_exclusively_at?->format('Y/m/d H:i') ?? '—' }}</span>
+                        </div>
+                        @if($template->exclusivePurchase)
+                            <div class="flex items-center justify-between gap-4">
+                                <span class="text-zinc-500 dark:text-zinc-400">خرید اختصاصی ثبت‌شده</span>
+                                <span class="font-bold">
+                                    {{ $template->exclusivePurchase->customer?->name ?? 'مهمان (خرید فروشگاه)' }}
+                                    — {{ money($template->exclusivePurchase->amount) }}
+                                </span>
+                            </div>
+                        @else
+                            <p class="text-xs leading-6 text-zinc-500 dark:text-zinc-400">
+                                این وضعیت به‌صورت دستی علامت خورده است (خرید اختصاصی پرداخت‌شده‌ای در سیستم ثبت نشده).
+                            </p>
+                        @endif
+                    </div>
+                @endif
+
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <x-input wire:model="buyerLabel" maxlength="190"
+                             placeholder="برچسب نمایشی خریدار — مثلاً: واگذارشده به شرکت نمونه"
+                             aria-label="برچسب خریدار اختصاصی" />
+                    <button type="button" wire:click="saveBuyerLabel" wire:loading.attr="disabled"
+                            class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl bg-zinc-900 px-3.5 py-2.5 text-xs font-black text-white transition-opacity hover:opacity-90 dark:bg-zinc-100 dark:text-zinc-900">
+                        ذخیره برچسب
+                    </button>
+                    @if($template->is_sold_exclusively)
+                        <button type="button" wire:click="releaseExclusive"
+                                wire:confirm="قالب دوباره عمومی شود و قابل خرید گردد؟"
+                                class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-xs font-black text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/30">
+                            <x-icon name="shield-check" class="size-3.5" />
+                            بازگشت به حالت عمومی
+                        </button>
+                    @else
+                        <button type="button" wire:click="markExclusiveSold"
+                                wire:confirm="قالب از فروشگاه و API حذف و به‌عنوان «فروخته‌شده اختصاصی» علامت بخورد؟"
+                                class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1 rounded-xl bg-violet-50 px-3.5 py-2.5 text-xs font-black text-violet-700 ring-1 ring-violet-200 transition-colors hover:bg-violet-100 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/30">
+                            <x-icon name="crown" class="size-3.5" />
+                            علامت‌گذاری «فروخته‌شده اختصاصی»
+                        </button>
+                    @endif
+                </div>
+                <p class="mt-2 text-xs leading-6 text-zinc-500 dark:text-zinc-400">
+                    پس از خرید اختصاصی، قالب از فروشگاه و API حذف می‌شود و برچسب خریدار (در صورت پر بودن) روی صفحهٔ قالب نمایش داده می‌شود؛ با «بازگشت به حالت عمومی» قالب دوباره قابل خرید می‌شود.
+                </p>
+            </div>
+
             <div class="mt-4 card p-5">
                 <h2 class="mb-3 text-sm font-black text-zinc-900 dark:text-zinc-50">توضیحات کامل</h2>
                 @if($template->description)

@@ -40,6 +40,9 @@ class Show extends Component
     /** شمارنده برای رندر مجدد input تصویر (رفع باگ «تصویر قالب تغییر نمی‌کند») */
     public int $thumbNonce = 0;
 
+    /** برچسب عمومی خریدار اختصاصی (قابل ویرایش توسط ادمین) */
+    public string $buyerLabel = '';
+
     /** تصاویر گالری جدید (چندتایی) */
     public array $newImages = [];
     public ?int $deleteImageId = null;
@@ -85,6 +88,7 @@ class Show extends Component
     public function mount(Template $template): void
     {
         $this->template = $template->load(['category', 'versions', 'comments.commentable']);
+        $this->buyerLabel = (string) ($template->exclusive_buyer_label ?? '');
     }
 
     /* ================= Tab switching ================= */
@@ -193,6 +197,69 @@ class Show extends Component
         $this->thumbNonce++;
         $this->showModal = false;
         $this->toast('قالب با موفقیت به‌روزرسانی شد.');
+    }
+
+    /* ================================================================
+     *  کنترل فروش اختصاصی (واگذاری) — قابل کنترل توسط ادمین
+     * ================================================================ */
+
+    /**
+     * علامت‌گذاری دستی به‌عنوان «فروخته‌شده اختصاصی»:
+     * قالب از فروشگاه و API حذف می‌شود و برچسب خریدار روی صفحه‌اش نمایش داده می‌شود.
+     */
+    public function markExclusiveSold(): void
+    {
+        if ($this->template->is_sold_exclusively) {
+            $this->toast('این قالب قبلاً واگذار شده است.', 'warning');
+            return;
+        }
+
+        $label = trim($this->buyerLabel) ?: null;
+
+        $this->template->update([
+            'is_sold_exclusively'   => true,
+            'sold_exclusively_at'   => now(),
+            'exclusive_buyer_label' => $label,
+        ]);
+
+        $this->template->refresh();
+        $this->toast('قالب به‌عنوان «فروخته‌شده اختصاصی» علامت خورد و از فروشگاه و API حذف شد.');
+    }
+
+    /** بازگرداندن قالب به حالت عمومی (لغو واگذاری) */
+    public function releaseExclusive(): void
+    {
+        if (! $this->template->is_sold_exclusively) {
+            $this->toast('این قالب در حالت عمومی است.', 'warning');
+            return;
+        }
+
+        $this->template->update([
+            'is_sold_exclusively'   => false,
+            'sold_exclusively_at'   => null,
+            'exclusive_buyer_label' => null,
+        ]);
+
+        $this->buyerLabel = '';
+        $this->template->refresh();
+        $this->toast('واگذاری لغو شد؛ قالب دوباره در فروشگاه و API عمومی است.');
+    }
+
+    /** ذخیره برچسب نمایشی خریدار (مثلاً «شرکت فلان — دامنه فلان») */
+    public function saveBuyerLabel(): void
+    {
+        $this->validate([
+            'buyerLabel' => ['nullable', 'string', 'max:190'],
+        ], [
+            'buyerLabel.max' => 'برچسب خریدار حداکثر ۱۹۰ کاراکتر است.',
+        ]);
+
+        $this->template->update([
+            'exclusive_buyer_label' => trim($this->buyerLabel) ?: null,
+        ]);
+
+        $this->template->refresh();
+        $this->toast('برچسب خریدار ذخیره شد؛ روی صفحهٔ قالب در فروشگاه نمایش داده می‌شود.');
     }
 
     /* ================================================================

@@ -42,6 +42,8 @@ class ApiTemplateController extends Controller
             $customer = $this->authService->authenticate($request);
 
             $templates = Template::with(['latestVersion', 'category.parent'])
+                // تعداد خریدهای پرداخت‌شدهٔ هر قالب (چند نفر استفاده می‌کنند/خریده‌اند) — درخواست کاربر برای API
+                ->withCount(['purchases as purchases_count' => fn ($q) => $q->where('status', TemplatePurchase::STATUS_PAID)])
                 ->where('status', Template::STATUS_ACTIVE)
                 // قالب‌های واگذارشده (خرید اختصاصی) از فهرست API حذف می‌شوند — مثل فروشگاه
                 ->where('is_sold_exclusively', false)
@@ -88,6 +90,7 @@ class ApiTemplateController extends Controller
             $customer = $this->authService->authenticate($request);
 
             $template = Template::with(['activeVersions', 'category.parent'])
+                ->withCount(['purchases as purchases_count' => fn ($q) => $q->where('status', TemplatePurchase::STATUS_PAID)])
                 ->where('slug', $slug)
                 ->where('status', Template::STATUS_ACTIVE)
                 ->first();
@@ -428,6 +431,8 @@ class ApiTemplateController extends Controller
 
         return array_merge($template->toArray(), [
             'is_purchased' => $purchase !== null,
+            // تعداد خریدهای موفق (چند نفر این قالب را خریده‌اند/استفاده می‌کنند)
+            'purchases_count' => (int) ($template->purchases_count ?? 0),
             'purchased'     => $purchase ? [
                 'purchase_id' => $purchase->id,
                 'version_id'  => $purchase->version_id,

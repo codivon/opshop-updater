@@ -54,6 +54,8 @@ class ApiPackageController extends Controller
                 ->unique();
 
             $packages = Package::with(['latestVersion', 'activePricingPlans', 'images', 'categoryModel.parent'])
+                // تعداد خریدهای پرداخت‌شدهٔ هر پکیج (چند نفر خریده‌اند) — درخواست کاربر برای API
+                ->withCount(['purchases as purchases_count' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)])
                 ->whereIn('project_id', $projectIds)
                 ->where('status', Package::STATUS_ACTIVE)
                 ->when($request->filled('search'), function ($q) use ($request) {
@@ -111,6 +113,7 @@ class ApiPackageController extends Controller
             $customer = $this->authService->authenticate($request);
 
             $package = Package::with(['activeVersions', 'activePricingPlans', 'project', 'images', 'categoryModel.parent'])
+                ->withCount(['purchases as purchases_count' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)])
                 ->where('slug', $slug)
                 ->where('status', Package::STATUS_ACTIVE)
                 ->first();
@@ -660,6 +663,8 @@ class ApiPackageController extends Controller
     {
         return array_merge($package->toArray(), [
             'is_purchased' => $license !== null,
+            // تعداد خریدهای موفق (چند نفر این پکیج را خریده‌اند)
+            'purchases_count' => (int) ($package->purchases_count ?? 0),
             'purchased_license' => $license ? [
                 'license_key'    => $license->license_key,
                 'expires_at'     => $license->expires_at?->toDateTimeString(),

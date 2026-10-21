@@ -36,7 +36,7 @@ class Template extends Model
     protected $fillable = [
         'category_id', 'name', 'slug', 'short_description', 'description',
         'thumbnail', 'price', 'discount', 'exclusive_price', 'exclusive_discount',
-        'exclusive_note', 'is_free', 'status', 'sort_order',
+        'exclusive_note', 'exclusive_buyer_label', 'is_free', 'status', 'sort_order',
     ];
 
     protected $casts = [
@@ -192,6 +192,21 @@ class Template extends Model
     public function getIsSoldOutAttribute(): bool
     {
         return $this->is_sold_exclusively;
+    }
+
+    /**
+     * متن نمایشی خریدار اختصاصی برای صفحهٔ فروشگاه:
+     * برچسب ذخیره‌شده (خودکار/ادمین) در اولویت، وگرنه نام مشتریِ آخرین خرید اختصاصی.
+     */
+    public function exclusiveBuyerDisplay(): ?string
+    {
+        if ($label = trim((string) $this->exclusive_buyer_label)) {
+            return $label;
+        }
+
+        $customer = $this->exclusivePurchase?->customer;
+
+        return $customer?->name ?: null;
     }
 
     /** آیا مسیر دانلود رایگان دارد؟ */

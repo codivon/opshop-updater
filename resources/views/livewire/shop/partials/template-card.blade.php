@@ -63,6 +63,12 @@
                 <x-icon name="message-square" class="size-3.5" />
                 {{ fa_num($template->comments_count) }} دیدگاه
             </span>
+            @if($template->has_exclusive_offer)
+                <span class="inline-flex items-center gap-1 text-violet-500" title="این قالب با خرید اختصاصی (واگذاری کامل) هم قابل خرید است">
+                    <x-icon name="crown" class="size-3.5" />
+                    خرید اختصاصی {{ money($template->exclusive_final_price) }}
+                </span>
+            @endif
         </div>
 
         <div class="mt-auto flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">

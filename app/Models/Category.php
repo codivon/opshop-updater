@@ -254,6 +254,63 @@ class Category extends Model
 
     /* ---------------- Helpers ---------------- */
 
+    /**
+     * نامک‌های قدیمی درختِ دسته‌بندی قالب‌ها → نامک جدید با پیشوند «tpl-».
+     *
+     * علت: categories.slug به‌صورت «سراسری» یکتاست و درخت قالب‌ها با درخت
+     * محصولات هم‌نام شده بود (html-templates و admin-dashboard) → خطای
+     * 1062 Duplicate entry هنگام migrate/seed.
+     *
+     * این متد ردیف‌های type=template با نامک قدیمی را به نامک جدید می‌برد
+     * (فقط وقتی نامکِ مقصد آزاد باشد) تا اجرای چندباره هم امن باشد.
+     * خروجی: تعداد نامک‌های تغییر‌یافته.
+     */
+    public static function remapTemplateTreeSlugs(): int
+    {
+        $map = [
+            'web-templates'           => 'tpl-web-templates',
+            'corporate-templates'     => 'tpl-corporate-templates',
+            'shop-templates'          => 'tpl-shop-templates',
+            'blog-magazine-templates' => 'tpl-blog-magazine-templates',
+            'news-templates'          => 'tpl-news-templates',
+            'personal-templates'      => 'tpl-personal-templates',
+            'landing-templates'       => 'tpl-landing-templates',
+            'product-landing'         => 'tpl-product-landing',
+            'event-landing'           => 'tpl-event-landing',
+            'app-landing'             => 'tpl-app-landing',
+            'dashboard-templates'     => 'tpl-dashboard-templates',
+            'admin-dashboard'         => 'tpl-admin-dashboard',
+            'crm-templates'           => 'tpl-crm-templates',
+            'html-ui-templates'       => 'tpl-html-ui-templates',
+            'html-templates'          => 'tpl-html-templates',
+            'ui-kits'                 => 'tpl-ui-kits',
+            'email-templates'         => 'tpl-email-templates',
+            'special-templates'       => 'tpl-special-templates',
+        ];
+
+        if (! \Illuminate\Support\Facades\Schema::hasTable('categories')) {
+            return 0;
+        }
+
+        $renamed = 0;
+
+        foreach ($map as $old => $new) {
+            // نامک مقصد آزاد باشد و ردیف قدیمی از نوع template باشد
+            $targetTaken = static::query()->where('slug', $new)->exists();
+
+            if ($targetTaken) {
+                continue;
+            }
+
+            $renamed += static::query()
+                ->where('type', self::TYPE_TEMPLATE)
+                ->where('slug', $old)
+                ->update(['slug' => $new]);
+        }
+
+        return $renamed;
+    }
+
     /** تعداد استفاده‌شده (پروژه + پکیج + قالب) برای جلوگیری از حذف در حال استفاده */
     public function usageCount(): int
     {

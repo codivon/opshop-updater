@@ -102,10 +102,16 @@ class TemplatePurchase extends Model
             $this->template->incrementSales();
 
             // خرید اختصاصی → قالب دیگر قابل فروش نیست (واگذاری کامل)
+            // + برچسب نمایشی خریدار برای صفحهٔ قالب (خرید مهمان → ادمین بعداً ویرایش می‌کند)
             if ($this->purchase_type === self::TYPE_EXCLUSIVE && ! $this->template->is_sold_exclusively) {
+                $buyerLabel = $this->customer?->name
+                    ? trim($this->customer->name . ($this->customer->phone ? ' — ' . $this->customer->phone : ''))
+                    : null;
+
                 $this->template->update([
-                    'is_sold_exclusively' => true,
-                    'sold_exclusively_at' => now(),
+                    'is_sold_exclusively'   => true,
+                    'sold_exclusively_at'   => now(),
+                    'exclusive_buyer_label' => $buyerLabel,
                 ]);
             }
         }

@@ -10,11 +10,21 @@ use Illuminate\Support\Facades\Schema;
  * خرید قالب یک‌باره است (نه اشتراک) → انقضا null یعنی «دائمی».
  * برای خریدهای اختصاصی نیز همین لایسنس صادر می‌شود.
  * ساختار هم‌تراز package_orders... (package_licenses) تا گزارش‌ها یکسان کار کنند.
+ *
+ * ⚠️ این مایگریشن باید «قبل از» 2026_10_22_000003 اجرا شود چون
+ * template_purchases.license_id کلید خارجی به این جدول دارد.
+ * (قبلاً بعد از آن بود و خطای 1824 «Failed to open the referenced table» می‌داد)
+ *
+ * idempotent: اگر جدول قبلاً ساخته شده باشد (اجرای ناقص قبلی)، رد می‌شود.
  */
 return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('template_licenses')) {
+            return;
+        }
+
         Schema::create('template_licenses', function (Blueprint $table) {
             $table->id();
             $table->string('license_key')->unique(); // TMP-XXXX-XXXX-XXXX-XXXX

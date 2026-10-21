@@ -23,6 +23,9 @@ class CategorySeeder extends Seeder
 
     public function run(): void
     {
+        // انتقال نامک‌های قدیمی درخت قالب به tpl-* (اگر از اجرای قبلی مانده باشد)
+        Category::remapTemplateTreeSlugs();
+
         foreach ($this->packageTree() as $root) {
             $this->createBranch(Category::TYPE_PACKAGE, $root);
         }
@@ -36,11 +39,14 @@ class CategorySeeder extends Seeder
 
     /**
      * دسته‌بندی‌های پیش‌فرض قالب‌ها (type=template) — همان درخت مایگریشن
-     * 2026_10_22_000005. اجرای مستقل:
+     * 2026_10_22_000005 با نامک‌های tpl-* (یکتای سراسری — بدون تداخل با درخت محصول).
+     * اجرای مستقل:
      *   php artisan db:seed --class=CategorySeeder
      */
     public function seedTemplates(): void
     {
+        Category::remapTemplateTreeSlugs();
+
         foreach ($this->templateTree() as $root) {
             $this->createBranch(Category::TYPE_TEMPLATE, $root);
         }
@@ -77,52 +83,52 @@ class CategorySeeder extends Seeder
     {
         return [
             [
-                'slug'        => 'web-templates',
+                'slug'        => 'tpl-web-templates',
                 'name'        => 'قالب وب‌سایت',
                 'description' => 'قالب‌های آماده وب برای انواع پروژه',
                 'sort_order'  => 10,
                 'children'    => [
-                    ['slug' => 'corporate-templates',     'name' => 'قالب شرکتی و اداری', 'sort_order' => 10],
-                    ['slug' => 'shop-templates',          'name' => 'قالب فروشگاهی',      'sort_order' => 20],
-                    ['slug' => 'blog-magazine-templates', 'name' => 'قالب وبلاگ و مجله‌ای', 'sort_order' => 30],
-                    ['slug' => 'news-templates',          'name' => 'قالب خبری',           'sort_order' => 40],
-                    ['slug' => 'personal-templates',      'name' => 'قالب شخصی و رزومه',   'sort_order' => 50],
+                    ['slug' => 'tpl-corporate-templates',     'name' => 'قالب شرکتی و اداری', 'sort_order' => 10],
+                    ['slug' => 'tpl-shop-templates',          'name' => 'قالب فروشگاهی',      'sort_order' => 20],
+                    ['slug' => 'tpl-blog-magazine-templates', 'name' => 'قالب وبلاگ و مجله‌ای', 'sort_order' => 30],
+                    ['slug' => 'tpl-news-templates',          'name' => 'قالب خبری',           'sort_order' => 40],
+                    ['slug' => 'tpl-personal-templates',      'name' => 'قالب شخصی و رزومه',   'sort_order' => 50],
                 ],
             ],
             [
-                'slug'        => 'landing-templates',
+                'slug'        => 'tpl-landing-templates',
                 'name'        => 'لندینگ‌پیج',
                 'description' => 'صفحات فرود تک‌صفحه‌ای برای کمپین و معرفی محصول',
                 'sort_order'  => 20,
                 'children'    => [
-                    ['slug' => 'product-landing', 'name' => 'معرفی محصول',      'sort_order' => 10],
-                    ['slug' => 'event-landing',   'name' => 'رویداد و همایش',   'sort_order' => 20],
-                    ['slug' => 'app-landing',     'name' => 'معرفی اپلیکیشن',   'sort_order' => 30],
+                    ['slug' => 'tpl-product-landing', 'name' => 'معرفی محصول',      'sort_order' => 10],
+                    ['slug' => 'tpl-event-landing',   'name' => 'رویداد و همایش',   'sort_order' => 20],
+                    ['slug' => 'tpl-app-landing',     'name' => 'معرفی اپلیکیشن',   'sort_order' => 30],
                 ],
             ],
             [
-                'slug'        => 'dashboard-templates',
+                'slug'        => 'tpl-dashboard-templates',
                 'name'        => 'پنل و داشبورد',
                 'description' => 'قالب‌های ادمین‌پنل، داشبورد مدیریتی و CRM',
                 'sort_order'  => 30,
                 'children'    => [
-                    ['slug' => 'admin-dashboard', 'name' => 'داشبورد مدیریت',       'sort_order' => 10],
-                    ['slug' => 'crm-templates',   'name' => 'CRM و پنل سازمانی',   'sort_order' => 20],
+                    ['slug' => 'tpl-admin-dashboard', 'name' => 'داشبورد مدیریت',       'sort_order' => 10],
+                    ['slug' => 'tpl-crm-templates',   'name' => 'CRM و پنل سازمانی',   'sort_order' => 20],
                 ],
             ],
             [
-                'slug'        => 'html-ui-templates',
+                'slug'        => 'tpl-html-ui-templates',
                 'name'        => 'HTML و UI کیت',
                 'description' => 'قالب‌های HTML خام، کامپوننت‌ها و کیت‌های رابط کاربری',
                 'sort_order'  => 40,
                 'children'    => [
-                    ['slug' => 'html-templates',  'name' => 'قالب HTML خام',            'sort_order' => 10],
-                    ['slug' => 'ui-kits',         'name' => 'کیت رابط کاربری (UI Kit)', 'sort_order' => 20],
-                    ['slug' => 'email-templates', 'name' => 'قالب ایمیل',               'sort_order' => 30],
+                    ['slug' => 'tpl-html-templates',  'name' => 'قالب HTML خام',            'sort_order' => 10],
+                    ['slug' => 'tpl-ui-kits',         'name' => 'کیت رابط کاربری (UI Kit)', 'sort_order' => 20],
+                    ['slug' => 'tpl-email-templates', 'name' => 'قالب ایمیل',               'sort_order' => 30],
                 ],
             ],
             [
-                'slug'        => 'special-templates',
+                'slug'        => 'tpl-special-templates',
                 'name'        => 'سایر قالب‌ها',
                 'description' => 'قالب‌های متفرقه و کاربردهای خاص',
                 'sort_order'  => 50,
