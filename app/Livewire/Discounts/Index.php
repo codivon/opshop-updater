@@ -34,6 +34,7 @@ class Index extends Component
         'expires_at'             => '',
         'applies_packages'       => true,
         'applies_products'       => true,
+        'applies_templates'      => true,
         'applies_subscriptions'  => true,
         'is_active'              => true,
         'notes'                  => '',
@@ -54,6 +55,7 @@ class Index extends Component
             'form.expires_at' => ['nullable', 'date'],
             'form.applies_packages'      => ['boolean'],
             'form.applies_products'      => ['boolean'],
+            'form.applies_templates'     => ['boolean'],
             'form.applies_subscriptions' => ['boolean'],
             'form.is_active' => ['boolean'],
             'form.notes'     => ['nullable', 'string', 'max:500'],
@@ -97,6 +99,7 @@ class Index extends Component
             'expires_at'             => '',
             'applies_packages'       => true,
             'applies_products'       => true,
+            'applies_templates'      => true,
             'applies_subscriptions'  => true,
             'is_active'              => true,
             'notes'                  => '',
@@ -118,6 +121,7 @@ class Index extends Component
             'expires_at'             => $code->expires_at?->format('Y-m-d\TH:i') ?? '',
             'applies_packages'       => $code->applies_packages,
             'applies_products'       => $code->applies_products,
+            'applies_templates'      => $code->applies_templates,
             'applies_subscriptions'  => $code->applies_subscriptions,
             'is_active'              => $code->is_active,
             'notes'                  => (string) ($code->notes ?? ''),
@@ -148,8 +152,8 @@ class Index extends Component
         $data = $this->validate();
 
         // حداقل یک محدوده باید انتخاب شده باشد
-        if (!$data['form']['applies_packages'] && !$data['form']['applies_products'] && !$data['form']['applies_subscriptions']) {
-            $this->addError('form.applies_packages', 'حداقل یکی از محدوده‌های اعتبار (پکیج/محصول/اشتراک) باید فعال باشد.');
+        if (!$data['form']['applies_packages'] && !$data['form']['applies_products'] && !$data['form']['applies_templates'] && !$data['form']['applies_subscriptions']) {
+            $this->addError('form.applies_packages', 'حداقل یکی از محدوده‌های اعتبار (پکیج/محصول/قالب/اشتراک) باید فعال باشد.');
             return;
         }
 
@@ -163,6 +167,7 @@ class Index extends Component
             'expires_at'             => filled($data['form']['expires_at']) ? Carbon::parse($data['form']['expires_at']) : null,
             'applies_packages'       => (bool) $data['form']['applies_packages'],
             'applies_products'       => (bool) $data['form']['applies_products'],
+            'applies_templates'      => (bool) $data['form']['applies_templates'],
             'applies_subscriptions'  => (bool) $data['form']['applies_subscriptions'],
             'is_active'              => (bool) $data['form']['is_active'],
             'notes'                  => $data['form']['notes'] ?: null,

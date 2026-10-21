@@ -61,6 +61,12 @@
                                             <x-icon name="rocket" class="size-3" />
                                             {{ $commentable->name }}
                                         </a>
+                                    @elseif($comment->commentable_type === \App\Models\Comment::TYPE_TEMPLATE)
+                                        <a href="{{ route('admin.templates.show', $commentable) }}" wire:navigate
+                                           class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2 py-0.5 text-[11px] font-bold text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
+                                            <x-icon name="layout-template" class="size-3" />
+                                            {{ $commentable->name }}
+                                        </a>
                                     @else
                                         <a href="{{ route('admin.packages.show', $commentable) }}" wire:navigate
                                            class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2 py-0.5 text-[11px] font-bold text-zinc-600 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">

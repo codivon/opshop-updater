@@ -105,8 +105,9 @@ class Index extends Component
     public function getTypesProperty(): array
     {
         return [
-            Comment::TYPE_PRODUCT => 'محصولات (پروژه‌ها)',
-            Comment::TYPE_PACKAGE => 'پکیج‌ها',
+            Comment::TYPE_PRODUCT  => 'محصولات (پروژه‌ها)',
+            Comment::TYPE_PACKAGE  => 'پکیج‌ها',
+            Comment::TYPE_TEMPLATE => 'قالب‌ها',
         ];
     }
 

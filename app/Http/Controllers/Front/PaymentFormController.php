@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PackagePurchase;
 use App\Models\ProductPurchase;
 use App\Models\SubscriptionOrder;
+use App\Models\TemplatePurchase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -154,6 +155,63 @@ class PaymentFormController extends Controller
             'package'    => null,
             'plan'       => null,
             'product'    => $purchase->product,
+            'amount'     => $purchase->amount,
+            'title'      => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
+            'subtitle'   => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',
+            'payButton'  => $gateway?->config('payButton') ?? 'پرداخت (موفق)',
+            'cancelButton' => $gateway?->config('cancelButton') ?? 'لغو پرداخت',
+            'successUrl' => $callback . $separator . http_build_query(['transactionId' => $trx]),
+            'cancelUrl'  => $callback . $separator . http_build_query(['transactionId' => $trx, 'cancel' => 'true']),
+        ];
+    }
+
+    /**
+     * نسخه‌ی قالب: فرم پرداخت خرید قالب (payment/form/template/{purchase}).
+     */
+    public function showTemplate(Request $request, TemplatePurchase $templatePurchase)
+    {
+        if (!$request->hasValidSignature()) {
+            abort(403, 'لینک پرداخت نامعتبر یا منقضی شده است.');
+        }
+
+        if ($templatePurchase->status !== TemplatePurchase::STATUS_PENDING) {
+            return redirect()
+                ->route('payment.result.template', $templatePurchase)
+                ->with('error', 'این تراکنش پرداخت دیگر در وضعیت انتظار نیست.');
+        }
+
+        // ۱) درگاه آزمایشی: صفحه شبیه‌ساز درگاه (نسخه قالب)
+        if ($templatePurchase->gateway === 'local') {
+            return view('payment.fake-gateway', $this->fakeGatewayDataForTemplate($templatePurchase));
+        }
+
+        // ۲) درایورهای فرم‌محور واقعی: HTML ذخیره‌شده را برگردان
+        $formHtml = $templatePurchase->meta['payment_form'] ?? null;
+
+        if (!$formHtml) {
+            abort(410, 'فرم پرداخت یافت نشد یا منقضی شده است. لطفاً خرید را دوباره آغاز کنید.');
+        }
+
+        return response($formHtml, 200, ['Content-Type' => 'text/html; charset=utf-8']);
+    }
+
+    /**
+     * داده‌های شبیه‌ساز درگاه آزمایشی برای خرید قالب (مهمان یا API).
+     */
+    private function fakeGatewayDataForTemplate(TemplatePurchase $purchase): array
+    {
+        $callback = route('payment.callback');
+        $separator = str_contains($callback, '?') ? '&' : '?';
+        $trx = (string) $purchase->transaction_id;
+
+        $gateway = \App\Models\Gateway::where('key', 'local')->first();
+
+        return [
+            'purchase'   => $purchase,
+            'package'    => null,
+            'plan'       => null,
+            'product'    => null,
+            'template'   => $purchase->template,
             'amount'     => $purchase->amount,
             'title'      => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
             'subtitle'   => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',

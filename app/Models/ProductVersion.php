@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
 class ProductVersion extends Model
@@ -40,6 +41,12 @@ class ProductVersion extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /** خریدهای ثبت‌شده روی همین نسخه (برای گارد حذف نسخه با خرید موفق) */
+    public function purchases(): HasMany
+    {
+        return $this->hasMany(ProductPurchase::class, 'version_id');
     }
 
     /* ---------------- Helpers ---------------- */

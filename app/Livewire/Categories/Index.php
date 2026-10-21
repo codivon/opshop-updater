@@ -37,7 +37,7 @@ class Index extends Component
         return [
             'form.name'        => ['required', 'string', 'max:120'],
             'form.slug'        => ['nullable', 'string', 'max:120', 'alpha_dash:ascii'],
-            'form.type'        => ['required', 'in:product,package'],
+            'form.type'        => ['required', 'in:product,package,template'],
             'form.parent_id'   => ['nullable', 'integer', 'exists:categories,id'],
             'form.description' => ['nullable', 'string', 'max:500'],
             'form.is_active'   => ['boolean'],
@@ -217,8 +217,9 @@ class Index extends Component
     public function getTypesProperty(): array
     {
         return [
-            Category::TYPE_PRODUCT => 'محصولات (پروژه‌ها)',
-            Category::TYPE_PACKAGE => 'پکیج‌ها',
+            Category::TYPE_PRODUCT  => 'محصولات (پروژه‌ها)',
+            Category::TYPE_PACKAGE  => 'پکیج‌ها',
+            Category::TYPE_TEMPLATE => 'قالب‌ها',
         ];
     }
 
@@ -227,7 +228,7 @@ class Index extends Component
     {
         return Category::query()
             ->with('parent:id,name')
-            ->withCount(['products', 'packages', 'children'])
+            ->withCount(['products', 'packages', 'templates', 'children'])
             ->when($this->search, fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('slug', 'like', "%{$this->search}%")))

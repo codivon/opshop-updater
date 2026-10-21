@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\ApiPackageController;
 use App\Http\Controllers\Api\ApiPaymentCallbackController;
 use App\Http\Controllers\Api\ApiPackageDownloadController;
 use App\Http\Controllers\Api\ApiSubscriptionController;
+use App\Http\Controllers\Api\ApiTemplateController;
+use App\Http\Controllers\Api\ApiTemplateDownloadController;
 Route::prefix('v1')->name('api.')->group(function () {
 
     Route::get('/check-update', [UpdateController::class, 'check'])->name('update.check');
@@ -54,6 +56,32 @@ Route::prefix('v1')->name('api.')->group(function () {
 
         // ساخت لینک دانلود یک‌بارمصرف ۱۵دقیقه‌ای برای پکیج خریداری‌شده — قابل قراردادن در href
         Route::post('/packages/{slug}/download-url', [ApiPackageDownloadController::class, 'issueDownloadUrl'])->name('download.url');
+
+    });
+
+    // --- قالب‌ها (Templates) — دقیقاً با همان محدودیت‌های API پکیج‌ها ---
+    Route::name('templates.')->group(function () {
+
+        // --- لیست و جزئیات ---
+        Route::get('/templates', [ApiTemplateController::class, 'index'])->name('index');
+        Route::get('/templates/{slug}', [ApiTemplateController::class, 'show'])->name('show');
+
+        // --- خرید و پرداخت ---
+        Route::post('/templates/{slug}/purchase', [ApiTemplateController::class, 'purchase'])->name('purchase');
+        Route::post('/templates/payments/{transactionId}/verify', [ApiTemplateController::class, 'verifyPayment'])->name('verify');
+
+        // --- آپدیت ---
+        Route::get('/templates/{slug}/check-update', [ApiTemplateController::class, 'checkUpdate'])->name('check-update');
+
+        // --- دانلود ---
+        // لینک مستقیم یک‌بارمصرف (خروجی download-url) — با یا بدون هدرهای احراز کار می‌کند
+        Route::get('/templates/download/{dlToken}', [ApiTemplateDownloadController::class, 'download'])->name('download');
+
+        // دانلود مستقیم قالبِ خریداری‌شده (خرید پرداخت‌شده لازم است) — برای proxy از سمت پروژه خریدار
+        Route::get('/templates/{slug}/download', [ApiTemplateDownloadController::class, 'downloadBySlug'])->name('download.direct');
+
+        // ساخت لینک دانلود یک‌بارمصرف ۱۵دقیقه‌ای برای قالب خریداری‌شده — قابل قراردادن در href
+        Route::post('/templates/{slug}/download-url', [ApiTemplateDownloadController::class, 'issueDownloadUrl'])->name('download.url');
 
     });
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PackagePurchase;
 use App\Models\ProductPurchase;
 use App\Models\SubscriptionOrder;
+use App\Models\TemplatePurchase;
 use App\Services\PaymentService;
 use App\Services\Sms\SmsManager;
 use App\Services\SubscriptionService;
@@ -18,12 +19,13 @@ use Illuminate\Http\Request;
  * هم GET و هم POST پشتیبانی می‌شود (POST درگاه‌ها CSRF ندارند →
  * مسیر payment/callback در استثناهای VerifyCsrfToken قرار دارد).
  *
- * سه نوع تراکنش از این مسیر عبور می‌کنند:
+ * چهار نوع تراکنش از این مسیر عبور می‌کنند:
  *  ۱) خرید پکیج (PackagePurchase) — مانند قبل
  *  ۲) سفارش اشتراک (SubscriptionOrder) — پس از تأیید پرداخت، به صفحه نتیجه
  *     اشتراک می‌رود (پرداخت موفق + «در انتظار تأیید مدیر»).
  *  ۳) خرید محصول/پروژه‌ی قابل‌فروش (ProductPurchase) — مهمان؛ صفحه نتیجه محصول
  *     با دکمه دانلود.
+ *  ۴) خرید قالب (TemplatePurchase) — مهمان یا API؛ صفحه نتیجه قالب با دکمه دانلود.
  *
  * پس از تأیید پرداخت:
  *  - خریدهای API (callback_url بیرونی) → صفحه‌ی «نتیجه پرداخت» (payment/return)
@@ -110,6 +112,32 @@ class WebPaymentController extends Controller
 
             return redirect()
                 ->route('payment.result.product', $productPurchase)
+                ->with(
+                    ($result['paid'] ?? false) ? 'success' : 'error',
+                    $result['message'] ?? (($result['paid'] ?? false) ? 'پرداخت با موفقیت تأیید شد.' : 'پرداخت ناموفق بود.')
+                );
+        }
+
+        // ---------- ۲-ب) خرید قالب (مهمان یا API) ----------
+        $templatePurchase = TemplatePurchase::where('transaction_id', $transactionId)->first();
+
+        if ($templatePurchase) {
+            $result = $this->paymentService->verifyTemplatePayment($transactionId);
+            $templatePurchase->refresh();
+
+            // 📱 پیامک مدیر: فروش موفق قالب
+            if (($result['paid'] ?? false) && $templatePurchase->isPaid()) {
+                $vars = [
+                    'template_name' => $templatePurchase->template?->name ?? 'قالب',
+                    'amount'        => number_format((int) $templatePurchase->amount),
+                    'gateway'       => $templatePurchase->gateway ?? '-',
+                ];
+
+                $this->smsManager->notifyAdmin('admin_template_paid', $vars, $templatePurchase);
+            }
+
+            return redirect()
+                ->route('payment.result.template', $templatePurchase)
                 ->with(
                     ($result['paid'] ?? false) ? 'success' : 'error',
                     $result['message'] ?? (($result['paid'] ?? false) ? 'پرداخت با موفقیت تأیید شد.' : 'پرداخت ناموفق بود.')

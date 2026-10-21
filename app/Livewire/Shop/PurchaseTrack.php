@@ -4,12 +4,13 @@ namespace App\Livewire\Shop;
 
 use App\Livewire\Concerns\WithToasts;
 use App\Models\ProductPurchase;
+use App\Models\TemplatePurchase;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
  * پیگیری خرید مهمان: با شماره تراکنش، صفحه نتیجه خرید دوباره باز می‌شود
- * (برای دانلود محصول پس از بستن صفحه اولیه).
+ * (برای دانلود محصول/قالب پس از بستن صفحه اولیه).
  */
 class PurchaseTrack extends Component
 {
@@ -23,6 +24,14 @@ class PurchaseTrack extends Component
 
         if ($trx === '') {
             $this->toast('شماره تراکنش را وارد کنید.', 'error');
+            return;
+        }
+
+        // اول قالب‌ها، بعد محصولات (هر دو خرید مهمان‌اند)
+        $purchase = TemplatePurchase::query()->where('transaction_id', $trx)->first();
+
+        if ($purchase) {
+            $this->redirect(route('payment.result.template', $purchase), navigate: true);
             return;
         }
 

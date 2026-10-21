@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * کد تخفیف (کوپن) — قابل اعمال روی پکیج، محصول و طرح اشتراک.
+ * کد تخفیف (کوپن) — قابل اعمال روی پکیج، محصول، قالب و طرح اشتراک.
  *
  *  - TYPE_PERCENT: «value» درصد (۱..۱۰۰)
  *  - TYPE_FIXED:   «value» مبلغ ثابت به تومان (کاپ روی مبلغ خرید)
@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *  محدودیت‌ها:
  *  - expires_at: تاریخ انقضا (null = بدون انقضا)
  *  - max_uses:   حداکثر تعداد استفاده کل (null = نامحدود) — با used_count کنترل می‌شود
- *  - applies_packages / applies_products / applies_subscriptions: محدوده اعتبار
+ *  - applies_packages / applies_products / applies_templates / applies_subscriptions: محدوده اعتبار
  */
 class DiscountCode extends Model
 {
@@ -24,6 +24,7 @@ class DiscountCode extends Model
     /** کانتکست‌های اعمال کد (برای راستی‌آزمایی محدوده) */
     public const CONTEXT_PACKAGE       = 'package';
     public const CONTEXT_PRODUCT       = 'product';
+    public const CONTEXT_TEMPLATE      = 'template';
     public const CONTEXT_SUBSCRIPTION  = 'subscription';
 
     public const TYPE_LABELS = [
@@ -33,7 +34,7 @@ class DiscountCode extends Model
 
     protected $fillable = [
         'code', 'type', 'value', 'max_uses', 'used_count', 'expires_at',
-        'applies_packages', 'applies_products', 'applies_subscriptions',
+        'applies_packages', 'applies_products', 'applies_templates', 'applies_subscriptions',
         'is_active', 'notes',
     ];
 
@@ -44,6 +45,7 @@ class DiscountCode extends Model
         'expires_at'             => 'datetime',
         'applies_packages'       => 'boolean',
         'applies_products'       => 'boolean',
+        'applies_templates'      => 'boolean',
         'applies_subscriptions'  => 'boolean',
         'is_active'              => 'boolean',
     ];
@@ -60,6 +62,11 @@ class DiscountCode extends Model
     public function productPurchases(): HasMany
     {
         return $this->hasMany(ProductPurchase::class);
+    }
+
+    public function templatePurchases(): HasMany
+    {
+        return $this->hasMany(TemplatePurchase::class);
     }
 
     public function subscriptionOrders(): HasMany
@@ -117,6 +124,7 @@ class DiscountCode extends Model
         return match ($context) {
             self::CONTEXT_PACKAGE      => $this->applies_packages,
             self::CONTEXT_PRODUCT      => $this->applies_products,
+            self::CONTEXT_TEMPLATE     => $this->applies_templates,
             self::CONTEXT_SUBSCRIPTION => $this->applies_subscriptions,
             default                    => false,
         };

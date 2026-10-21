@@ -65,6 +65,8 @@
                             <td class="px-4 py-3">
                                 @if($category->type === \App\Models\Category::TYPE_PRODUCT)
                                     <x-badge variant="primary" icon="rocket">محصول</x-badge>
+                                @elseif($category->type === \App\Models\Category::TYPE_TEMPLATE)
+                                    <x-badge variant="warning" icon="layout-template">قالب</x-badge>
                                 @else
                                     <x-badge variant="neutral" icon="package">پکیج</x-badge>
                                 @endif
@@ -72,6 +74,8 @@
                             <td class="px-4 py-3 tabular-nums text-zinc-600 dark:text-zinc-300">
                                 @if($category->type === \App\Models\Category::TYPE_PRODUCT)
                                     {{ fa_num($category->products_count) }} محصول
+                                @elseif($category->type === \App\Models\Category::TYPE_TEMPLATE)
+                                    {{ fa_num($category->templates_count) }} قالب
                                 @else
                                     {{ fa_num($category->packages_count) }} پکیج
                                 @endif

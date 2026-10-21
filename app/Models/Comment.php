@@ -6,14 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * دیدگاه چندریختی — هم برای محصولات (پروژه‌های قابل‌فروش) و هم برای پکیج‌ها.
+ * دیدگاه چندریختی — برای محصولات (پروژه‌های قابل‌فروش)، پکیج‌ها و قالب‌ها.
  *
- * commentable_type از morph map استفاده می‌کند: 'product' | 'package'
+ * commentable_type از morph map استفاده می‌کند: 'product' | 'package' | 'template'
  */
 class Comment extends Model
 {
-    public const TYPE_PRODUCT = 'product';
-    public const TYPE_PACKAGE = 'package';
+    public const TYPE_PRODUCT  = 'product';
+    public const TYPE_PACKAGE  = 'package';
+    public const TYPE_TEMPLATE = 'template';
 
     public const STATUS_PENDING  = 'pending';
     public const STATUS_APPROVED = 'approved';
@@ -87,9 +88,10 @@ class Comment extends Model
     public function getTypeLabelAttribute(): string
     {
         return match ($this->commentable_type) {
-            self::TYPE_PRODUCT => 'محصول (پروژه)',
-            self::TYPE_PACKAGE => 'پکیج',
-            default            => $this->commentable_type,
+            self::TYPE_PRODUCT  => 'محصول (پروژه)',
+            self::TYPE_PACKAGE  => 'پکیج',
+            self::TYPE_TEMPLATE => 'قالب',
+            default             => $this->commentable_type,
         };
     }
 

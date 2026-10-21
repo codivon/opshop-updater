@@ -6,6 +6,7 @@ use App\Models\Gateway;
 use App\Models\PackagePurchase;
 use App\Models\ProductPurchase;
 use App\Models\SubscriptionOrder;
+use App\Models\TemplatePurchase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use RuntimeException;
@@ -249,6 +250,82 @@ class PaymentService
     }
 
     /**
+     * ایجاد تراکنش پرداخت برای خرید قالب (Template) — مهمان یا API با مشتری.
+     * قرارداد خروجی همان createPayment است: payment_url قابل ریدایرکت.
+     */
+    public function createTemplatePayment(TemplatePurchase $purchase, ?string $gateway = null): array
+    {
+        if ($purchase->amount <= 0) {
+            throw new RuntimeException('مبلغ تراکنش باید بزرگ‌تر از صفر باشد.');
+        }
+
+        try {
+            $gateway = $gateway ?? Gateway::where('is_active', true)->first()?->key ?? 'zarinpal';
+            $gatewayConfigs = get_gateway_configs($gateway);
+
+            // کال‌بک درگاه همان مسیر مشترک پنل است؛ WebPaymentController تشخیص می‌دهد
+            // که تراکنش متعلق به خرید قالب است و آن را به صفحه نتیجه قالب هدایت می‌کند.
+            $callbackUrl = URL::route('payment.callback');
+
+            $templateName = $purchase->template?->name ?? 'قالب';
+
+            $invoice = (new Invoice)
+                ->amount(intval($purchase->amount))
+                ->detail('description', "خرید قالب {$templateName}")
+                ->detail('template_purchase_id', $purchase->id)
+                ->detail('template_id', $purchase->template_id)
+                ->detail('customer_id', $purchase->customer_id);
+
+            $payment = Payment::via($gateway)
+                ->config($gatewayConfigs)
+                ->callbackUrl($callbackUrl)
+                ->purchase(
+                    $invoice,
+                    function ($driver, $transactionId) use ($purchase, $gateway) {
+                        $purchase->update([
+                            'transaction_id' => $transactionId,
+                            'gateway'        => $gateway,
+                        ]);
+
+                        Log::info('Template purchase transaction created', [
+                            'purchase_id'    => $purchase->id,
+                            'transaction_id' => $transactionId,
+                            'gateway'        => $gateway,
+                        ]);
+                    }
+                );
+
+            /** @var \Shetabit\Multipay\RedirectionForm $form */
+            $form = $payment->pay();
+
+            $paymentUrl = $this->resolveFormUrl($form, $purchase, $gateway, 'payment.form.template');
+
+            if (!$paymentUrl) {
+                throw new RuntimeException('دریافت آدرس پرداخت از درگاه ناموفق بود.');
+            }
+
+            $purchase->update([
+                'payment_url' => $paymentUrl,
+                'status'      => TemplatePurchase::STATUS_PENDING,
+            ]);
+
+            return [
+                'payment_url'    => $paymentUrl,
+                'transaction_id' => (string) $purchase->transaction_id,
+                'amount'         => $purchase->amount,
+                'gateway'        => $purchase->gateway ?? $gateway,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Template payment creation failed', [
+                'purchase_id' => $purchase->id,
+                'error'       => $e->getMessage(),
+            ]);
+            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * تأیید پرداخت سفارش اشتراک بعد از بازگشت از درگاه.
      * توجه: در این مرحله فقط پرداخت تأیید می‌شود؛ فعال‌سازی اشتراک و صدور
      * لایسنس پکیج‌های همراه، پس از تأیید مدیر (SubscriptionService::approve) انجام می‌شود.
@@ -354,7 +431,7 @@ class PaymentService
      *  ۱) درایورهای URL‌محور (GET بدون ورودی) → اکشن فرم
      *  ۲) درایورهای فرم‌محور POST → HTML فرم در meta + مسیر امضادار (۳۰ دقیقه)
      */
-    private function resolveFormUrl(\Shetabit\Multipay\RedirectionForm $form, PackagePurchase|SubscriptionOrder|ProductPurchase $payable, string $gateway, string $routeName): string
+    private function resolveFormUrl(\Shetabit\Multipay\RedirectionForm $form, PackagePurchase|SubscriptionOrder|ProductPurchase|TemplatePurchase $payable, string $gateway, string $routeName): string
     {
         $action = trim((string) $form->getAction());
         $method = strtoupper((string) $form->getMethod());
@@ -378,6 +455,7 @@ class PaymentService
             [match (true) {
                 $payable instanceof SubscriptionOrder => 'order',
                 $payable instanceof ProductPurchase   => 'productPurchase',
+                $payable instanceof TemplatePurchase  => 'templatePurchase',
                 default                               => 'purchase',
             } => $payable->id]
         );
@@ -453,6 +531,89 @@ class PaymentService
             $purchase->markAsFailed($e->getMessage());
 
             Log::error('Product payment verification exception', [
+                'transaction_id' => $transactionId,
+                'purchase_id'    => $purchase->id,
+                'error'          => $e->getMessage(),
+            ]);
+
+            return [
+                'paid'     => false,
+                'purchase' => $purchase,
+                'message'  => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * تأیید پرداخت قالب بعد از بازگشت از درگاه (مهمان یا API).
+     * موفق → markAsPaid (افزایش فروش قالب) + آماده‌شدن دانلود در صفحه نتیجه.
+     *
+     * @return array{paid: bool, purchase?: TemplatePurchase, message: string}
+     */
+    public function verifyTemplatePayment(string $transactionId): array
+    {
+        $purchase = TemplatePurchase::where('transaction_id', $transactionId)->first();
+
+        if (!$purchase) {
+            Log::warning('Template purchase not found for verification', ['transaction_id' => $transactionId]);
+
+            return [
+                'paid'    => false,
+                'message' => 'تراکنش قالب یافت نشد.',
+            ];
+        }
+
+        if ($purchase->isPaid()) {
+            return [
+                'paid'      => true,
+                'purchase'  => $purchase,
+                'message'   => 'این تراکنش قبلاً تأیید شده است.',
+            ];
+        }
+
+        try {
+            $gateway = $purchase->gateway ?? 'zarinpal';
+            $gatewayConfigs = get_gateway_configs($gateway);
+
+            Payment::via($gateway)
+                ->config($gatewayConfigs)
+                ->amount($purchase->amount)
+                ->transactionId($transactionId)
+                ->verify();
+
+            $purchase->markAsPaid($gateway);
+
+            Log::info('Template payment verified', [
+                'purchase_id'    => $purchase->id,
+                'transaction_id' => $transactionId,
+                'gateway'        => $gateway,
+            ]);
+
+            return [
+                'paid'      => true,
+                'purchase'  => $purchase,
+                'message'   => 'پرداخت با موفقیت تأیید شد.',
+            ];
+
+        } catch (InvalidPaymentException $e) {
+            $purchase->markAsFailed($e->getMessage());
+
+            Log::error('Invalid template payment', [
+                'transaction_id' => $transactionId,
+                'purchase_id'    => $purchase->id,
+                'error'          => $e->getMessage(),
+            ]);
+
+            return [
+                'paid'     => false,
+                'purchase' => $purchase,
+                'message'  => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+            ];
+
+        } catch (\Exception $e) {
+            $purchase->markAsFailed($e->getMessage());
+
+            Log::error('Template payment verification exception', [
                 'transaction_id' => $transactionId,
                 'purchase_id'    => $purchase->id,
                 'error'          => $e->getMessage(),

@@ -68,6 +68,9 @@
                                     @if($code->applies_products)
                                         <x-badge variant="neutral" icon="rocket">محصول</x-badge>
                                     @endif
+                                    @if($code->applies_templates)
+                                        <x-badge variant="neutral" icon="layout-template">قالب</x-badge>
+                                    @endif
                                     @if($code->applies_subscriptions)
                                         <x-badge variant="neutral" icon="crown">اشتراک</x-badge>
                                     @endif
@@ -163,6 +166,7 @@
                 <div class="space-y-2.5">
                     <x-toggle wire:model="form.applies_packages" label="خرید پکیج‌ها" />
                     <x-toggle wire:model="form.applies_products" label="خرید محصولات (پروژه‌ها)" />
+                    <x-toggle wire:model="form.applies_templates" label="خرید قالب‌ها" />
                     <x-toggle wire:model="form.applies_subscriptions" label="خرید طرح‌های اشتراک" />
                 </div>
                 @error('form.applies_packages') <p class="mt-2 text-xs font-bold text-rose-600 dark:text-rose-400">{{ $message }}</p> @enderror

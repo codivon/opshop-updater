@@ -30,10 +30,11 @@ class AppServiceProvider extends ServiceProvider
         View::share('errors', new ViewErrorBag);
 
         // Morph map — ستون‌های *_type در DB کوتاه و پایدار می‌مانند
-        // (دیدگاه‌های چندریختی: محصول/پکیج).
+        // (دیدگاه‌های چندریختی: محصول/پکیج/قالب).
         \Illuminate\Database\Eloquent\Relations\Relation::morphMap([
-            \App\Models\Comment::TYPE_PRODUCT => \App\Models\Product::class,
-            \App\Models\Comment::TYPE_PACKAGE => \App\Models\Package::class,
+            \App\Models\Comment::TYPE_PRODUCT  => \App\Models\Product::class,
+            \App\Models\Comment::TYPE_PACKAGE  => \App\Models\Package::class,
+            \App\Models\Comment::TYPE_TEMPLATE => \App\Models\Template::class,
         ]);
     }
 }

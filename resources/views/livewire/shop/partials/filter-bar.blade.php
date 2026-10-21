@@ -6,8 +6,8 @@
 --}}
 @php
     $type = $type ?? 'package';
-    $countKey = $type === 'package' ? 'packages_count' : 'products_count';
-    $placeholder = $type === 'package' ? 'جستجوی پکیج…' : 'جستجوی پروژه…';
+    $countKey = $type === 'package' ? 'packages_count' : ($type === 'template' ? 'templates_count' : 'products_count');
+    $placeholder = $type === 'package' ? 'جستجوی پکیج…' : ($type === 'template' ? 'جستجوی قالب…' : 'جستجوی پروژه…');
     $hasActive = $search !== '' || $category !== '' || $priceFilter !== '' || $sort !== 'newest';
 @endphp
 

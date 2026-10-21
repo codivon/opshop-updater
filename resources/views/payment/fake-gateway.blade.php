@@ -109,6 +109,16 @@
                     <span class="k">مدت اعتبار</span>
                     <span class="v">{{ $subscriptionPlan?->duration_label ?? ($order->meta['plan']['duration_months'] ?? '-') }}</span>
                 </div>
+            @elseif(isset($template) && $template)
+                {{-- خرید قالب --}}
+                <div class="gw-row">
+                    <span class="k">قالب</span>
+                    <span class="v">{{ $template->name }}</span>
+                </div>
+                <div class="gw-row">
+                    <span class="k">دسته‌بندی</span>
+                    <span class="v">{{ $template->category?->name ?? '-' }}</span>
+                </div>
             @elseif(isset($product) && $product)
                 {{-- خرید محصول قابل‌فروش --}}
                 <div class="gw-row">

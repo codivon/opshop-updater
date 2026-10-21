@@ -67,6 +67,20 @@ class ImageUploadService
     }
 
     /* ===================================================================
+     *  آپلود تصویر شاخص قالب (Template)
+     *  Returns: مسیر نسبی (uploads/templates/thumbnails/xxx.jpg)
+     * =================================================================== */
+    public function uploadThumbnailTemplate(UploadedFile $file, string $slug): string
+    {
+        $this->validateImage($file);
+
+        $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $filename  = 'template_' . \Illuminate\Support\Str::slug($slug) . '_thumb_' . time() . '_' . Str::random(6) . '.' . $extension;
+
+        return $this->storeFile($file, 'uploads/templates/thumbnails', $filename);
+    }
+
+    /* ===================================================================
      *  آپلود چندین تصویر گالری
      *  Returns: array of PackageImage
      * =================================================================== */

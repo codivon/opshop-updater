@@ -11,8 +11,15 @@ use Illuminate\Support\Collection;
 
 class Category extends Model
 {
-    public const TYPE_PRODUCT = 'product';
-    public const TYPE_PACKAGE = 'package';
+    public const TYPE_PRODUCT  = 'product';
+    public const TYPE_PACKAGE  = 'package';
+    public const TYPE_TEMPLATE = 'template';
+
+    public const ALL_TYPES = [
+        self::TYPE_PRODUCT,
+        self::TYPE_PACKAGE,
+        self::TYPE_TEMPLATE,
+    ];
 
     /** حداکثر عمق درخت دسته‌بندی (محافظ در برابر حلقه) */
     public const MAX_DEPTH = 5;
@@ -35,6 +42,11 @@ class Category extends Model
     public function packages(): HasMany
     {
         return $this->hasMany(Package::class);
+    }
+
+    public function templates(): HasMany
+    {
+        return $this->hasMany(Template::class);
     }
 
     /** دسته والد (برای دسته‌بندی درختی) */
@@ -184,8 +196,9 @@ class Category extends Model
             ->active()
             ->ordered()
             ->withCount([
-                'packages' => fn ($q) => $q->where('status', Package::STATUS_ACTIVE),
-                'products' => fn ($q) => $q->where('status', Product::STATUS_ACTIVE),
+                'packages'  => fn ($q) => $q->where('status', Package::STATUS_ACTIVE),
+                'products'  => fn ($q) => $q->where('status', Product::STATUS_ACTIVE),
+                'templates' => fn ($q) => $q->where('status', Template::STATUS_ACTIVE),
             ])
             ->get();
 
@@ -199,7 +212,12 @@ class Category extends Model
         // تعداد تجمیعی (خود + زیردرخت)
         $sum = null;
         $sum = function (self $cat) use (&$sum, $byParent): int {
-            $own = (int) ($cat->type === self::TYPE_PACKAGE ? $cat->packages_count : $cat->products_count);
+            $own = (int) match ($cat->type) {
+                self::TYPE_PACKAGE  => $cat->packages_count,
+                self::TYPE_PRODUCT  => $cat->products_count,
+                self::TYPE_TEMPLATE => $cat->templates_count,
+                default             => 0,
+            };
 
             $childrenTotal = $byParent
                 ->get($cat->id, collect())
@@ -236,13 +254,14 @@ class Category extends Model
 
     /* ---------------- Helpers ---------------- */
 
-    /** تعداد استفاده‌شده (پروژه + پکیج) برای جلوگیری از حذف در حال استفاده */
+    /** تعداد استفاده‌شده (پروژه + پکیج + قالب) برای جلوگیری از حذف در حال استفاده */
     public function usageCount(): int
     {
         return match ($this->type) {
-            self::TYPE_PRODUCT => $this->products()->count(),
-            self::TYPE_PACKAGE => $this->packages()->count(),
-            default            => 0,
+            self::TYPE_PRODUCT  => $this->products()->count(),
+            self::TYPE_PACKAGE  => $this->packages()->count(),
+            self::TYPE_TEMPLATE => $this->templates()->count(),
+            default             => 0,
         };
     }
 

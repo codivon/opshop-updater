@@ -164,6 +164,19 @@ class Home extends Component
     }
 
     #[Computed]
+    public function templates()
+    {
+        return \App\Models\Template::query()
+            ->with(['category:id,name', 'latestVersion:id,template_id,version'])
+            ->withCount(['comments' => fn ($q) => $q->where('status', 'approved')])
+            ->where('status', \App\Models\Template::STATUS_ACTIVE)
+            ->orderBy('sort_order')
+            ->orderByDesc('id')
+            ->limit(self::PREVIEW_LIMIT)
+            ->get();
+    }
+
+    #[Computed]
     public function featuredPlans()
     {
         return \App\Models\SubscriptionPlan::query()
@@ -192,6 +205,12 @@ class Home extends Component
         return $this->homeCategoryTree(Category::TYPE_PRODUCT);
     }
 
+    #[Computed]
+    public function templateCategoryTree(): \Illuminate\Support\Collection
+    {
+        return $this->homeCategoryTree(Category::TYPE_TEMPLATE);
+    }
+
     private function homeCategoryTree(string $type): \Illuminate\Support\Collection
     {
         $flat = Category::shopTree($type);
@@ -216,6 +235,7 @@ class Home extends Component
     {
         return [
             'products'  => \App\Models\Product::where('status', \App\Models\Product::STATUS_ACTIVE)->count(),
+            'templates' => \App\Models\Template::where('status', \App\Models\Template::STATUS_ACTIVE)->count(),
             'packages'  => Package::where('status', Package::STATUS_ACTIVE)->count(),
             'versions'  => \App\Models\PackageVersion::where('status', \App\Models\PackageVersion::STATUS_ACTIVE)->count(),
             'plans'     => \App\Models\SubscriptionPlan::where('is_active', true)->count(),

@@ -24,6 +24,12 @@ Route::get('packages/{slug}', \App\Livewire\Shop\PackageShow::class)->name('shop
 // صفحات مستقل فروشگاه (لیست کامل با فیلترها)
 Route::get('shop/packages', \App\Livewire\Shop\PackagesIndex::class)->name('shop.packages');
 Route::get('shop/products', \App\Livewire\Shop\ProductsIndex::class)->name('shop.products');
+Route::get('shop/templates', \App\Livewire\Shop\TemplatesIndex::class)->name('shop.templates');
+
+// قالب‌های قابل‌فروش (خرید مهمان بدون ثبت‌نام — مانند محصولات)
+Route::get('templates/{slug}', \App\Livewire\Shop\TemplateShow::class)->name('shop.template');
+Route::get('payment/result/template/{purchase}', \App\Livewire\Shop\TemplatePaymentResult::class)->name('payment.result.template');
+Route::get('templates/download/{token}', [\App\Http\Controllers\Front\TemplateDownloadController::class, 'download'])->name('templates.download');
 
 // محصولات قابل‌فروش (پروژه‌ها — خرید مهمان بدون ثبت‌نام)
 Route::get('products/{slug}', \App\Livewire\Shop\ProductShow::class)->name('shop.product');
@@ -92,6 +98,11 @@ Route::get('payment/form/product/{productPurchase}', [\App\Http\Controllers\Fron
     ->name('payment.form.product')
     ->middleware('signed');
 
+// همان فرم برای خرید قالب‌ها
+Route::get('payment/form/template/{templatePurchase}', [\App\Http\Controllers\Front\PaymentFormController::class, 'showTemplate'])
+    ->name('payment.form.template')
+    ->middleware('signed');
+
 // مسیر عمومی دانلود آپدیت (بدون احراز هویت)
 Route::get('get-update/{code}', [UpdateDownloadController::class, 'download'])->name('public.download');
 
@@ -111,9 +122,11 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
     Route::get('packages', \App\Livewire\Packages\Index::class)->name('packages.index');
     Route::get('packages/{package}', \App\Livewire\Packages\Show::class)->name('packages.show');
 
-    // محصولات (پروژه‌های قابل‌فروش) + دسته‌بندی‌ها + دیدگاه‌ها
+    // محصولات (پروژه‌های قابل‌فروش) + قالب‌ها + دسته‌بندی‌ها + دیدگاه‌ها
     Route::get('products', \App\Livewire\Products\Index::class)->name('products.index');
     Route::get('products/{product}', \App\Livewire\Products\Show::class)->name('products.show');
+    Route::get('templates', \App\Livewire\Templates\Index::class)->name('templates.index');
+    Route::get('templates/{template}', \App\Livewire\Templates\Show::class)->name('templates.show');
     Route::get('categories', \App\Livewire\Categories\Index::class)->name('categories.index');
     Route::get('discounts', \App\Livewire\Discounts\Index::class)->name('discounts.index');
     Route::get('comments', \App\Livewire\Comments\Index::class)->name('comments.index');
