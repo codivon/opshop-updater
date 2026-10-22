@@ -26,26 +26,3 @@ Schedule::command('sms:check-subscriptions')->dailyAt('09:00');
 |   * * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1
 */
 Schedule::command('backups:tick')->everyMinute()->withoutOverlapping();
-
-/*
-|--------------------------------------------------------------------------
-| پاک‌سازی فایل‌های موقت آپلود تکه‌ای
-|--------------------------------------------------------------------------
-| فایل‌های .part نیمه‌کاره (آپلود رهاشده) بعد از یک روز خودکار حذف می‌شوند
-| تا دیسک اشغال نماند.
-*/
-Schedule::call(function () {
-    $dir = storage_path('app/chunk-uploads');
-
-    if (! is_dir($dir)) {
-        return;
-    }
-
-    $cutoff = now()->subDay()->getTimestamp();
-
-    foreach (glob($dir . '/*.part') ?: [] as $file) {
-        if (@filemtime($file) !== false && @filemtime($file) < $cutoff) {
-            @unlink($file);
-        }
-    }
-})->dailyAt('03:30')->name('cleanup-chunk-uploads');

@@ -242,7 +242,7 @@
                     <label for="update-file" class="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/60 px-4 py-3.5 text-sm text-zinc-500 transition-colors hover:border-brand-400 hover:bg-brand-50/50 hover:text-brand-600 dark:border-zinc-700 dark:bg-zinc-800/40 dark:text-zinc-400 dark:hover:border-brand-500 dark:hover:bg-brand-500/10 dark:hover:text-brand-400">
                         <span class="flex items-center gap-2">
                             <x-icon name="upload" class="size-4.5 shrink-0" />
-                            <span wire:loading.remove wire:target="form.file">{{ filled($form['file'] ?? null) || $updateChunkPath ? 'فایل انتخاب شد' : 'انتخاب فایل بسته آپدیت' }}</span>
+                            <span wire:loading.remove wire:target="form.file">{{ filled($form['file'] ?? null) ? 'فایل انتخاب شد' : 'انتخاب فایل بسته آپدیت' }}</span>
                             <span wire:loading wire:target="form.file" class="flex items-center gap-2 text-brand-600 dark:text-brand-400">
                                 <x-icon name="loader" class="size-4 animate-spin" />
                                 در حال آپلود…
@@ -250,17 +250,9 @@
                         </span>
                         @if(filled($form['file'] ?? null))
                             <span class="max-w-[45%] truncate font-mono text-xs text-brand-600 dark:text-brand-400" dir="ltr">{{ $form['file']?->getClientOriginalName() }}</span>
-                        @elseif($updateChunkPath)
-                            <span class="max-w-[45%] truncate font-mono text-xs text-emerald-600 dark:text-emerald-400" dir="ltr" title="{{ $updateChunkSize ? bytes_human($updateChunkSize) : '' }}">{{ $updateChunkName }}</span>
                         @endif
                     </label>
-                    <input type="file" id="update-file" wire:model="form.file"
-                           data-chunk-upload
-                           data-progress-name="form.file"
-                           data-chunk-props="updateChunkPath|updateChunkName|updateChunkSize"
-                           data-chunk-max="512"
-                           data-chunk-accept="zip,rar,tar,gz"
-                           class="hidden" />
+                    <input type="file" id="update-file" wire:model="form.file" class="hidden" />
                     <x-upload-progress target="form.file" label="در حال آپلود فایل آپدیت" />
                 </div>
             </x-field>

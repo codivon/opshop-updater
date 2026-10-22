@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Tools;
 
-use App\Livewire\Concerns\InteractsWithChunkUploads;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Backup as BackupModel;
 use App\Services\BackupService;
@@ -25,15 +24,10 @@ use Throwable;
 #[Title('پشتیبان‌گیری')]
 class Backup extends Component
 {
-    use WithFileUploads, WithToasts, InteractsWithChunkUploads;
+    use WithFileUploads, WithToasts;
 
     /** فایل ZIP آپلودشده برای بازیابی */
     public $backupFile;
-
-    /** فایل پشتیبان آپلود تکه‌ای (chunk-uploads/{uuid}.part) — مسیر/نام/حجم */
-    public ?string $restoreChunkPath = null;
-    public ?string $restoreChunkName = null;
-    public ?int $restoreChunkSize = null;
 
     /** مشمول شدن فایل‌ها و تصاویر در پشتیبان */
     public bool $includeFiles = true;
@@ -228,7 +222,7 @@ class Backup extends Component
     /** دکمهٔ «بازیابی اطلاعات» — منبع را مشخص و مودال تأیید را باز می‌کند */
     public function requestRestore(string $source): void
     {
-        if ($source === 'upload' && ! $this->backupFile && ! $this->hasChunkFile('restoreChunkPath')) {
+        if ($source === 'upload' && ! $this->backupFile) {
             $this->toast('ابتدا فایل پشتیبان را انتخاب کنید یا از فهرست فایل‌های موجود یکی را برگزینید.', 'warning');
 
             return;
@@ -245,36 +239,21 @@ class Backup extends Component
 
         try {
             if ($source === 'upload') {
-                // مسیر ۱: آپلود تکه‌ای (fast-upload.js) — برای ZIP حجیم و اینترنت ضعیف
-                if ($this->hasChunkFile('restoreChunkPath')) {
-                    $chunkAbs = $this->takeChunkFile('restoreChunkPath', 'backupFile', ['zip'], 512);
-                    if ($chunkAbs === null) {
-                        $this->toast($this->chunkError ?: 'فایل پشتیبان معتبر نیست.', 'error');
+                $this->validateOnly('backupFile');
 
-                        return;
-                    }
+                if (! $this->backupFile) {
+                    $this->toast('فایلی انتخاب نشده است.', 'warning');
 
-                    $original = (string) ($this->restoreChunkName ?: 'backup.zip');
-                    $path     = BackupService::storeIncoming($chunkAbs, $original);
-                    $record   = BackupService::startRestore($path, $original);
-                    $this->clearChunkFile('restoreChunkPath');
-                } else {
-                    $this->validateOnly('backupFile');
-
-                    if (! $this->backupFile) {
-                        $this->toast('فایلی انتخاب نشده است.', 'warning');
-
-                        return;
-                    }
-
-                    $original = (string) $this->backupFile->getClientOriginalName();
-                    $path     = BackupService::storeIncoming(
-                        (string) $this->backupFile->getRealPath(),
-                        $original
-                    );
-                    $record = BackupService::startRestore($path, $original);
-                    $this->reset('backupFile');
+                    return;
                 }
+
+                $original = (string) $this->backupFile->getClientOriginalName();
+                $path     = BackupService::storeIncoming(
+                    (string) $this->backupFile->getRealPath(),
+                    $original
+                );
+                $record = BackupService::startRestore($path, $original);
+                $this->reset('backupFile');
             } else {
                 $name = basename((string) $source);
                 $path = BackupService::incomingDir() . '/' . $name;

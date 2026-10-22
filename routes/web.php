@@ -116,10 +116,6 @@ Route::get('get-update/{code}', [UpdateDownloadController::class, 'download'])->
 Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
 
-    // آپلود تکه‌ای فایل‌های حجیم (ZIP نسخه/آپدیت/پشتیبان) — از public/js/fast-upload.js
-    Route::post('upload/chunk', [\App\Http\Controllers\ChunkUploadController::class, 'store'])->name('upload.chunk');
-    Route::get('upload/chunk/status', [\App\Http\Controllers\ChunkUploadController::class, 'status'])->name('upload.chunk.status');
-
     // محصولات
     Route::get('projects', \App\Livewire\Projects\Index::class)->name('projects.index');
     Route::get('updates', \App\Livewire\Updates\Index::class)->name('updates.index');
