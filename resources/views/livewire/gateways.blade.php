@@ -132,8 +132,7 @@
                             <div class="rounded-xl border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
                                 <p class="mb-2 text-xs font-bold text-zinc-600 dark:text-zinc-300">لوگوی اختصاصی (اختیاری)</p>
                                 <div class="flex flex-wrap items-center gap-3">
-                                    <input type="file"
-                           data-compress wire:model="logoUploads.{{ $gw['id'] }}" accept="image/*,.svg"
+                                    <input type="file" wire:model="logoUploads.{{ $gw['id'] }}" accept="image/*,.svg"
                                            class="block w-full text-xs text-zinc-500 file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-zinc-600 hover:file:bg-zinc-200 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-300"
                                            aria-label="آپلود لوگوی درگاه {{ $gw['name'] }}" />
                                     <x-upload-progress target="logoUploads.{{ $gw['id'] }}" label="در حال آپلود لوگو" class="w-full" />

@@ -329,8 +329,7 @@
         <x-slot:gallery>
             <div class="card p-4">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <input type="file"
-                           data-compress accept="image/jpeg,image/png,image/webp,image/gif" multiple wire:model="newImages" class="input w-full sm:flex-1" aria-label="انتخاب تصاویر گالری" />
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple wire:model="newImages" class="input w-full sm:flex-1" aria-label="انتخاب تصاویر گالری" />
                     <x-btn icon="upload" wire:click="uploadImages" wire:loading.attr="disabled" wire:target="uploadImages">
                         افزودن به گالری
                     </x-btn>
@@ -700,8 +699,7 @@
                     </div>
                 @endif
                 <div wire:key="show-thumb-preview-{{ $thumbNonce }}" x-data="filePreview()" class="space-y-2">
-                    <input type="file"
-                           data-compress accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
                     <template x-for="(preview, i) in previews" :key="i">
                         <div class="flex items-center gap-3">
                             <img :src="preview.url" :alt="preview.name" class="size-16 shrink-0 rounded-xl object-cover ring-1 ring-zinc-200 dark:ring-zinc-700" />
@@ -718,8 +716,7 @@
 
             {{-- گالری جدید --}}
             <x-field label="افزودن تصاویر به گالری" hint="اختیاری — به گالری موجود اضافه می‌شود">
-                <input type="file"
-                           data-compress accept="image/jpeg,image/png,image/webp,image/gif" multiple wire:model="newImages" class="input" aria-label="تصاویر جدید گالری" />
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple wire:model="newImages" class="input" aria-label="تصاویر جدید گالری" />
                 <x-upload-progress target="newImages" label="در حال آپلود گالری" />
                 @error('newImages.0') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
             </x-field>
@@ -764,14 +761,7 @@
 
             <x-field label="فایل ZIP قالب">
                 <div wire:key="tver-file-{{ (int) $editingVersionId }}" x-data class="space-y-2">
-                    <input type="file" accept=".zip,application/zip"
-                           wire:model="versionFile"
-                           data-chunk-upload
-                           data-progress-name="versionFile"
-                           data-chunk-props="versionChunkPath|versionChunkName|versionChunkSize"
-                           data-chunk-max="512"
-                           data-chunk-accept="zip"
-                           class="input" />
+                    <input type="file" accept=".zip,application/zip" wire:model="versionFile" class="input" />
                     <p class="text-xs text-zinc-500 dark:text-zinc-400">
                         @if($editingVersionId)
                             اگر فایل جدید انتخاب نکنید، فایل فعلی حفظ می‌شود.
@@ -779,13 +769,6 @@
                             فایل ZIP این نسخه — پس از خرید، دانلود از همین فایل انجام می‌شود.
                         @endif
                     </p>
-                    @if($versionChunkPath)
-                        <p class="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20">
-                            <x-icon name="check-circle" class="size-3.5" />
-                            فایل <code class="font-mono" dir="ltr">{{ \Illuminate\Support\Str::limit((string) $versionChunkName, 40) }}</code>
-                            ({{ bytes_human($versionChunkSize) ?? '—' }}) آماده ذخیره است.
-                        </p>
-                    @endif
                 </div>
                 <x-upload-progress target="versionFile" label="در حال آپلود فایل ZIP" />
                 @error('versionFile') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror

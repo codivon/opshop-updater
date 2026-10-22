@@ -73,9 +73,6 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    {{-- آپلود سریع: فشرده‌سازی تصویر + آپلود تکه‌ای (بدون نیاز به build) --}}
-    <script src="{{ asset('js/fast-upload.js') }}?v={{ file_exists(public_path('js/fast-upload.js')) ? filemtime(public_path('js/fast-upload.js')) : 1 }}" defer></script>
-
     <script>
         // Apply theme before first paint to avoid a flash.
         window.initDarkMode && window.initDarkMode();

@@ -300,23 +300,20 @@
 
             <x-field label="فایل ZIP محصول">
                 <div wire:key="pver-file-{{ (int) $editingVersionId }}" wire:ignore x-data class="space-y-2">
-                    <input type="file" accept=".zip,application/zip"
-                           wire:model="versionFile"
-                           data-chunk-upload
-                           data-progress-name="versionFile"
-                           data-chunk-props="versionChunkPath|versionChunkName|versionChunkSize"
-                           data-chunk-max="512"
-                           data-chunk-accept="zip"
-                           class="input" />
-                </div>
-                <x-upload-progress target="versionFile" label="در حال آپلود فایل ZIP" />
-                @if($versionChunkPath)
-                    <p class="mt-2 flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20">
-                        <x-icon name="check-circle" class="size-3.5" />
-                        فایل <code class="font-mono" dir="ltr">{{ \Illuminate\Support\Str::limit((string) $versionChunkName, 40) }}</code>
-                        ({{ bytes_human($versionChunkSize) ?? '—' }}) آماده ذخیره است.
+                    <input type="file" accept=".zip,application/zip" wire:model="versionFile" class="input" />
+                    <x-upload-progress target="versionFile" label="در حال آپلود فایل ZIP" />
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                        @if($editingVersionId)
+                            اگر فایل جدید انتخاب نکنید، فایل فعلی حفظ می‌شود.
+                        @else
+                            فایل ZIP این نسخه — پس از خرید، دانلود از همین فایل انجام می‌شود.
+                        @endif
                     </p>
-                @endif
+                </div>
+                <div wire:loading wire:target="versionFile" class="mt-2 flex items-center gap-2 text-xs text-brand-600 dark:text-brand-400">
+                    <x-icon name="loader" class="size-4 animate-spin" />
+                    در حال آپلود فایل…
+                </div>
                 @error('versionFile') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
             </x-field>
 

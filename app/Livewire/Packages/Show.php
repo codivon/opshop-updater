@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Packages;
 
-use App\Livewire\Concerns\InteractsWithChunkUploads;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Package;
 use App\Models\PackageImage;
@@ -24,7 +23,7 @@ use RuntimeException;
 #[Title('جزئیات پکیج')]
 class Show extends Component
 {
-    use WithFileUploads, WithPagination, WithToasts, InteractsWithChunkUploads;
+    use WithFileUploads, WithPagination, WithToasts;
 
     public Package $package;
 
@@ -56,11 +55,6 @@ class Show extends Component
 
     /** @var \Livewire\TemporaryUploadedFile|null */
     public $versionFile = null;
-
-    /** فایل ZIP آپلود تکه‌ای (chunk-uploads/{uuid}.part) — مسیر/نام/حجم */
-    public ?string $versionChunkPath = null;
-    public ?string $versionChunkName = null;
-    public ?int $versionChunkSize = null;
 
     public ?int $deleteVersionId = null;
 
@@ -323,7 +317,6 @@ class Show extends Component
         $this->resetValidation();
         $this->editingVersionId = null;
         $this->versionFile = null;
-        $this->clearChunkFile('versionChunkPath');
         $this->versionForm = [
             'version'             => '',
             'type'                => 'minor',
@@ -348,7 +341,6 @@ class Show extends Component
         $this->resetValidation();
         $this->editingVersionId = $version->id;
         $this->versionFile = null;
-        $this->clearChunkFile('versionChunkPath');
         $this->versionForm = [
             'version'             => $version->version,
             'type'                => $version->type,
@@ -386,7 +378,7 @@ class Show extends Component
             'versionForm.status'              => ['required', 'in:draft,active,archived'],
             'versionForm.release_date'        => ['nullable', 'date'],
             'versionFile'                     => array_filter([
-                ($this->editingVersionId || $this->versionChunkPath) ? 'nullable' : 'required',
+                $this->editingVersionId ? 'nullable' : 'required',
                 'file', 'mimes:zip', 'max:307200',
             ]),
         ], [
@@ -426,24 +418,7 @@ class Show extends Component
         ];
 
         // آپلود فایل ZIP جدید (در ایجاد الزامی، در ویرایش اختیاری)
-        // مسیر ۱: آپلود تکه‌ای (fast-upload.js — مناسب فایل حجیم/اینترنت ضعیف)
-        if ($this->versionChunkPath) {
-            if ($this->editingVersionId) {
-                $old = PackageVersion::find($this->editingVersionId);
-                if ($old?->file_path && Storage::disk('local')->exists($old->file_path)) {
-                    Storage::disk('local')->delete($old->file_path);
-                }
-            }
-
-            try {
-                $filename = $this->package->slug . '_v' . Str::slug($form['version']) . '_' . time() . '.zip';
-                $data = array_merge($data, $this->storeChunkFile('versionChunkPath', 'packages', $filename, ['zip'], 512));
-            } catch (RuntimeException $e) {
-                $this->addError('versionFile', $e->getMessage());
-
-                return;
-            }
-        } elseif ($this->versionFile) {
+        if ($this->versionFile) {
             if ($this->editingVersionId) {
                 $old = PackageVersion::find($this->editingVersionId);
                 if ($old?->file_path && Storage::disk('local')->exists($old->file_path)) {
@@ -469,7 +444,6 @@ class Show extends Component
         }
 
         $this->versionFile = null;
-        $this->clearChunkFile('versionChunkPath');
         $this->showVersionModal = false;
     }
 
