@@ -296,6 +296,8 @@ class Index extends Component
         return Template::query()
             ->with(['category:id,name', 'latestVersion:id,template_id,version'])
             ->withCount(['versions', 'purchases' => fn ($q) => $q->where('status', 'paid'), 'comments' => fn ($q) => $q->where('status', 'pending')])
+            // درآمد واقعی هر قالب (خریدهای پرداخت‌شده)
+            ->withSum(['purchases as paid_revenue_sum' => fn ($q) => $q->where('status', 'paid')], 'amount')
             ->when($this->search, fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('slug', 'like', "%{$this->search}%")))

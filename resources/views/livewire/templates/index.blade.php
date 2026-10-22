@@ -88,6 +88,9 @@
                         <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
                             <span class="inline-flex items-center gap-1"><x-icon name="layers" class="size-3.5" /> {{ fa_num($template->versions_count) }} نسخه</span>
                             <span class="inline-flex items-center gap-1"><x-icon name="receipt" class="size-3.5" /> {{ fa_num($template->purchases_count) }} فروش</span>
+                            @if($template->paid_revenue_sum > 0)
+                                <span class="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400" title="درآمد این قالب"><x-icon name="credit-card" class="size-3.5" /> {{ money($template->paid_revenue_sum, false) }}</span>
+                            @endif
                             <span class="inline-flex items-center gap-1"><x-icon name="message-square" class="size-3.5" /> {{ fa_num($template->comments_count) }} دیدگاه</span>
                         </div>
 

@@ -75,8 +75,13 @@
                 </div>
                 <div class="inline-flex items-center gap-2 rounded-xl px-3 py-2" style="background: rgba(255,255,255,.15)">
                     <x-icon name="credit-card" class="size-4 opacity-80" />
-                    <span class="text-sm font-black tabular-nums">{{ fa_num($package->purchases_count) }}</span>
-                    <span class="text-xs opacity-80">خرید</span>
+                    <span class="text-sm font-black tabular-nums">{{ fa_num($this->sales['count']) }}</span>
+                    <span class="text-xs opacity-80">فروش</span>
+                </div>
+                <div class="inline-flex items-center gap-2 rounded-xl px-3 py-2" style="background: rgba(255,255,255,.15)">
+                    <x-icon name="receipt" class="size-4 opacity-80" />
+                    <span class="text-sm font-black tabular-nums">{{ money($this->sales['revenue'], false) }}</span>
+                    <span class="text-xs opacity-80">درآمد</span>
                 </div>
                 <div class="inline-flex items-center gap-2 rounded-xl px-3 py-2" style="background: rgba(255,255,255,.15)">
                     <x-icon name="layers" class="size-4 opacity-80" />
@@ -119,6 +124,7 @@
     <div class="card p-5 sm:p-6">
         @php($tabs = [
             ['id' => 'info',      'label' => 'اطلاعات',       'icon' => 'info'],
+            ['id' => 'sales',     'label' => 'فروش',          'icon' => 'receipt', 'count' => fa_num($this->sales['count'])],
             ['id' => 'versions',  'label' => 'نسخه‌ها',        'icon' => 'layers', 'count' => fa_num($this->counts['versions'])],
             ['id' => 'plans',     'label' => 'پلن‌های قیمت',   'icon' => 'tag',    'count' => fa_num($this->counts['plans'])],
             ['id' => 'licenses',  'label' => 'لایسنس‌ها',      'icon' => 'key',    'count' => fa_num($this->counts['licenses'])],
@@ -194,6 +200,126 @@
                     </div>
                 </div>
         </x-slot:info>
+        <x-slot:sales>
+                <div class="space-y-6">
+                    {{-- KPIs --}}
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                        <x-stat label="فروش موفق" :value="fa_num($this->sales['count'])" icon="receipt" variant="primary" hint="خرید پرداخت‌شده" />
+                        <x-stat label="درآمد این پکیج" :value="money($this->sales['revenue'])" icon="credit-card" variant="info" hint="مجموع مبالغ پرداختی" />
+                        <x-stat label="خریداران یکتا" :value="fa_num($this->sales['buyers'])" icon="users" variant="violet" hint="مشتری متمایز" />
+                        <x-stat label="تخفیف داده‌شده" :value="money($this->sales['discount'])" icon="ticket-percent" variant="warning" hint="مجموع کدهای تخفیف" />
+                        <x-stat label="میانگین هر فروش" :value="money($this->sales['average'])" icon="trending-up" variant="success" hint="درآمد تقسیم بر تعداد" />
+                    </div>
+
+                    <div class="grid gap-4 lg:grid-cols-5">
+                        {{-- پرفروش‌ترین نسخه‌ها --}}
+                        <div class="card p-5 lg:col-span-2">
+                            <h3 class="flex items-center gap-2 text-sm font-bold text-zinc-800 dark:text-zinc-100">
+                                <x-icon name="layers" class="size-4 text-brand-600" />
+                                فروش به تفکیک نسخه
+                            </h3>
+                            @if($this->sales['by_version']->count())
+                                <ul class="mt-4 space-y-3">
+                                    @foreach($this->sales['by_version'] as $row)
+                                        <li>
+                                            <div class="flex items-center justify-between gap-3 text-xs">
+                                                <span class="font-mono font-bold text-zinc-700 dark:text-zinc-200" dir="ltr">
+                                                    {{ $row->version_label ? 'v' . $row->version_label : 'نسخه حذف‌شده' }}
+                                                </span>
+                                                <span class="tabular-nums text-zinc-500 dark:text-zinc-400">
+                                                    {{ fa_num($row->sales_count) }} فروش · {{ money($row->revenue, false) }}
+                                                </span>
+                                            </div>
+                                            <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/80 dark:bg-zinc-700/60">
+                                                @php($maxSales = max(1, $this->sales['by_version']->max('sales_count')))
+                                                <div class="h-full rounded-full bg-gradient-to-r from-brand-500 to-teal-500"
+                                                     style="width: {{ (int) round(($row->sales_count / $maxSales) * 100) }}%"></div>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @else
+                                <p class="mt-4 text-xs text-zinc-500 dark:text-zinc-400">هنوز فروشی ثبت نشده است.</p>
+                            @endif
+                        </div>
+
+                        {{-- آخرین فروش‌ها --}}
+                        <div class="card overflow-hidden lg:col-span-3">
+                            <div class="flex items-center justify-between gap-3 px-5 pt-5">
+                                <h3 class="flex items-center gap-2 text-sm font-bold text-zinc-800 dark:text-zinc-100">
+                                    <x-icon name="receipt" class="size-4 text-brand-600" />
+                                    آخرین فروش‌ها
+                                </h3>
+                                <a href="{{ route('admin.purchases.index') }}" wire:navigate
+                                   class="text-xs font-medium text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400">
+                                    همه خریدها ←
+                                </a>
+                            </div>
+                            @if($this->sales['recent']->count())
+                                <div class="mt-4 overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead>
+                                            <tr class="border-b border-zinc-200 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                                                <th class="px-4 py-2 text-start font-semibold">خریدار</th>
+                                                <th class="hidden px-4 py-2 text-start font-semibold sm:table-cell">نسخه</th>
+                                                <th class="px-4 py-2 text-start font-semibold">مبلغ</th>
+                                                <th class="hidden px-4 py-2 text-start font-semibold md:table-cell">درگاه</th>
+                                                <th class="px-4 py-2 text-start font-semibold">تاریخ</th>
+                                                <th></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                                            @foreach($this->sales['recent'] as $sale)
+                                                <tr wire:key="sale-{{ $sale->id }}">
+                                                    <td class="px-4 py-2.5">
+                                                        <div class="flex items-center gap-2.5">
+                                                            <x-avatar :name="$sale->customer?->name ?? '؟'" size="sm" />
+                                                            <div class="min-w-0">
+                                                                <p class="truncate text-xs font-semibold text-zinc-800 dark:text-zinc-200">{{ $sale->customer?->name ?? '—' }}</p>
+                                                                @if($sale->customer?->phone)
+                                                                    <p class="font-mono text-[10px] text-zinc-400" dir="ltr">{{ $sale->customer->phone }}</p>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="hidden px-4 py-2.5 sm:table-cell">
+                                                        @if($sale->version)
+                                                            <x-badge variant="neutral" class="font-mono" dir="ltr">v{{ $sale->version->version }}</x-badge>
+                                                        @else
+                                                            <span class="text-zinc-400">—</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="whitespace-nowrap px-4 py-2.5 text-xs font-black tabular-nums text-zinc-800 dark:text-zinc-100">
+                                                        {{ money($sale->amount, false) }}
+                                                        @if($sale->discount_amount > 0)
+                                                            <span class="block text-[10px] font-normal text-emerald-600 dark:text-emerald-400">−{{ money($sale->discount_amount, false) }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="hidden px-4 py-2.5 md:table-cell">
+                                                        <x-badge variant="neutral" class="font-mono uppercase">{{ $sale->gateway ?? '—' }}</x-badge>
+                                                    </td>
+                                                    <td class="whitespace-nowrap px-4 py-2.5 text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                                                        {{ $sale->paid_at ? verta_date($sale->paid_at, 'Y/m/d') : verta_date($sale->created_at, 'Y/m/d') }}
+                                                    </td>
+                                                    <td class="px-2 py-2.5">
+                                                        <a href="{{ route('admin.purchases.show', $sale) }}" wire:navigate
+                                                           class="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                                           title="مشاهده خرید">
+                                                            <x-icon name="eye" class="size-4" />
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <x-empty icon="receipt" title="هنوز فروشی ثبت نشده" description="پس از اولین خرید پرداخت‌شده، اطلاعات فروش اینجا نمایش داده می‌شود." />
+                            @endif
+                        </div>
+                    </div>
+                </div>
+        </x-slot:sales>
         <x-slot:versions>
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm text-zinc-500 dark:text-zinc-400">نسخه‌های منتشرشده و فایل ZIP هر نسخه.</p>

@@ -379,7 +379,16 @@
 
         {{-- ================= PURCHASES ================= --}}
         <x-slot:purchases>
-            <div class="card overflow-hidden">
+            {{-- خلاصه فروش قالب --}}
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                <x-stat label="فروش موفق" :value="fa_num($this->stats['normal_sales'] + $this->stats['exclusive_sales'])" icon="receipt" variant="primary" hint="خرید پرداخت‌شده" />
+                <x-stat label="درآمد این قالب" :value="money($this->stats['revenue'])" icon="credit-card" variant="info" hint="مجموع مبالغ پرداختی" />
+                <x-stat label="خرید معمولی" :value="fa_num($this->stats['normal_sales'])" icon="shopping-cart" variant="neutral" hint="عمومی" />
+                <x-stat label="خرید اختصاصی" :value="fa_num($this->stats['exclusive_sales'])" icon="crown" variant="violet" hint="واگذاری کامل" />
+                <x-stat label="لایسنس فعال" :value="fa_num($this->stats['licenses'])" icon="key" variant="success" hint="صادرشده" />
+            </div>
+
+            <div class="card mt-4 overflow-hidden">
                 @if($this->purchases->count())
                     <div class="table-wrap ring-0">
                         <table class="table">

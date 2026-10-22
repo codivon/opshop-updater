@@ -319,9 +319,14 @@ class Dashboard extends Component
     #[Computed]
     public function topPackages()
     {
+        // فروش واقعی (خریدهای پرداخت‌شده) — ستون قدیمی purchases_count پکیج‌ها همیشه ۰ است
         return Package::query()
-            ->select('id', 'name', 'slug', 'downloads_count', 'purchases_count', 'is_free', 'status')
-            ->orderByDesc('purchases_count')->limit(5)->get();
+            ->withCount(['purchases as paid_purchases_count' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)])
+            ->withSum(['purchases as paid_revenue_sum' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)], 'amount')
+            ->orderByDesc('paid_purchases_count')
+            ->orderByDesc('paid_revenue_sum')
+            ->limit(5)
+            ->get();
     }
 
     #[Computed]

@@ -822,11 +822,11 @@ class Index extends Component
     public function topPackages()
     {
         return Package::query()
-            ->select('id', 'name', 'slug', 'is_free', 'default_price', 'downloads_count', 'purchases_count', 'status')
+            ->select('id', 'name', 'slug', 'is_free', 'default_price', 'downloads_count', 'status')
             ->withCount(['purchases as paid_purchases_count' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)])
             ->withSum(['purchases as paid_purchases_revenue' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)], 'amount')
             ->orderByDesc('paid_purchases_count')
-            ->orderByDesc('purchases_count')
+            ->orderByDesc('paid_purchases_revenue')
             ->limit(5)
             ->get();
     }

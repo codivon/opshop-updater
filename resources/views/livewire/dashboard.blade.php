@@ -127,7 +127,10 @@
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-semibold text-zinc-700 group-hover:text-brand-600 dark:text-zinc-200 dark:group-hover:text-brand-400">{{ $package->name }}</p>
                             <p class="flex items-center gap-2 text-xs text-zinc-500">
-                                {{ fa_num($package->purchases_count) }} خرید
+                                {{ fa_num($package->paid_purchases_count) }} فروش
+                                @if($package->paid_revenue_sum > 0)
+                                    <span class="font-bold text-emerald-600 dark:text-emerald-400">· {{ money($package->paid_revenue_sum, false) }}</span>
+                                @endif
                                 <span class="text-zinc-300 dark:text-zinc-600">·</span>
                                 {{ fa_num($package->downloads_count) }} دانلود
                             </p>

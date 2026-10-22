@@ -2,14 +2,21 @@
     نوار پیشرفت آپلود Livewire (فایل/تصویر) — نمایش درصد زنده.
     استفاده:
         <x-upload-progress target="thumbnailFile" label="در حال آپلود تصویر" />
-    رویدادهای Livewire 3: upload-progress / upload-finished / upload-error (detail.name = نام پراپرتی)
+        <x-upload-progress target="form.file" label="در حال آپلود فایل آپدیت" />
+    رویدادهای واقعی Livewire 3 (روی خود input ارسال و تا window حباب می‌شوند):
+        livewire-upload-start    { id, property }
+        livewire-upload-progress { progress }   ← بدون نام property
+        livewire-upload-finish   { id, property }
+        livewire-upload-error    { id, property }
+    target دقیقاً همان عبارت wire:model است (مثل «versionFile» یا «form.file»).
 --}}
 @props(['target' => '', 'label' => 'در حال آپلود'])
 
 <div x-data="{ uploading: false, progress: 0 }"
-     x-on:upload-progress.window="if ($event.detail.name === @js($target)) { uploading = true; progress = Math.round($event.detail.progress); }"
-     x-on:upload-finished.window="if ($event.detail.name === @js($target)) { progress = 100; setTimeout(() => { uploading = false; progress = 0; }, 600); }"
-     x-on:upload-error.window="if ($event.detail.name === @js($target)) { uploading = false; progress = 0; }"
+     x-on:livewire-upload-start.window="if ($event.detail && $event.detail.property === @js($target)) { uploading = true; progress = 0; }"
+     x-on:livewire-upload-progress.window="if (uploading && $event.detail && typeof $event.detail.progress !== 'undefined') { progress = Math.max(1, Math.round($event.detail.progress)); }"
+     x-on:livewire-upload-finish.window="if ($event.detail && $event.detail.property === @js($target)) { progress = 100; setTimeout(() => { uploading = false; progress = 0; }, 700); }"
+     x-on:livewire-upload-error.window="if ($event.detail && $event.detail.property === @js($target)) { uploading = false; progress = 0; }"
      x-show="uploading"
      x-cloak
      {{ $attributes->merge(['class' => 'mt-2']) }}

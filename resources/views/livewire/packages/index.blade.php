@@ -51,6 +51,7 @@
                 <option value="price_desc">گران‌ترین</option>
                 <option value="price_asc">ارزان‌ترین</option>
                 <option value="downloads_desc">پرمصرف‌ترین</option>
+                <option value="sales_desc">پرفروش‌ترین</option>
             </select>
         </div>
         <div wire:loading wire:target="search, status, project_id, categoryFilter, sort" class="flex items-center gap-2 text-xs text-brand-600 dark:text-brand-400">
@@ -167,10 +168,16 @@
                                     <x-icon name="download" class="size-3.5" />
                                     {{ fa_num($package->downloads_count) }}
                                 </span>
-                                <span class="inline-flex items-center gap-1 tabular-nums" title="خریدها">
-                                    <x-icon name="credit-card" class="size-3.5" />
-                                    {{ fa_num($package->purchases_count) }}
+                                <span class="inline-flex items-center gap-1 tabular-nums" title="فروش موفق (خرید پرداخت‌شده)">
+                                    <x-icon name="receipt" class="size-3.5" />
+                                    {{ fa_num($package->paid_purchases_count) }} فروش
                                 </span>
+                                @if($package->paid_revenue_sum > 0)
+                                    <span class="inline-flex items-center gap-1 tabular-nums font-bold text-emerald-600 dark:text-emerald-400" title="درآمد این پکیج">
+                                        <x-icon name="credit-card" class="size-3.5" />
+                                        {{ money($package->paid_revenue_sum, false) }}
+                                    </span>
+                                @endif
                             </span>
                         </div>
                     </div>

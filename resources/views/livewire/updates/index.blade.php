@@ -253,6 +253,7 @@
                         @endif
                     </label>
                     <input type="file" id="update-file" wire:model="form.file" class="hidden" />
+                    <x-upload-progress target="form.file" label="در حال آپلود فایل آپدیت" />
                 </div>
             </x-field>
 

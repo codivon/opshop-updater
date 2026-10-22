@@ -6,6 +6,7 @@ use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Category;
 use App\Models\Package;
+use App\Models\PackagePurchase;
 use App\Models\Project;
 use App\Services\ImageUploadService;
 use Illuminate\Support\Str;
@@ -89,6 +90,9 @@ class Index extends Component
         return Package::query()
             ->with(['project:id,name', 'latestVersion', 'categoryModel:id,name'])
             ->withCount('activeVersions')
+            // اطلاعات فروش واقعی هر پکیج (خرید موفق): تعداد + درآمد
+            ->withCount(['purchases as paid_purchases_count' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)])
+            ->withSum(['purchases as paid_revenue_sum' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)], 'amount')
             ->when($this->search, fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('slug', 'like', "%{$this->search}%")))
@@ -104,6 +108,9 @@ class Index extends Component
             ->when($this->sort === 'price_desc', fn ($q) => $q->orderByDesc('default_price'))
             ->when($this->sort === 'price_asc', fn ($q) => $q->orderByRaw('default_price is null')->orderBy('default_price'))
             ->when($this->sort === 'downloads_desc', fn ($q) => $q->orderByDesc('downloads_count'))
+            ->when($this->sort === 'sales_desc', fn ($q) => $q
+                ->orderByDesc('paid_purchases_count')
+                ->orderByDesc('paid_revenue_sum'))
             ->paginate(12);
     }
 

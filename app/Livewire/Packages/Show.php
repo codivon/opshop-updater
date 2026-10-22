@@ -6,6 +6,7 @@ use App\Livewire\Concerns\WithToasts;
 use App\Models\Package;
 use App\Models\PackageImage;
 use App\Models\PackagePricingPlan;
+use App\Models\PackagePurchase;
 use App\Models\PackageVersion;
 use App\Services\ImageUploadService;
 use Illuminate\Support\Facades\Storage;
@@ -120,6 +121,50 @@ class Show extends Component
             'licenses'        => $this->package->licenses()->count(),
             'plans'           => $this->package->pricingPlans()->count(),
             'images'          => $this->package->images()->count(),
+        ];
+    }
+
+    /**
+     * اطلاعات فروش همین پکیج (فقط خریدهای پرداخت‌شده):
+     * تعداد فروش، درآمد، تخفیف داده‌شده، خریداران یکتا، میانگین سفارش
+     * + تفکیک فروش به تفکیک نسخه + آخرین فروش‌ها.
+     */
+    #[Computed]
+    public function sales(): array
+    {
+        $paid = $this->package->purchases()->where('status', PackagePurchase::STATUS_PAID);
+
+        $count    = (clone $paid)->count();
+        $revenue  = (clone $paid)->sum('amount');
+        $discount = (clone $paid)->sum('discount_amount');
+        $buyers   = (clone $paid)->distinct('customer_id')->count('customer_id');
+
+        // تفکیک فروش به تفکیک نسخه (نسخه حذف‌شده = بدون برچسب)
+        $byVersion = (clone $paid)
+            ->selectRaw('version_id, count(*) as sales_count, sum(amount) as revenue')
+            ->groupBy('version_id')
+            ->orderByDesc('sales_count')
+            ->limit(8)
+            ->get()
+            ->map(function ($row) {
+                $row->version_label = $row->version_id
+                    ? \App\Models\PackageVersion::query()->find($row->version_id)?->version
+                    : null;
+
+                return $row;
+            });
+
+        return [
+            'count'        => $count,
+            'revenue'      => (int) $revenue,
+            'discount'     => (int) $discount,
+            'buyers'       => $buyers,
+            'average'      => $count > 0 ? (int) round($revenue / $count) : 0,
+            'by_version'   => $byVersion,
+            'recent'       => (clone $paid)->latest('id')
+                ->with(['customer:id,name,phone', 'version:id,version'])
+                ->limit(10)
+                ->get(),
         ];
     }
 
