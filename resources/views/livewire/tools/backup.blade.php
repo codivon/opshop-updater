@@ -174,9 +174,22 @@
                 </label>
                 <input id="backup-file" type="file" accept=".zip,application/zip"
                        wire:model="backupFile"
+                       data-chunk-upload
+                       data-progress-name="backupFile"
+                       data-chunk-props="restoreChunkPath|restoreChunkName|restoreChunkSize"
+                       data-chunk-max="512"
+                       data-chunk-accept="zip"
                        class="input file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-zinc-600 dark:file:bg-zinc-800 dark:file:text-zinc-300" />
 
                 <x-upload-progress target="backupFile" label="در حال آپلود فایل پشتیبان" />
+
+                @if($restoreChunkPath)
+                    <p class="mt-1.5 flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20">
+                        <x-icon name="check-circle" class="size-3.5" />
+                        فایل <code class="font-mono" dir="ltr">{{ \Illuminate\Support\Str::limit((string) $restoreChunkName, 40) }}</code>
+                        ({{ bytes_human($restoreChunkSize) ?? '—' }}) آمادهٔ بازیابی است.
+                    </p>
+                @endif
 
                 @error('backupFile')
                     <p class="mt-1.5 text-xs font-bold text-rose-600 dark:text-rose-400">{{ $message }}</p>
@@ -232,7 +245,7 @@
                 <p class="text-[11px] leading-5 text-zinc-400 dark:text-zinc-500">
                     فایل JSON قدیمی (نسخه ۱) هم پذیرفته می‌شود.
                 </p>
-                <x-btn icon="upload" wire:click="requestRestore('upload')" class="shrink-0" :disabled="! $backupFile">
+                <x-btn icon="upload" wire:click="requestRestore('upload')" class="shrink-0" :disabled="! $backupFile && ! $restoreChunkPath">
                     بازیابی اطلاعات
                 </x-btn>
             </div>

@@ -364,3 +364,12 @@ admin-panel/
 - (۴۴) 🆕 دسته‌بندی‌های پیش‌فرض قالب‌ها هم در مایگریشن 2026_10_22_000005 و هم در `CategorySeeder::seedTemplates()` (idempotent با firstOrCreate بر type+slug).
 
 *آخرین به‌روزرسانی: بعد از Task 35 (تکمیل قالب‌ها: دو قیمت/گالری/لایسنس/رفع باگ تصویر + داشبورد قالب‌محور + گزارش‌های بازه‌ای با تاریخ شمسی و CSV + نوار پیشرفت آپلود + دسته‌بندی‌های پیش‌فرض قالب). جزئیات: README-TASK35-FA.md*
+
+**گاتچای Task 37/38 (فروش واقعی + آپلود سریع)**:
+- (۴۵) 🆕 اصلاح گاتچای (۴۱): رویدادهای «upload-progress با detail.name» هرگز از Livewire ارسال نمی‌شوند! رویدادهای واقعی Livewire 3 (dispatch روی خود input با bubbles): `livewire-upload-start/finish/error` با detail `{id, property}` و `livewire-upload-progress` فقط با `{progress}` (بدون نام property). کامپوننت `x-upload-progress` حالا همین‌ها را گوش می‌دهد (تشخیص target از start/finish، به‌روزرسانی درصد gated با uploading).
+- (۴۶) 🆕 شمارندهٔ خرید واقعی: ستون قدیمی `packages.purchases_count` هیچ‌جا increment نمی‌شود (همیشه ۰) — همیشه `withCount(['purchases as paid_purchases_count' => where status=paid])` + `withSum(... 'amount')` استفاده شود. قالب‌ها ستون کهنه ندارند و withCountشان درست است.
+- (۴۷) 🆕 آپلود تکه‌ای (fast-upload.js): ورودی‌های بزرگ (ZIP نسخه پکیج/قالب/محصول، فایل آپدیت، پشتیبان) با `data-chunk-upload` به `/admin/upload/chunk` تکه‌ای می‌روند؛ `wire:model` روی ورودی مانده تا اگر JS لود نشد آپلود معمولی Livewire کار کند (رهگیری با listener فاز capture روی document + stopPropagation). قرارداد پراپرتی‌ها: `{prop}Path|{prop}Name|{prop}Size` (مثل versionChunkPath) + تریت `InteractsWithChunkUploads` (takeChunkFile/storeChunkFile/clearChunkFile). فایل موقت: storage/app/chunk-uploads/{uuid}.part — پاک‌سازی روزانه ۰۳:۳۰ در scheduler.
+- (۴۸) 🆕 فشرده‌سازی تصویر سمت کلاینت: ورودی‌های تصویر با `data-compress` قبل از آپلود resize/encode می‌شوند (≤۲۲۰۰px، WebP/JPEG ۰.۸۵، PNG فقط WebP تا شفافیت نماند؛ GIF/SVG/≤۳۰۰KB دست‌نخورده). فایل جایگزین با DataTransfer + dispatch مجدد change با پرچم `__fu`.
+- (۴۹) 🆕 resume آپلود: اثر انگشت فایل (name|size|lastModified) در localStorage → GET /admin/upload/chunk/status?id= → ادامه از اندازهٔ سرور. خطای ۴۰۹ همیشه یعنی offset=body.size.
+
+*آخرین به‌روزرسانی: بعد از Task 38 (آپلود سریع برای اینترنت ایران: تکه‌ای + فشرده‌سازی + resume + سقف‌های .user.ini و اطلاعات فروش واقعی پکیج/قالب در پنل). جزئیات: worklog.md*

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Products;
 
+use App\Livewire\Concerns\InteractsWithChunkUploads;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Comment;
 use App\Models\Product;
@@ -19,7 +20,7 @@ use Livewire\WithFileUploads;
 #[Title('جزئیات محصول')]
 class Show extends Component
 {
-    use WithToasts, WithFileUploads;
+    use WithToasts, WithFileUploads, InteractsWithChunkUploads;
 
     public Product $product;
 
@@ -30,6 +31,11 @@ class Show extends Component
     public bool $showVersionModal = false;
     public ?int $editingVersionId = null;
     public $versionFile; // UploadedFile ZIP
+
+    /** فایل ZIP آپلود تکه‌ای (chunk-uploads/{uuid}.part) — مسیر/نام/حجم */
+    public ?string $versionChunkPath = null;
+    public ?string $versionChunkName = null;
+    public ?int $versionChunkSize = null;
     public array $versionForm = [
         'version'      => '',
         'type'         => ProductVersion::TYPE_MINOR,
@@ -83,6 +89,7 @@ class Show extends Component
         $this->resetErrorBag();
         $this->editingVersionId = null;
         $this->versionFile = null;
+        $this->clearChunkFile('versionChunkPath');
         $this->versionForm = [
             'version'      => $this->nextVersionSuggestion(),
             'type'         => ProductVersion::TYPE_MINOR,
@@ -104,6 +111,7 @@ class Show extends Component
 
         $this->editingVersionId = $version->id;
         $this->versionFile = null;
+        $this->clearChunkFile('versionChunkPath');
         $this->versionForm = [
             'version'      => $version->version,
             'type'         => $version->type,
@@ -138,8 +146,17 @@ class Show extends Component
                     'release_date' => $data['versionForm']['release_date'] ?: null,
                 ];
 
-                // فایل جدید (اختیاری هنگام ویرایش)
-                if ($this->versionFile) {
+                // فایل جدید (اختیاری هنگام ویرایش) — تکه‌ای یا معمولی
+                if ($this->versionChunkPath) {
+                    $this->deleteVersionFile($version);
+                    $payload = array_merge($payload, $this->storeChunkFile(
+                        'versionChunkPath',
+                        "products/{$this->product->slug}",
+                        $this->product->slug . '-v' . Str::replace([' ', '/'], ['-', ''], $payload['version']) . '-' . time() . '.zip',
+                        ['zip'],
+                        512
+                    ));
+                } elseif ($this->versionFile) {
                     $this->deleteVersionFile($version);
                     $stored = $this->storeVersionFile($this->versionFile, $payload['version']);
                     $payload = array_merge($payload, $stored);
@@ -148,9 +165,17 @@ class Show extends Component
                 $version->update($payload);
                 $message = 'نسخه ویرایش شد.';
             } else {
-                $stored = $this->versionFile ? $this->storeVersionFile($this->versionFile, trim($data['versionForm']['version'])) : [
-                    'file_path' => null, 'file_hash' => null, 'file_size' => null,
-                ];
+                $stored = $this->versionChunkPath
+                    ? $this->storeChunkFile(
+                        'versionChunkPath',
+                        "products/{$this->product->slug}",
+                        $this->product->slug . '-v' . Str::replace([' ', '/'], ['-', ''], trim($data['versionForm']['version'])) . '-' . time() . '.zip',
+                        ['zip'],
+                        512
+                    )
+                    : ($this->versionFile ? $this->storeVersionFile($this->versionFile, trim($data['versionForm']['version'])) : [
+                        'file_path' => null, 'file_hash' => null, 'file_size' => null,
+                    ]);
 
                 $version = $this->product->versions()->create([
                     'version'      => trim($data['versionForm']['version']),

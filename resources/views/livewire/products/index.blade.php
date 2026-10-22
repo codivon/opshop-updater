@@ -195,7 +195,8 @@
                 {{-- thumbnail --}}
                 <x-field label="تصویر شاخص">
                     <div wire:key="product-thumb-preview" wire:ignore x-data="filePreview()" class="space-y-2">
-                        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
+                        <input type="file"
+                           data-compress accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
                         <x-upload-progress target="thumbnailFile" label="در حال آپلود تصویر شاخص" />
                         <template x-for="(preview, i) in previews" :key="i">
                             <div class="flex items-center gap-3">

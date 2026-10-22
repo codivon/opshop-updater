@@ -549,7 +549,8 @@
                             <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">JPG، PNG، WEBP یا GIF — حداکثر ۳ مگابایت برای هر تصویر و ۱۰ تصویر در هر بار.</p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" wire:model="newImages" class="input w-full sm:flex-1" />
+                            <input type="file"
+                           data-compress multiple accept="image/jpeg,image/png,image/webp,image/gif" wire:model="newImages" class="input w-full sm:flex-1" />
                             <x-btn icon="upload" wire:click="uploadImages" :loading="true">آپلود</x-btn>
                         </div>
                         <x-upload-progress target="newImages" label="در حال آپلود تصاویر گالری" />
@@ -676,7 +677,8 @@
                 <x-field label="فایل تصویر جدید">
                     {{-- wire:ignore keeps the generated preview nodes alive across Livewire morphs --}}
                     <div wire:key="ck-thumb-preview" wire:ignore x-data="filePreview()" class="space-y-2">
-                        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
+                        <input type="file"
+                           data-compress accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
                         <x-upload-progress target="thumbnailFile" label="در حال آپلود تصویر شاخص" />
                         <template x-for="(preview, i) in previews" :key="i">
                             <div class="flex items-center gap-3">
@@ -708,7 +710,8 @@
                 </p>
                 {{-- wire:ignore keeps the generated preview grid alive across Livewire morphs --}}
                 <div wire:key="ck-gallery-preview" wire:ignore x-data="filePreview({ multiple: true })" class="space-y-2">
-                    <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" wire:model="newGallery" x-ref="input" class="input" />
+                    <input type="file"
+                           data-compress multiple accept="image/jpeg,image/png,image/webp,image/gif" wire:model="newGallery" x-ref="input" class="input" />
                     <x-upload-progress target="newGallery" label="در حال آپلود گالری" />
                     <p class="text-xs text-zinc-500 dark:text-zinc-400">حداکثر ۱۰ تصویر؛ به گالری فعلی اضافه می‌شود.</p>
                     <template x-if="previews.length">
@@ -799,8 +802,22 @@
                         </p>
                     @endif
                 @endif
-                <input type="file" accept=".zip,application/zip" wire:model="versionFile" class="input" />
+                <input type="file" accept=".zip,application/zip"
+                       wire:model="versionFile"
+                       data-chunk-upload
+                       data-progress-name="versionFile"
+                       data-chunk-props="versionChunkPath|versionChunkName|versionChunkSize"
+                       data-chunk-max="512"
+                       data-chunk-accept="zip"
+                       class="input" />
                 <x-upload-progress target="versionFile" label="در حال آپلود فایل ZIP" />
+                @if($versionChunkPath)
+                    <p class="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 ring-1 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20">
+                        <x-icon name="check-circle" class="size-3.5" />
+                        فایل <code class="font-mono" dir="ltr">{{ \Illuminate\Support\Str::limit((string) $versionChunkName, 40) }}</code>
+                        ({{ bytes_human($versionChunkSize) ?? '—' }}) آماده ذخیره است.
+                    </p>
+                @endif
                 @php($vfErrBag = $errors ?? null)
                 @if($vfErrBag?->has('versionFile'))
                     <p class="flex items-center gap-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">
@@ -808,10 +825,6 @@
                         {{ $vfErrBag->first('versionFile') }}
                     </p>
                 @endif
-                <div wire:loading wire:target="versionFile" class="flex items-center gap-2 text-xs text-brand-600 dark:text-brand-400">
-                    <x-icon name="loader" class="size-4 animate-spin" />
-                    در حال آپلود…
-                </div>
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2">

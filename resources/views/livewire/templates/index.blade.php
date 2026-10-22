@@ -259,7 +259,8 @@
             {{-- thumbnail --}}
             <x-field label="تصویر شاخص">
                 <div wire:key="template-thumb-preview-{{ $thumbNonce }}" x-data="filePreview()" class="space-y-2">
-                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
+                    <input type="file"
+                           data-compress accept="image/jpeg,image/png,image/webp,image/gif" wire:model="thumbnailFile" x-ref="input" class="input" />
                     <template x-for="(preview, i) in previews" :key="i">
                         <div class="flex items-center gap-3">
                             <img :src="preview.url" :alt="preview.name"

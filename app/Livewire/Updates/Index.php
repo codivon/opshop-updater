@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Updates;
 
+use App\Livewire\Concerns\InteractsWithChunkUploads;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Project;
@@ -19,7 +20,7 @@ use Livewire\WithPagination;
 #[Title('آپدیت‌ها')]
 class Index extends Component
 {
-    use WithPagination, WithFileUploads, WithToasts, WithBulkActions;
+    use WithPagination, WithFileUploads, WithToasts, WithBulkActions, InteractsWithChunkUploads;
 
     #[Url]
     public string $search = '';
@@ -42,6 +43,11 @@ class Index extends Component
 
     public bool $showModal = false;
     public ?int $editingId = null;
+
+    /** فایل آپلود تکه‌ای (chunk-uploads/{uuid}.part) — مسیر/نام/حجم */
+    public ?string $updateChunkPath = null;
+    public ?string $updateChunkName = null;
+    public ?int $updateChunkSize = null;
     public ?int $deleteId = null;
 
     public function updatedSearch(): void
@@ -146,6 +152,7 @@ class Index extends Component
             'download_link' => '',
             'file' => null,
         ];
+        $this->clearChunkFile('updateChunkPath');
         $this->showModal = true;
     }
 
@@ -166,6 +173,7 @@ class Index extends Component
             'download_link' => $update->download_link ?? '',
             'file' => null,
         ];
+        $this->clearChunkFile('updateChunkPath');
         $this->showModal = true;
     }
 
@@ -183,7 +191,37 @@ class Index extends Component
 
         $data['is_mandatory'] = (bool) ($this->form['is_mandatory'] ?? false);
 
-        if ($file) {
+        // مسیر ۱: فایل آپلود تکه‌ای (fast-upload.js) — مناسب فایل حجیم/اینترنت ضعیف
+        if ($this->hasChunkFile('updateChunkPath')) {
+            $chunkAbs = $this->takeChunkFile('updateChunkPath', 'form.file', ['zip', 'rar', 'tar', 'gz'], 512);
+            if ($chunkAbs === null) {
+                return; // پیام خطا روی form.file نمایش داده می‌شود
+            }
+
+            if ($this->editingId
+                && ($previous = Update::find($this->editingId))
+                && $previous->download_link
+                && ! filter_var($previous->download_link, FILTER_VALIDATE_URL)
+                && Storage::disk('local')->exists($previous->download_link)) {
+                Storage::disk('local')->delete($previous->download_link);
+            }
+
+            $filename = 'update_' . time() . '_' . (string) ($this->updateChunkName ?: 'file.zip');
+            $destRel  = 'updates/' . $filename;
+            $destAbs  = Storage::disk('local')->path($destRel);
+            @mkdir(dirname($destAbs), 0775, true);
+
+            if (! @rename($chunkAbs, $destAbs)) {
+                $this->addError('form.file', 'ذخیرهٔ فایل روی دیسک ناموفق بود (کوتا/دسترسی).');
+
+                return;
+            }
+
+            clearstatcache(true, $destAbs);
+            $this->clearChunkFile('updateChunkPath');
+            $data['download_link'] = $destRel;
+            $data['file_size']     = $this->formatFileSize((int) filesize($destAbs));
+        } elseif ($file) {
             // حذف فایل قدیمی اگر از نوع ذخیره شده در دیسک باشد (پورت از update())
             if ($this->editingId
                 && ($previous = Update::find($this->editingId))
@@ -231,12 +269,14 @@ class Index extends Component
         }
 
         $this->form['file'] = null;
+        $this->clearChunkFile('updateChunkPath');
         $this->showModal = false;
     }
 
     public function removeFile(): void
     {
         $this->form['download_link'] = '';
+        $this->clearChunkFile('updateChunkPath');
     }
 
     public function delete(): void
