@@ -19,8 +19,22 @@
 
         {{-- form --}}
         <form wire:submit="login" class="space-y-4 p-6">
-            <x-field label="کد آپدیت شما" for="login-code" required hint="کد آپدیت را از پنل مشتری یا پیامک خرید خود دریافت کرده‌اید.">
-                <x-input id="login-code" wire:model="updateCode" icon="key" placeholder="مثلاً: 1A2B3C4D5E6F" dir="ltr" class="text-start font-mono tracking-wider" autocomplete="off" />
+            {{-- خلاصهٔ خطاها — هر خطایی (کد نامعتبر، قفل تلاش، کپچا…) اینجا هم دیده می‌شود --}}
+            @if($errors->any())
+                <div class="flex items-start gap-2.5 rounded-xl bg-rose-50 px-3.5 py-3 text-sm font-medium text-rose-700 ring-1 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20"
+                     role="alert">
+                    <x-icon name="alert-circle" class="mt-0.5 size-4.5 shrink-0" />
+                    <ul class="space-y-1 leading-6">
+                        @foreach($errors->all() as $err)
+                            <li>{{ $err }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <x-field label="کد آپدیت شما" for="login-code" error="updateCode" required hint="کد آپدیت را از پنل مشتری یا پیامک خرید خود دریافت کرده‌اید.">
+                <x-input id="login-code" wire:model="updateCode" icon="key" placeholder="مثلاً: 1A2B3C4D5E6F" dir="ltr" class="text-start font-mono tracking-wider" autocomplete="off"
+                         :class="$errors->has('updateCode') ? 'input-error' : ''" />
             </x-field>
 
             @if(\App\Support\Features::captcha('customer_login'))
