@@ -13,6 +13,11 @@
                          required autocomplete="current-password" :class="$errors->has('password') ? 'input-error' : ''" />
             </x-field>
 
+            <x-captcha name="captcha" />
+
+            {{-- هانی‌پات ضدربات — برای انسان نامرئی است --}}
+            <x-honeypot name="website" />
+
             <label class="flex cursor-pointer items-center gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" name="remember" value="1" class="checkbox" {{ old('remember') ? 'checked' : '' }}>
                 مرا به خاطر بسپار

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Rules\CaptchaRule;
 use Illuminate\Foundation\Auth\RegistersUsers;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -51,6 +52,11 @@ class RegisterController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            // ضدربات: کپچای خودمیزبان (سؤال ریاضی سشن) + رد فیلد مخفی هانی‌پات
+            'captcha' => ['required', 'string', new CaptchaRule],
+            'website' => ['prohibited'],
+        ], [
+            'website.prohibited' => 'امکان ثبت‌نام وجود ندارد.',
         ]);
     }
 

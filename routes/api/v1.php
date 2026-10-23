@@ -7,7 +7,9 @@ use App\Http\Controllers\Api\ApiPackageDownloadController;
 use App\Http\Controllers\Api\ApiSubscriptionController;
 use App\Http\Controllers\Api\ApiTemplateController;
 use App\Http\Controllers\Api\ApiTemplateDownloadController;
-Route::prefix('v1')->name('api.')->group(function () {
+// سقف ۱۲۰ درخواست در دقیقه برای هر IP روی کل API (ضد DDoS/جست‌وجوی کد؛
+// کلاینت‌های آپدیت‌سنتر به‌راحتی زیر این سقف می‌مانند)
+Route::prefix('v1')->name('api.')->middleware('throttle:120,1')->group(function () {
 
     Route::get('/check-update', [UpdateController::class, 'check'])->name('update.check');
     Route::get('/download-update/{updateId}', [UpdateController::class, 'download'])->name('update.download');
