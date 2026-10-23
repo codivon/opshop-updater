@@ -103,8 +103,21 @@ Route::get('payment/form/template/{templatePurchase}', [\App\Http\Controllers\Fr
     ->name('payment.form.template')
     ->middleware('signed');
 
-// مسیر عمومی دانلود آپدیت (بدون احراز هویت)
-Route::get('get-update/{code}', [UpdateDownloadController::class, 'download'])->name('public.download');
+// مسیر عمومی دانلود آپدیت (بدون احراز هویت) — سقف ۳۰ درخواست در دقیقه برای هر IP (ضد جست‌وجوی کد)
+Route::get('get-update/{code}', [UpdateDownloadController::class, 'download'])
+    ->name('public.download')
+    ->middleware('throttle:30,1');
+
+/*
+|--------------------------------------------------------------------------
+| کپچای خودمیزبان — تازه‌سازی سؤال امنیتی (لینک «سؤال دیگر» فرم‌های کلاسیک)
+|--------------------------------------------------------------------------
+*/
+Route::get('captcha/refresh', function () {
+    \App\Services\CaptchaService::fresh();
+
+    return back();
+})->name('captcha.refresh');
 
 \Illuminate\Support\Facades\Auth::routes();
 

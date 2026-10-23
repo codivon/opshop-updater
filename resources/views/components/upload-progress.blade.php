@@ -29,7 +29,10 @@
         <span class="tabular-nums" x-text="progress + '٪'">۰٪</span>
     </div>
     <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/80 dark:bg-zinc-700/60">
-        <div class="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-600 transition-[width] duration-200"
+        {{-- نکته: از bg-gradient-to-l استفاده شده (نه to-r) چون CSS کامیت‌شده بدون build رشد
+             می‌کند و فقط کلاس‌های موجود در بیلد قبلی رندر می‌شوند؛ to-r در بیلد نیست و
+             نوار کاملاً نامرئی می‌شد. در RTL جهت پر شدن از راست است → رنگ اول سمت راست. --}}
+        <div class="h-full rounded-full bg-gradient-to-l from-brand-500 to-brand-600 transition-all duration-200"
              x-bind:style="'width:' + progress + '%'"></div>
     </div>
 </div>

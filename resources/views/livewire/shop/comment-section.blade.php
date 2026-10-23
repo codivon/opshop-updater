@@ -111,6 +111,11 @@
                 <x-textarea id="cm-body" wire:model="body" rows="4" placeholder="تجربه‌تان از این {{ $label === 'محصول' ? 'پروژه' : 'پکیج' }} را بنویسید…" />
             </x-field>
 
+            <x-captcha wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+
+            {{-- هانی‌پات ضدربات — برای انسان نامرئی است --}}
+            <x-honeypot name="website" wireTarget="website" />
+
             <div class="flex justify-end">
                 <x-btn type="submit" icon="send" :loading="true">ارسال دیدگاه</x-btn>
             </div>

@@ -23,6 +23,11 @@
                 <x-input id="login-code" wire:model="updateCode" icon="key" placeholder="مثلاً: 1A2B3C4D5E6F" dir="ltr" class="text-start font-mono tracking-wider" autocomplete="off" />
             </x-field>
 
+            <x-captcha wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+
+            {{-- هانی‌پات ضدربات — برای انسان نامرئی است --}}
+            <x-honeypot name="website" wireTarget="website" />
+
             <x-btn type="submit" icon="log-in" :loading="true" class="w-full">
                 ورود به حساب مشتری
             </x-btn>

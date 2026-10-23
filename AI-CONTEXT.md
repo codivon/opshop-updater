@@ -364,3 +364,13 @@ admin-panel/
 - (۴۴) 🆕 دسته‌بندی‌های پیش‌فرض قالب‌ها هم در مایگریشن 2026_10_22_000005 و هم در `CategorySeeder::seedTemplates()` (idempotent با firstOrCreate بر type+slug).
 
 *آخرین به‌روزرسانی: بعد از Task 35 (تکمیل قالب‌ها: دو قیمت/گالری/لایسنس/رفع باگ تصویر + داشبورد قالب‌محور + گزارش‌های بازه‌ای با تاریخ شمسی و CSV + نوار پیشرفت آپلود + دسته‌بندی‌های پیش‌فرض قالب). جزئیات: README-TASK35-FA.md*
+
+**گاتچای Task 40 (امنیت + ربات‌گیر)**:
+- (۴۵) 🆕 کپچا خودمیزبان است (`App\Services\CaptchaService`): سؤال ریاضی با پاسخ در سشن، مصرف یک‌بارمصرف (هر verify سؤال تازه می‌سازد)، تلهٔ زمان ۲ ثانیه (پاسخ سریع‌تر = ربات)، انقضای ۳۰ دقیقه. نصب روی: ورود/ثبت‌نام مدیر (CaptchaRule در LoginController/RegisterController)، لاگین مشتری و فرم دیدگاه (بررسی دستی + `$this->reset('captcha')`). هیچ سرویس خارجی در کار نیست (گوگل/hCaptcha روی اینترنت ایران ناپایدارند).
+- (۴۶) 🆕 `<x-captcha name="captcha" />` فرم کلاسیک / `<x-captcha wireTarget="captcha" refreshWire="refreshCaptcha" />` فرم Livewire — کامپوننت باید متد عمومی `refreshCaptcha()` داشته باشد. `<x-honeypot name="website" wireTarget="website" />` فیلد مخفی ضدربات؛ سمت سرور: پر بودنش = رد بی‌سروصدا (کامپوننت Livewire باید پراپرتی `$website` داشته باشد).
+- (۴۷) 🆕 همهٔ RateLimiterها (throttle مسیرها + قفل ورود مدیر/مشتری + سقف دیدگاه) روی استور **file** بایند شده‌اند (AppServiceProvider::register) — مستقل از جدول cache دیتابیس؛ روی هاست اشتراکی همیشه کار می‌کند. ورود مدیر: ۵ تلاش/۱۵دقیقه (پراپرتی‌های LoginController)؛ لاگین مشتری: ۸ کد اشتباه/۱۵دقیقه؛ دیدگاه: ۵/۱۰دقیقه؛ API v1: throttle 120/min؛ get-update عمومی: 30/min.
+- (۴۸) 🆕 کلاس‌های CSS جدید در Blade فقط بعد از rebuild وارد public/build می‌شوند و CSS بیلدشده در ریپو کامیت می‌شود (هاست build ندارد) — قبل از استفاده از کلاس تازه، وجودش را در `public/build/assets/app-*.css` چک کنید یا از کلاس موجود استفاده کنید. نمونه: `bg-gradient-to-r` و `transition-[width]` در بیلد نبودند → نوار پیشرفت آپلود نامرئی بود؛ با `bg-gradient-to-l` (موجود در بیلد؛ در RTL جهت پر شدن از راست = مناسب) و `transition-all` جایگزین شد.
+- (۴۹) 🆕 هدرهای امنیتی پایه (X-Frame-Options/nosniff/Referrer-Policy/Permissions-Policy/HSTS) روی همهٔ پاسخ‌ها از `bootstrap/app.php` → `App\Http\Middleware\SecurityHeaders`.
+- اصلاح گاتچای (۴۱): رویدادهای واقعی Livewire 3 همان `livewire-upload-start/progress/finish/error` هستند (progress فقط `{progress}` دارد، بدون نام property) — توضیح قبلی دربارهٔ `detail.name` نادرست بود؛ کامپوننت upload-progress از Task 37 روی رویدادهای درست بازنویسی شده است.
+
+*آخرین به‌روزرسانی: بعد از Task 40 (امنیت: کپچای خودمیزبان روی ورود مدیر/ثبت‌نام/لاگین مشتری/دیدگاه‌ها + هانی‌پات + قفل تلاش‌ها با RateLimiter روی استور file + throttle مسیرهای عمومی/API + هدرهای امنیتی + رفع نامرئی‌بودن نوار پیشرفت آپلود).*

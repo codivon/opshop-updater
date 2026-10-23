@@ -13,7 +13,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // RateLimiter (throttle مسیرها + تلاش‌های ورود + سقف کامنت) روی استور «file»
+        // — مستقل از جدول cache دیتابیس؛ روی هاست اشتراکی همیشه در دسترس است.
+        $this->app->singleton(\Illuminate\Cache\RateLimiter::class, function ($app) {
+            return new \Illuminate\Cache\RateLimiter($app['cache']->store('file'));
+        });
     }
 
     /**

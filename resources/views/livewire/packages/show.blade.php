@@ -232,7 +232,8 @@
                                             </div>
                                             <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/80 dark:bg-zinc-700/60">
                                                 @php($maxSales = max(1, $this->sales['by_version']->max('sales_count')))
-                                                <div class="h-full rounded-full bg-gradient-to-r from-brand-500 to-teal-500"
+                                                {{-- bg-gradient-to-l: به‌جای to-r چون در CSS بیلدشده موجود است (توضیح در upload-progress) --}}
+                                                <div class="h-full rounded-full bg-gradient-to-l from-brand-500 to-teal-500"
                                                      style="width: {{ (int) round(($row->sales_count / $maxSales) * 100) }}%"></div>
                                             </div>
                                         </li>

@@ -14,6 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // درگاه‌های پرداخت بانکی با POST خارج از Laravel (بدون توکن CSRF) به کال‌بک برمی‌گردند
         $middleware->validateCsrfTokens(except: ['payment/callback', 'api/*']);
+
+        // هدرهای امنیتی روی همهٔ پاسخ‌ها (وب + API): ضدکلیک‌جک، nosniff و…
+        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
