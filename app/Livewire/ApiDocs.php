@@ -86,6 +86,7 @@ class ApiDocs extends Component
                             ['name' => 'per_page', 'in' => 'query', 'type' => 'integer', 'required' => false, 'desc' => 'تعداد در هر صفحه (پیش‌فرض ۱۵)'],
                         ],
                         'request' => $auth($b.'/packages?per_page=15'),
+                        'sample' => $this->samples('GET', $b.'/packages?per_page=15'),
                         'response' => <<<'JSON'
 {
   "data": [
@@ -135,6 +136,7 @@ JSON,
                             ['name' => 'slug', 'in' => 'path', 'type' => 'string', 'required' => true, 'desc' => 'نامک یکتای پکیج'],
                         ],
                         'request' => $auth($b.'/packages/shop-package'),
+                        'sample' => $this->samples('GET', $b.'/packages/shop-package'),
                         'response' => <<<'JSON'
 {
   "data": {
@@ -162,6 +164,7 @@ JSON,
                             ['name' => 'gateway', 'in' => 'body', 'type' => 'string', 'required' => false, 'desc' => 'کلید درگاه (مثل zarinpal) — پیش‌فرض از پنل؛ برای تست از local'],
                         ],
                         'request' => $auth($b.'/packages/shop-package/purchase', '  -X POST '."\n".'  -H "Content-Type: application/json" '."\n".'  -d \'{"pricing_plan_id": 7, "callback_url": "https://your-site.com/payment-result", "gateway": "zarinpal"}\''),
+                        'sample' => $this->samples('POST', $b.'/packages/shop-package/purchase', ['pricing_plan_id' => 7, 'callback_url' => 'https://your-site.com/payment-result', 'gateway' => 'zarinpal']),
                         'response' => <<<'JSON'
 {
   "payment_url": "https://gateway.example.com/start?...",
@@ -194,6 +197,7 @@ JSON,
                             ['name' => 'transactionId', 'in' => 'path', 'type' => 'string', 'required' => true, 'desc' => 'شناسهٔ تراکنش دریافتی از پاسخ purchase'],
                         ],
                         'request' => $auth($b.'/payments/tr_9f8a2b1c/verify', '  -X POST'),
+                        'sample' => $this->samples('POST', $b.'/payments/tr_9f8a2b1c/verify'),
                         'response' => <<<'JSON'
 {
   "paid": true,
@@ -215,6 +219,7 @@ JSON,
                             ['name' => 'license_key', 'in' => 'body', 'type' => 'string', 'required' => true, 'desc' => 'کلید لایسنس ذخیره‌شده در پروژهٔ خریدار'],
                         ],
                         'request' => $auth($b.'/packages/shop-package/verify-license', '  -X POST '."\n".'  -H "Content-Type: application/json" '."\n".'  -d \'{"license_key": "LIC-XXXX-XXXX"}\''),
+                        'sample' => $this->samples('POST', $b.'/packages/shop-package/verify-license', ['license_key' => 'LIC-XXXX-XXXX']),
                         'response' => <<<'JSON'
 {
   "valid": true,
@@ -236,6 +241,7 @@ JSON,
                             ['name' => 'current_version', 'in' => 'query', 'type' => 'string', 'required' => true, 'desc' => 'نسخهٔ نصب‌شده فعلی، مثل 1.0.0'],
                         ],
                         'request' => $auth($b.'/packages/shop-package/check-update?current_version=1.0.0'),
+                        'sample' => $this->samples('GET', $b.'/packages/shop-package/check-update?current_version=1.0.0'),
                         'response' => <<<'JSON'
 {
   "has_update": true,
@@ -262,6 +268,7 @@ JSON,
                             ['name' => 'version', 'in' => 'query', 'type' => 'string', 'required' => false, 'desc' => 'نسخهٔ خاص؛ پیش‌فرض آخرین نسخهٔ فعال'],
                         ],
                         'request' => $auth($b.'/packages/shop-package/download-url', '  -X POST'),
+                        'sample' => $this->samples('POST', $b.'/packages/shop-package/download-url'),
                         'response' => <<<'JSON'
 {
   "download_url": "https://panel.example.com/api/v1/packages/download/dl_a1b2c3d4...",
@@ -283,6 +290,7 @@ JSON,
                             ['name' => 'version', 'in' => 'query', 'type' => 'string', 'required' => false, 'desc' => 'نسخهٔ خاص؛ پیش‌فرض آخرین نسخه'],
                         ],
                         'request' => $auth($b.'/packages/shop-package/download'),
+                        'sample' => $this->samples('GET', $b.'/packages/shop-package/download', binary: 'package.zip'),
                         'response' => 'فایل باینری ZIP — با هدرهای: Content-Disposition: attachment; X-Package-Version: 2.1.0; X-Package-Hash: e3b0c442... (SHA-256)',
                     ],
                     [
@@ -294,6 +302,7 @@ JSON,
                             ['name' => 'dlToken', 'in' => 'path', 'type' => 'string', 'required' => true, 'desc' => 'توکن دانلود — فقط یک بار و تا ۱۵ دقیقه معتبر است'],
                         ],
                         'request' => 'curl -L -o package.zip "'.$b.'/packages/download/dl_a1b2c3d4..."',
+                        'sample' => $this->samples('GET', $b.'/packages/download/dl_a1b2c3d4...', noHeaders: true, binary: 'package.zip'),
                         'response' => 'فایل باینری ZIP (همان هدرهای X-Package-Version و X-Package-Hash)',
                     ],
                 ],
@@ -317,6 +326,7 @@ JSON,
                             ['name' => 'per_page', 'in' => 'query', 'type' => 'integer', 'required' => false, 'desc' => 'تعداد در هر صفحه (پیش‌فرض ۱۵)'],
                         ],
                         'request' => $auth($b.'/templates'),
+                        'sample' => $this->samples('GET', $b.'/templates'),
                         'response' => <<<'JSON'
 {
   "data": [
@@ -343,6 +353,7 @@ JSON,
                             ['name' => 'slug', 'in' => 'path', 'type' => 'string', 'required' => true, 'desc' => 'نامک یکتای قالب'],
                         ],
                         'request' => $auth($b.'/templates/news-template'),
+                        'sample' => $this->samples('GET', $b.'/templates/news-template'),
                         'response' => <<<'JSON'
 {
   "data": {
@@ -370,6 +381,7 @@ JSON,
                             ['name' => 'gateway', 'in' => 'body', 'type' => 'string', 'required' => false, 'desc' => 'کلید درگاه فعال'],
                         ],
                         'request' => $auth($b.'/templates/news-template/purchase', '  -X POST '."\n".'  -H "Content-Type: application/json" '."\n".'  -d \'{"callback_url": "https://your-site.com/payment-result"}\''),
+                        'sample' => $this->samples('POST', $b.'/templates/news-template/purchase', ['callback_url' => 'https://your-site.com/payment-result']),
                         'response' => <<<'JSON'
 {
   "payment_url": "https://gateway.example.com/start?...",
@@ -389,6 +401,7 @@ JSON,
                             ['name' => 'transactionId', 'in' => 'path', 'type' => 'string', 'required' => true, 'desc' => 'شناسهٔ تراکنش دریافتی از پاسخ purchase'],
                         ],
                         'request' => $auth($b.'/templates/payments/tr_5d4e3f2a/verify', '  -X POST'),
+                        'sample' => $this->samples('POST', $b.'/templates/payments/tr_5d4e3f2a/verify'),
                         'response' => <<<'JSON'
 {
   "paid": true,
@@ -408,6 +421,7 @@ JSON,
                             ['name' => 'current_version', 'in' => 'query', 'type' => 'string', 'required' => true, 'desc' => 'نسخهٔ فعلی، مثل 1.4.0'],
                         ],
                         'request' => $auth($b.'/templates/news-template/check-update?current_version=1.4.0'),
+                        'sample' => $this->samples('GET', $b.'/templates/news-template/check-update?current_version=1.4.0'),
                         'response' => <<<'JSON'
 {
   "has_update": true,
@@ -427,6 +441,7 @@ JSON,
                             ['name' => 'version', 'in' => 'query', 'type' => 'string', 'required' => false, 'desc' => 'نسخهٔ خاص؛ پیش‌فرض آخرین نسخه'],
                         ],
                         'request' => $auth($b.'/templates/news-template/download-url', '  -X POST'),
+                        'sample' => $this->samples('POST', $b.'/templates/news-template/download-url'),
                         'response' => <<<'JSON'
 {
   "download_url": "https://panel.example.com/api/v1/templates/download/dl_c3d4e5f6...",
@@ -447,6 +462,7 @@ JSON,
                             ['name' => 'version', 'in' => 'query', 'type' => 'string', 'required' => false, 'desc' => 'نسخهٔ خاص؛ پیش‌فرض آخرین نسخه'],
                         ],
                         'request' => $auth($b.'/templates/news-template/download'),
+                        'sample' => $this->samples('GET', $b.'/templates/news-template/download', binary: 'template.zip'),
                         'response' => 'فایل باینری ZIP — با هدرهای X-Package-Version و X-Package-Hash',
                     ],
                     [
@@ -458,6 +474,7 @@ JSON,
                             ['name' => 'dlToken', 'in' => 'path', 'type' => 'string', 'required' => true, 'desc' => 'توکن یک‌بارمصرف ۱۵ دقیقه‌ای'],
                         ],
                         'request' => 'curl -L -o template.zip "'.$b.'/templates/download/dl_c3d4e5f6..."',
+                        'sample' => $this->samples('GET', $b.'/templates/download/dl_c3d4e5f6...', noHeaders: true, binary: 'template.zip'),
                         'response' => 'فایل باینری ZIP',
                     ],
                 ],
@@ -480,6 +497,7 @@ JSON,
                             ['name' => 'per_page', 'in' => 'query', 'type' => 'integer', 'required' => false, 'desc' => 'تعداد در هر صفحه (پیش‌فرض ۱۵)'],
                         ],
                         'request' => $auth($b.'/subscription-plans'),
+                        'sample' => $this->samples('GET', $b.'/subscription-plans'),
                         'response' => <<<'JSON'
 {
   "data": [
@@ -515,6 +533,7 @@ JSON,
                             ['name' => 'gateway', 'in' => 'body', 'type' => 'string', 'required' => false, 'desc' => 'کلید درگاه فعال'],
                         ],
                         'request' => $auth($b.'/subscription-plans/gold/purchase', '  -X POST '."\n".'  -H "Content-Type: application/json" '."\n".'  -d \'{"callback_url": "https://your-site.com/payment-result"}\''),
+                        'sample' => $this->samples('POST', $b.'/subscription-plans/gold/purchase', ['callback_url' => 'https://your-site.com/payment-result']),
                         'response' => <<<'JSON'
 {
   "payment_url": "https://gateway.example.com/start?...",
@@ -545,6 +564,7 @@ JSON,
                             ['name' => 'transactionId', 'in' => 'path', 'type' => 'string', 'required' => true, 'desc' => 'شناسهٔ تراکنش دریافتی از پاسخ purchase'],
                         ],
                         'request' => $auth($b.'/subscriptions/payments/tr_7g8h9i0j/verify', '  -X POST'),
+                        'sample' => $this->samples('POST', $b.'/subscriptions/payments/tr_7g8h9i0j/verify'),
                         'response' => <<<'JSON'
 {
   "paid": true,
@@ -564,6 +584,7 @@ JSON,
                         'desc' => 'اشتراک‌های طرح‌محور + ۲۰ سفارش اخیر + free_packages (پکیج‌های رایگانِ طرح‌های فعال، همراه با لایسنسِ صادرشدهٔ هر کدام).',
                         'params' => [],
                         'request' => $auth($b.'/my-subscriptions'),
+                        'sample' => $this->samples('GET', $b.'/my-subscriptions'),
                         'response' => <<<'JSON'
 {
   "data": {
@@ -627,6 +648,7 @@ JSON,
                             ['name' => 'type', 'in' => 'query', 'type' => 'string', 'required' => false, 'desc' => 'package یا product (پیش‌فرض package)'],
                         ],
                         'request' => $auth($b.'/categories?type=package'),
+                        'sample' => $this->samples('GET', $b.'/categories?type=package'),
                         'response' => <<<'JSON'
 {
   "data": [
@@ -663,6 +685,7 @@ JSON,
                             ['name' => 'version', 'in' => 'query', 'type' => 'string', 'required' => true, 'desc' => 'نسخهٔ فعلی برنامه، مثل 1.0.0'],
                         ],
                         'request' => 'curl "'.$b.'/check-update?token=YOUR_UPDATE_CODE&version=1.0.0"',
+                        'sample' => $this->samples('GET', $b.'/check-update?token=YOUR_UPDATE_CODE&version=1.0.0', noHeaders: true),
                         'response' => <<<'JSON'
 {
   "update_available": true,
@@ -685,11 +708,147 @@ JSON,
                             ['name' => 'token', 'in' => 'query', 'type' => 'string', 'required' => true, 'desc' => 'کد آپدیت مشتری'],
                         ],
                         'request' => 'curl -L -o update.zip "'.$b.'/download-update/17?token=YOUR_UPDATE_CODE"',
+                        'sample' => $this->samples('GET', $b.'/download-update/17?token=YOUR_UPDATE_CODE', noHeaders: true, binary: 'update.zip'),
                         'response' => 'فایل باینری آپدیت (attachment)',
                     ],
                 ],
             ],
         ];
+    }
+
+    /** نمونهٔ «اولین درخواست» شروع سریع به هر سه زبان (cURL در blade ساخته می‌شود) */
+    public function quickStartSamples(): array
+    {
+        return $this->samples('GET', $this->baseUrl().'/packages?per_page=15');
+    }
+
+    /* ===================================================================
+     *  نمونه‌سازها — Laravel HTTP Client و Guzzle
+     *  کد آمادهٔ کپی از روی متد/آدرس/بدنهٔ ساختاریافته ساخته می‌شود تا هر سه
+     *  زبان (cURL / Laravel / Guzzle) همیشه با سورس کنترلرها هماهنگ بمانند.
+     * =================================================================== */
+
+    /** ساخت جفت نمونهٔ [laravel, guzzle] برای یک اندپوینت */
+    private function samples(string $method, string $url, array $body = [], bool $noHeaders = false, ?string $binary = null): array
+    {
+        $parts = parse_url($url);
+        parse_str($parts['query'] ?? '', $query);
+
+        $origin = ($parts['scheme'] ?? 'https').'://'.($parts['host'] ?? 'localhost');
+        if (isset($parts['port'])) {
+            $origin .= ':'.$parts['port'];
+        }
+        $path = $parts['path'] ?? '/';
+
+        $headers = $noHeaders ? [] : [
+            'Authorization' => 'Bearer YOUR_UPDATE_CODE',
+            'X-Project-Url' => 'https://your-site.com',
+        ];
+
+        // اعداد داخل کوئری برای نمونهٔ تمیزتر به اینتجر تبدیل شوند (per_page=15 نه '15')
+        $query = array_map(fn ($v) => is_string($v) && ctype_digit($v) ? (int) $v : $v, $query);
+
+        return [
+            'laravel' => $this->laravelSample(strtolower($method), $origin.$path, $query, $body, $headers, $binary),
+            'guzzle'  => $this->guzzleSample($origin, $path, $query, $body, $headers, strtolower($method), $binary),
+        ];
+    }
+
+    /** آرایهٔ PHP با کلیدهای هم‌تراز برای درج داخل نمونه‌کد */
+    private function phpArray(array $items, int $indent): string
+    {
+        if ($items === []) {
+            return '[]';
+        }
+
+        $pad = str_repeat(' ', $indent);
+        $width = max(array_map('strlen', array_keys($items)));
+        $rows = [];
+
+        foreach ($items as $key => $value) {
+            $rows[] = $pad."'".addslashes((string) $key)."'"
+                .str_repeat(' ', $width - strlen((string) $key)).' => '.$this->phpValue($value).',';
+        }
+
+        return "[\n".implode("\n", $rows)."\n".str_repeat(' ', max(0, $indent - 4)).']';
+    }
+
+    /** مقدار PHP داخل نمونه‌کد — رشته با کوتیشن، عدد/بولین خام */
+    private function phpValue(mixed $value): string
+    {
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        return "'".addslashes((string) $value)."'";
+    }
+
+    /** نمونهٔ Laravel HTTP Client */
+    private function laravelSample(string $method, string $url, array $query, array $body, array $headers, ?string $binary): string
+    {
+        $chainParts = [];
+        if ($headers !== []) {
+            $chainParts[] = 'withHeaders('.$this->phpArray($headers, 4).')';
+        }
+        if ($binary !== null) {
+            $chainParts[] = "withOptions([\n    'sink' => '".addslashes($binary)."', // فایل در همین مسیر ذخیره می‌شود\n])";
+        }
+
+        // بدون هدر/سینک → فراخوانی استاتیک Http::get(...)؛ با هدر → Http::withHeaders([...])->get(...)
+        $verb = $method === 'post' ? 'post' : 'get';
+        if ($method === 'post') {
+            $args = $body === []
+                ? "'".$url."'"
+                : "'".$url."', ".$this->phpArray($body, 4);
+        } else {
+            $args = $query === []
+                ? "'".$url."'"
+                : "'".$url."', ".$this->phpArray($query, 4);
+        }
+        $call = $chainParts === []
+            ? "Http::".$verb."(".$args.')'
+            : 'Http::'.implode('->', $chainParts).'->'.$verb.'('.$args.')';
+
+        $trailer = $binary !== null
+            ? "\necho \$response->header('X-Package-Version');\n// صحت فایل: hash_file('sha256', '".addslashes($binary)."') را با هدر X-Package-Hash مقایسه کنید"
+            : "\n\$data = \$response->throw()->json();";
+
+        return 'use Illuminate\\Support\\Facades\\Http;'."\n\n\$response = ".$call.';'.$trailer;
+    }
+
+    /** نمونهٔ Guzzle */
+    private function guzzleSample(string $origin, string $path, array $query, array $body, array $headers, string $method, ?string $binary): string
+    {
+        if ($headers !== []) {
+            $headers['Accept'] = 'application/json';
+        }
+
+        $parts = [];
+        if ($headers !== []) {
+            $parts[] = "'headers' => ".$this->phpArray($headers, 8);
+        }
+        if ($query !== []) {
+            $parts[] = "'query' => ".$this->phpArray($query, 8);
+        }
+        if ($body !== []) {
+            $parts[] = "'json' => ".$this->phpArray($body, 8);
+        }
+        if ($binary !== null) {
+            $parts[] = "'sink' => '".addslashes($binary)."'";
+        }
+
+        $opts = $parts === [] ? '' : ", [\n    ".implode(",\n    ", $parts).",\n]";
+        $call = "\$client->".$method."('".addslashes($path)."'".$opts.')';
+
+        $trailer = $binary !== null
+            ? "\necho \$response->getHeaderLine('X-Package-Version');\n// صحت فایل: hash_file('sha256', '".addslashes($binary)."') را با هدر X-Package-Hash مقایسه کنید"
+            : "\$data = json_decode((string) \$response->getBody(), true);";
+
+        return 'use GuzzleHttp\\Client;'."\n\n\$client = new Client(['base_uri' => '".$origin."', 'timeout' => 30]);\n\n\$response = ".$call.";\n\n".$trailer;
     }
 
     public function render()

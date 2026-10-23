@@ -34,7 +34,7 @@
                 </div>
             </div>
 
-            <div class="w-full max-w-sm shrink-0">
+            <div class="w-full max-w-sm shrink-0 space-y-3">
                 <div class="rounded-2xl bg-black/30 p-4 ring-1 ring-white/10 backdrop-blur">
                     <p class="flex items-center gap-1.5 text-[11px] font-bold text-zinc-400">
                         <x-icon name="globe" class="size-3.5" /> آدرس پایه (Base URL)
@@ -49,6 +49,14 @@
                         </button>
                     </div>
                 </div>
+                <a href="{{ route('admin.api-docs.agent-spec') }}" download
+                   class="flex items-center justify-between gap-2 rounded-2xl bg-white/10 px-4 py-3 ring-1 ring-white/15 backdrop-blur transition-colors hover:bg-white/15">
+                    <span class="flex items-center gap-2.5">
+                        <x-icon name="file-text" class="size-5 text-brand-300" />
+                        <span class="text-[13px] font-bold">مشخصات کامل API برای ایجنت</span>
+                    </span>
+                    <x-icon name="download" class="size-4 text-zinc-300" />
+                </a>
             </div>
         </div>
     </header>
@@ -85,10 +93,45 @@
         </div>
 
         @php($curlQuick = 'curl "'.$base.'/packages" \\'. "\n" .'  -H "Authorization: Bearer YOUR_UPDATE_CODE" \\'. "\n" .'  -H "X-Project-Url: https://your-site.com"')
-        @php($phpQuick = 'Http::withHeaders(['."\n".'    \'Authorization\' => \'Bearer YOUR_UPDATE_CODE\','."\n".'    \'X-Project-Url\' => \'https://your-site.com\','."\n".'])->get(\''.$base.'/packages\');')
-        <div class="mt-5 grid gap-4 lg:grid-cols-2">
+        @php($quickSamples = $this->quickStartSamples())
+        <div class="mt-5 grid gap-4 lg:grid-cols-3">
             <x-code-block label="اولین درخواست (cURL)" :code="$curlQuick" />
-            <x-code-block label="همان درخواست با PHP (Laravel HTTP Client)" :code="$phpQuick" />
+            <x-code-block label="اولین درخواست (Laravel HTTP Client)" :code="$quickSamples['laravel']" />
+            <x-code-block label="اولین درخواست (PHP — Guzzle)" :code="$quickSamples['guzzle']" />
+        </div>
+    </section>
+
+    {{-- ============================== فایل ایجنت ============================== --}}
+    <section aria-labelledby="agent-title">
+        <div class="relative overflow-hidden rounded-3xl bg-gradient-to-l from-brand-600 via-brand-500 to-brand-400 p-px shadow-xl">
+            <div class="flex flex-col gap-6 rounded-3xl bg-white p-6 dark:bg-zinc-900 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+                <div class="max-w-2xl">
+                    <div class="flex items-center gap-2.5">
+                        <span class="flex size-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400"><x-icon name="file-text" class="size-5" /></span>
+                        <h2 id="agent-title" class="text-lg font-black text-zinc-900 dark:text-zinc-50">دستور ساخت کامل برای ایجنت هوش مصنوعی</h2>
+                    </div>
+                    <p class="mt-3 text-[13.5px] leading-7 text-zinc-600 dark:text-zinc-300">
+                        یک فایل Markdown مستقل که همه‌چیز لازم برای ساخت سمت فروشگاهی (پروژهٔ خریدار) داخلش است:
+                        قرارداد کامل هر {{ fa_num($this->endpointsCount()) }} اندپوینت با نمونهٔ JSON واقعی، جریان‌های خرید/لایسنس/آپدیت گام‌به‌گام،
+                        جدول خطاها، چک‌لیست امنیتی، معماری پیشنهادی فروشگاه و نمونه‌کد کامل Laravel و Guzzle.
+                        کافی است فایل را به هر ایجنتی بدهید تا فروشگاه شما را کامل بسازد.
+                    </p>
+                    <ul class="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px] font-medium text-zinc-500 dark:text-zinc-400">
+                        <li class="flex items-center gap-1.5"><x-icon name="check-circle" class="size-4 shrink-0 text-emerald-500" /> مرجع کامل اندپوینت‌ها</li>
+                        <li class="flex items-center gap-1.5"><x-icon name="check-circle" class="size-4 shrink-0 text-emerald-500" /> دیاگرام جریان پرداخت و آپدیت</li>
+                        <li class="flex items-center gap-1.5"><x-icon name="check-circle" class="size-4 shrink-0 text-emerald-500" /> نمونه‌کد Laravel + Guzzle + cURL</li>
+                        <li class="flex items-center gap-1.5"><x-icon name="check-circle" class="size-4 shrink-0 text-emerald-500" /> چک‌لیست پذیرش برای ایجنت</li>
+                    </ul>
+                </div>
+                <a href="{{ route('admin.api-docs.agent-spec') }}" download
+                   class="group inline-flex shrink-0 cursor-pointer items-center gap-3 rounded-2xl bg-zinc-900 px-5 py-4 text-sm font-black text-white shadow-lg shadow-zinc-900/20 transition-all hover:-translate-y-0.5 hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-100">
+                    <x-icon name="download" class="size-5 transition-transform group-hover:translate-y-0.5" />
+                    <span class="flex flex-col items-start gap-0.5">
+                        <span>دانلود فایل مستندات ایجنت</span>
+                        <span class="text-[10px] font-semibold opacity-70">Markdown · قابل‌ارائه مستقیم به AI</span>
+                    </span>
+                </a>
+            </div>
         </div>
     </section>
 
@@ -273,9 +316,34 @@
                                         </div>
                                     @endif
 
-                                    {{-- نمونه درخواست و پاسخ --}}
+                                    {{-- نمونهٔ درخواست — سوییچ زبان cURL / Laravel / Guzzle + پاسخ --}}
                                     <div class="grid gap-4 xl:grid-cols-2">
-                                        <x-code-block label="نمونهٔ درخواست" :code="$ep['request']" />
+                                        <div x-data="{ lang: 'curl' }" class="space-y-3 self-start">
+                                            @php($sampleLangs = isset($ep['sample']) ? ['curl' => 'cURL', 'laravel' => 'Laravel', 'guzzle' => 'Guzzle'] : ['curl' => 'cURL'])
+                                            @if(count($sampleLangs) > 1)
+                                                <div class="flex w-fit gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/70" role="tablist" aria-label="زبان نمونهٔ درخواست">
+                                                    @foreach($sampleLangs as $langKey => $langLabel)
+                                                        <button type="button" role="tab" @click="lang = '{{ $langKey }}'"
+                                                                :aria-selected="lang === '{{ $langKey }}'"
+                                                                :class="lang === '{{ $langKey }}' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'"
+                                                                class="cursor-pointer rounded-lg px-3 py-1.5 font-mono text-[11.5px] font-bold transition-all">
+                                                            {{ $langLabel }}
+                                                        </button>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                            <div x-show="lang === 'curl'" role="tabpanel">
+                                                <x-code-block label="نمونهٔ درخواست (cURL)" :code="$ep['request']" />
+                                            </div>
+                                            @isset($ep['sample'])
+                                                <div x-show="lang === 'laravel'" x-cloak role="tabpanel">
+                                                    <x-code-block label="نمونهٔ درخواست (Laravel HTTP Client)" :code="$ep['sample']['laravel']" />
+                                                </div>
+                                                <div x-show="lang === 'guzzle'" x-cloak role="tabpanel">
+                                                    <x-code-block label="نمونهٔ درخواست (PHP — Guzzle)" :code="$ep['sample']['guzzle']" />
+                                                </div>
+                                            @endisset
+                                        </div>
                                         <div class="space-y-4">
                                             <x-code-block label="پاسخ (JSON)" :code="$ep['response']" collapsible />
                                             @if(!empty($ep['alt_response']))

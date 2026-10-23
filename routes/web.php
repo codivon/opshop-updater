@@ -174,6 +174,14 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', \App\Http\Middleware
     Route::get('reports', \App\Livewire\Reports\Index::class)->name('reports.index');
     Route::get('logs', \App\Livewire\Logs\Index::class)->name('logs.index');
     Route::get('api-docs', \App\Livewire\ApiDocs::class)->name('api-docs');
+
+    // دانلود فایل مشخصات کامل API برای ایجنت هوش مصنوعی (Markdown)
+    Route::get('api-docs/agent-spec', function () {
+        $path = base_path('docs/API-AGENT-SPEC.md');
+        abort_unless(is_file($path), 404, 'فایل مشخصات ایجنت یافت نشد.');
+
+        return response()->download($path, 'opshop-api-agent-spec.md', ['Content-Type' => 'text/markdown; charset=UTF-8']);
+    })->name('api-docs.agent-spec');
     Route::get('settings', \App\Livewire\Settings\Index::class)->name('settings.index');
     Route::get('settings/gateways', \App\Livewire\Gateways::class)->name('settings.gateways');
     Route::get('settings/security', \App\Livewire\Settings\Security::class)->name('settings.security');
