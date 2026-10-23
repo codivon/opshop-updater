@@ -16,7 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: ['payment/callback', 'api/*']);
 
         // هدرهای امنیتی روی همهٔ پاسخ‌ها (وب + API): ضدکلیک‌جک، nosniff و…
+        // (کلید اصلی + HSTS از پنل «امنیت و امکانات»)
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+
+        // حالت تعمیر و نگهداری — پنل/پرداخت/API همیشه باز می‌مانند
+        $middleware->append(\App\Http\Middleware\CheckMaintenance::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

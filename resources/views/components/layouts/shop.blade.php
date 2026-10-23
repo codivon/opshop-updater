@@ -4,13 +4,22 @@
 --}}
 @props(['title' => null])
 
+@php
+    // شخصی‌سازی از پنل «امنیت و امکانات» + نام سایت از تنظیمات عمومی
+    $siteName = \App\Support\Features::siteName();
+    $announcement = \App\Support\Features::announcementData();
+    $footerDescription = \App\Support\Features::footerDescription();
+    $footerText = \App\Support\Features::footerText();
+    $socialLinks = \App\Support\Features::socialLinks();
+@endphp
+
 <!DOCTYPE html>
 <html lang="fa" dir="rtl" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'فروشگاه پکیج‌ها' }} · آپدیت‌سنتر</title>
+    <title>{{ $title ?? 'فروشگاه پکیج‌ها' }} · {{ $siteName }}</title>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -65,7 +74,7 @@
                 <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-lg shadow-pop">
                     <x-icon name="rocket" class="size-5" />
                 </span>
-                <span class="hidden text-sm font-black text-zinc-900 sm:block dark:text-zinc-50">آپدیت‌سنتر</span>
+                <span class="hidden text-sm font-black text-zinc-900 sm:block dark:text-zinc-50">{{ $siteName }}</span>
             </a>
 
             <span class="hidden h-6 w-px bg-zinc-200 sm:block dark:bg-zinc-800" aria-hidden="true"></span>
@@ -112,6 +121,18 @@
                     <x-icon name="layout-template" class="size-4.5" />
                     قالب‌ها
                 </a>
+                @if(\App\Support\Features::changelog())
+                    <a href="{{ route('shop.changelog') }}" wire:navigate
+                       @class([
+                           'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
+                           'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.changelog'),
+                           'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! request()->routeIs('shop.changelog'),
+                       ])
+                       @if(request()->routeIs('shop.changelog')) aria-current="page" @endif>
+                        <x-icon name="history" class="size-4.5" />
+                        تغییرات
+                    </a>
+                @endif
                 <a href="{{ route('shop.subscriptions') }}" wire:navigate
                    @class([
                        'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
@@ -174,6 +195,35 @@
         </div>
     </header>
 
+    {{-- ============ Announcement bar (نوار اعلان — از پنل امنیت و امکانات) ============ --}}
+    @if($announcement['enabled'] && $announcement['text'] !== '')
+        <div x-data="{ annClosed: localStorage.getItem('shop-ann-closed') === '{{ $announcement['hash'] }}' }"
+             x-show="!annClosed" x-cloak style="display: none" role="region" aria-label="اعلان سایت">
+            <div class="relative px-4 py-2.5 text-center text-sm font-bold sm:px-6"
+                 style="background-color: {{ $announcement['bg'] }}; color: {{ $announcement['color'] }};">
+                <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-2 gap-y-1">
+                    <x-icon name="megaphone" class="size-4 shrink-0 opacity-80" />
+                    <span>{{ $announcement['text'] }}</span>
+                    @if($announcement['link'] !== '')
+                        <a href="{{ $announcement['link'] }}" class="inline-flex items-center gap-1 underline underline-offset-4 transition-opacity hover:opacity-80">
+                            {{ $announcement['link_text'] !== '' ? $announcement['link_text'] : 'اطلاعات بیشتر' }}
+                            <x-icon name="arrow-left" class="size-3.5" />
+                        </a>
+                    @endif
+                </div>
+                @if($announcement['dismissible'])
+                    <button type="button"
+                            class="absolute inset-y-0 start-2 my-auto flex size-7 items-center justify-center rounded-lg opacity-70 transition-opacity hover:opacity-100"
+                            style="color: {{ $announcement['color'] }};"
+                            @click="localStorage.setItem('shop-ann-closed', '{{ $announcement['hash'] }}'); annClosed = true"
+                            aria-label="بستن اعلان">
+                        <x-icon name="x" class="size-4" />
+                    </button>
+                @endif
+            </div>
+        </div>
+    @endif
+
     {{-- ============ Content ============ --}}
     <main class="pb-8 sm:pb-10">
         {{ $slot }}
@@ -188,13 +238,30 @@
                     <x-icon name="rocket" class="size-4" />
                 </span>
                 <div>
-                    <p class="text-xs font-black text-zinc-800 dark:text-zinc-100">آپدیت‌سنتر</p>
-                    <p class="mt-0.5 text-xs leading-none text-zinc-400">مرکز توزیع پکیج و آپدیت پروژه‌ها</p>
+                    <p class="text-xs font-black text-zinc-800 dark:text-zinc-100">{{ $siteName }}</p>
+                    <p class="mt-0.5 text-xs leading-none text-zinc-400">{{ $footerDescription !== '' ? $footerDescription : 'مرکز توزیع پکیج و آپدیت پروژه‌ها' }}</p>
                 </div>
             </div>
-            <p class="text-xs text-zinc-400">
-                © {{ fa_num(verta_date(now(), 'Y')) }} آپدیت‌سنتر · تمامی حقوق محفوظ است.
-            </p>
+            <div class="flex flex-col items-center gap-3 sm:items-end">
+                @if(count($socialLinks) > 0)
+                    <div class="flex items-center gap-1">
+                        @foreach($socialLinks as $social)
+                            <a href="{{ $social['url'] }}" @if(!str_starts_with($social['url'], 'mailto:')) target="_blank" rel="noopener noreferrer" @endif
+                               class="rounded-xl p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                               title="{{ $social['title'] }}" aria-label="{{ $social['title'] }}">
+                                <x-icon name="{{ $social['icon'] }}" class="size-4.5" />
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+                <p class="text-xs text-zinc-400">
+                    @if($footerText !== '')
+                        {{ $footerText }}
+                    @else
+                        © {{ fa_num(verta_date(now(), 'Y')) }} {{ $siteName }} · تمامی حقوق محفوظ است.
+                    @endif
+                </p>
+            </div>
         </div>
     </footer>
 

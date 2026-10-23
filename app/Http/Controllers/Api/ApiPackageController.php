@@ -386,7 +386,7 @@ class ApiPackageController extends Controller
                         ];
 
                         $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
-                        $this->smsManager->notifyAdmin('admin_purchase_paid', $vars, $purchase);
+                        $this->smsManager->notifyAdminSale('package', 'admin_purchase_paid', $vars, $purchase);
                     } catch (\Throwable) {
                         // پیامک هرگز نباید جریان خرید را بشکند
                     }

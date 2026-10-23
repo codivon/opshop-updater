@@ -5,6 +5,7 @@ namespace App\Livewire\Shop;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Comment;
 use App\Services\CaptchaService;
+use App\Support\Features;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Computed;
@@ -15,8 +16,8 @@ use Livewire\WithPagination;
  * بخش دیدگاه‌های صفحه محصول/پکیج (کامپوننت فرزند چندریختی):
  * فرم ثبت دیدگاه مهمان (با تأیید مدیر) + فهرست دیدگاه‌های تأییدشده.
  *
- * لایه‌های ضداسپم: کپچای خودمیزبان + هانی‌پات + سقف ارسال
- * (۵ دیدگاه تأییدشدهٔ کپچا در هر ۱۰ دقیقه برای هر IP؛ تأیید مدیر هم جداگانه لازم است).
+ * لایه‌های ضداسپم (هرکدام از پنل «امنیت و امکانات» قابل تنظیم):
+ * کپچای خودمیزبان + هانی‌پات + سقف ارسال برای هر IP؛ تأیید مدیر هم جداگانه لازم است.
  *
  * <livewire:shop.comment-section :model="$product" :key="'cs-'.$product->id" />
  */
@@ -29,12 +30,6 @@ class CommentSection extends Component
 
     /** برچسب «محصول» یا «پکیج» برای متن‌های صفحه */
     public string $label = 'محصول';
-
-    /** سقف دیدگاه در پنجرهٔ زمانی */
-    protected const MAX_PER_WINDOW = 5;
-
-    /** طول پنجرهٔ سقف‌گذاری (ثانیه) */
-    protected const WINDOW_SECONDS = 600;
 
     /* ---- form ---- */
     public string $name = '';
@@ -61,7 +56,9 @@ class CommentSection extends Component
             $this->email = (string) ($customer->email ?: '');
         }
 
-        CaptchaService::fresh();
+        if (Features::captcha('comments')) {
+            CaptchaService::fresh();
+        }
     }
 
     /** سؤال امنیتی جدید (دکمهٔ «سؤال دیگر» — بدون رفرش صفحه) */
@@ -98,20 +95,21 @@ class CommentSection extends Component
 
     public function submit(): void
     {
-        $limiterKey = 'shop-comment:' . request()->ip();
+        // ۱) سقف ارسال دیدگاه برای هر IP — اعداد از پنل «امنیت و امکانات»
+        [$maxPerWindow, $decayMinutes] = Features::lockoutConfig('comment');
+        $limiterKey = 'shop-comment:'.request()->ip();
 
-        // ۱) سقف ارسال دیدگاه برای هر IP
-        if (RateLimiter::tooManyAttempts($limiterKey, self::MAX_PER_WINDOW)) {
+        if (RateLimiter::tooManyAttempts($limiterKey, $maxPerWindow)) {
             $minutes = (int) ceil(RateLimiter::availableIn($limiterKey) / 60);
 
-            $this->addError('captcha', 'تعداد دیدگاه‌های ارسالی بیش از حد مجاز است؛ حدود ' . fa_num(max(1, $minutes)) . ' دقیقهٔ دیگر دوباره تلاش کنید.');
+            $this->addError('captcha', 'تعداد دیدگاه‌های ارسالی بیش از حد مجاز است؛ حدود '.fa_num(max(1, $minutes)).' دقیقهٔ دیگر دوباره تلاش کنید.');
             return;
         }
 
         $data = $this->validate();
 
         // ۲) هانی‌پات: فیلد مخفی پُر است = ربات → ذخیره نمی‌شود
-        if (trim($this->website) !== '') {
+        if (Features::honeypot() && trim($this->website) !== '') {
             CaptchaService::fresh();
             $this->reset('captcha');
             $this->addError('captcha', 'پاسخ سؤال امنیتی نادرست است؛ سؤال جدید آماده شد.');
@@ -119,13 +117,13 @@ class CommentSection extends Component
         }
 
         // ۳) کپچای خودمیزبان (پاسخ مصرف و سؤال تازه می‌شود)
-        if (! CaptchaService::verify($this->captcha)) {
+        if (Features::captcha('comments') && ! CaptchaService::verify($this->captcha)) {
             $this->reset('captcha');
             $this->addError('captcha', 'پاسخ سؤال امنیتی نادرست است؛ سؤال جدید آماده شد.');
             return;
         }
 
-        RateLimiter::hit($limiterKey, self::WINDOW_SECONDS);
+        RateLimiter::hit($limiterKey, $decayMinutes * 60);
 
         Comment::create([
             'commentable_type' => $this->model->getMorphClass(),

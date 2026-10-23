@@ -23,10 +23,14 @@
                 <x-input id="login-code" wire:model="updateCode" icon="key" placeholder="مثلاً: 1A2B3C4D5E6F" dir="ltr" class="text-start font-mono tracking-wider" autocomplete="off" />
             </x-field>
 
-            <x-captcha wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+            @if(\App\Support\Features::captcha('customer_login'))
+                <x-captcha wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+            @endif
 
             {{-- هانی‌پات ضدربات — برای انسان نامرئی است --}}
-            <x-honeypot name="website" wireTarget="website" />
+            @if(\App\Support\Features::honeypot())
+                <x-honeypot name="website" wireTarget="website" />
+            @endif
 
             <x-btn type="submit" icon="log-in" :loading="true" class="w-full">
                 ورود به حساب مشتری

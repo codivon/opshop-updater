@@ -74,7 +74,7 @@ class WebPaymentController extends Controller
                 ];
 
                 $this->smsManager->send('subscription_paid', $customer?->phone, $vars, $subscriptionOrder, once: true);
-                $this->smsManager->notifyAdmin('admin_subscription_paid', $vars, $subscriptionOrder);
+                $this->smsManager->notifyAdminSale('subscription', 'admin_subscription_paid', $vars, $subscriptionOrder);
             }
 
             // سفارش API (callback_url بیرونی) → صفحه نتیجه + شمارش معکوس، سپس فروشگاه
@@ -107,7 +107,7 @@ class WebPaymentController extends Controller
                     'gateway'      => $productPurchase->gateway ?? '-',
                 ];
 
-                $this->smsManager->notifyAdmin('admin_product_paid', $vars, $productPurchase);
+                $this->smsManager->notifyAdminSale('product', 'admin_product_paid', $vars, $productPurchase);
             }
 
             return redirect()
@@ -133,7 +133,7 @@ class WebPaymentController extends Controller
                     'gateway'       => $templatePurchase->gateway ?? '-',
                 ];
 
-                $this->smsManager->notifyAdmin('admin_template_paid', $vars, $templatePurchase);
+                $this->smsManager->notifyAdminSale('template', 'admin_template_paid', $vars, $templatePurchase);
             }
 
             return redirect()
@@ -168,7 +168,7 @@ class WebPaymentController extends Controller
             ];
 
             $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
-            $this->smsManager->notifyAdmin('admin_purchase_paid', $vars, $purchase);
+            $this->smsManager->notifyAdminSale('package', 'admin_purchase_paid', $vars, $purchase);
         }
 
         // خرید فروشگاه (API): ابتدا صفحه‌ی نتیجه + شمارش معکوس، سپس بازگشت به فروشگاه

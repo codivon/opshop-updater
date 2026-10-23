@@ -16,7 +16,7 @@ use App\Models\PackagePricingPlan;
 use App\Models\PackagePurchase;
 use App\Models\PackageVersion;
 use App\Models\Product;
-use App\Models\ProductComment;
+use App\Models\Comment;
 use App\Models\ProductPurchase;
 use App\Models\ProductVersion;
 use App\Models\Project;
@@ -335,7 +335,7 @@ if ($grantPkg) {
 // ---------- admin user (برای ورود اولیه پنل) ----------
 User::updateOrCreate(
     ['email' => 'admin@panel.test'],
-    ['name' => 'مدیر سیستم', 'password' => bcrypt('secret123'), 'status' => 'active'],
+    ['name' => 'مدیر سیستم', 'password' => bcrypt('secret123'), 'role' => 'admin', 'status' => 'active'],
 );
 
 // ============================================================
@@ -521,6 +521,6 @@ echo 'Projects: ' . Project::count() . ' | Packages: ' . Package::count() . ' | 
     . ' | Subscriptions: ' . Subscription::count() . ' | Updates: ' . Update::count()
     . ' | SubPlans: ' . SubscriptionPlan::count() . ' | SubOrders: ' . SubscriptionOrder::count() . "\n";
 echo 'Products: ' . Product::count() . ' | ProductVersions: ' . ProductVersion::count()
-    . ' | ProductComments: ' . ProductComment::count()
+    . ' | ProductComments: ' . Comment::where('commentable_type', 'product')->count()
     . ' | ProductPurchases: ' . ProductPurchase::count()
     . ' | Categories: ' . Category::count() . "\n";

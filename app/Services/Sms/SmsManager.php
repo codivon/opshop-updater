@@ -199,6 +199,22 @@ class SmsManager
     }
 
     /**
+     * اعلان فروش به مدیر — با کلید جداگانه برای هر بخش تا از پنل
+     * «امنیت و امکانات» قابل خاموش/روشن‌کردن باشد:
+     *
+     *   $area: package | product | template | subscription
+     *   (کلیدهای notify_sale_package / notify_sale_product / …)
+     */
+    public function notifyAdminSale(string $area, string $templateKey, array $vars = [], ?object $loggable = null): ?SmsLog
+    {
+        if (!\App\Support\Features::saleNotify($area)) {
+            return null;
+        }
+
+        return $this->notifyAdmin($templateKey, $vars, $loggable);
+    }
+
+    /**
      * ارسال آزمایشی (دکمه تست در صفحه قالب‌ها)
      */
     public function sendTest(string $templateKey, string $mobile): ?SmsLog

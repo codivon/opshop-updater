@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Rules\CaptchaRule;
+use App\Support\Features;
 use Illuminate\Foundation\Auth\RegistersUsers;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -48,14 +49,20 @@ class RegisterController extends Controller
      */
     protected function validator(array $data)
     {
-        return Validator::make($data, [
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            // ضدربات: کپچای خودمیزبان (سؤال ریاضی سشن) + رد فیلد مخفی هانی‌پات
-            'captcha' => ['required', 'string', new CaptchaRule],
+            // رد فیلد مخفی هانی‌پات (تله از پنل امنیت و امکانات قابل خاموش‌کردن است)
             'website' => ['prohibited'],
-        ], [
+        ];
+
+        // ضدربات: کپچای خودمیزبان (سؤال ریاضی سشن) — از پنل امنیت و امکانات
+        if (Features::captcha('admin_register')) {
+            $rules['captcha'] = ['required', 'string', new CaptchaRule];
+        }
+
+        return Validator::make($data, $rules, [
             'website.prohibited' => 'امکان ثبت‌نام وجود ندارد.',
         ]);
     }

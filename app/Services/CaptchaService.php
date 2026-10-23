@@ -19,11 +19,19 @@ class CaptchaService
     public const SESSION_ANSWER   = 'captcha.answer';
     public const SESSION_TS       = 'captcha.ts';
 
-    /** کمینهٔ ثانیه بین ساخت سؤال و پاسخ — زیر این یعنی ربات */
+    /** کمینهٔ ثانیه بین ساخت سؤال و پاسخ — پیش‌فرض (قابل تنظیم از پنل) */
     public const MIN_SECONDS = 2;
 
     /** حداکثر عمر سؤال (ثانیه) */
     public const MAX_AGE = 1800;
+
+    /**
+     * کمینهٔ ثانیهٔ تلهٔ زمان — از پنل «امنیت و امکانات» قابل تنظیم.
+     */
+    public static function minSeconds(): int
+    {
+        return max(0, min(120, (int) setting('sec_captcha_min_seconds', (string) self::MIN_SECONDS)));
+    }
 
     /**
      * متن سؤال فعلی برای نمایش (در صورت نبود یا منقضی‌بودن، سؤال تازه می‌سازد).
@@ -84,7 +92,7 @@ class CaptchaService
         $ok = is_numeric($expected)
             && preg_match('/^\d{1,4}$/', $given) === 1
             && (int) $given === (int) $expected
-            && $age >= self::MIN_SECONDS
+            && $age >= self::minSeconds()
             && $age <= self::MAX_AGE;
 
         static::fresh();

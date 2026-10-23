@@ -51,6 +51,13 @@
                     <x-toggle wire:model="form.mail_enabled" label="فعال‌سازی ارسال ایمیل" id="mail_enabled" />
                 </div>
 
+                <div class="rounded-xl bg-amber-50 p-4 ring-1 ring-amber-600/20 dark:bg-amber-500/10 dark:ring-amber-400/20">
+                    <x-toggle wire:model="form.mail_use_settings" label="استفاده از همین تنظیمات SMTP برای ارسال ایمیل‌های سیستمی (مثل کد ورود دومرحله‌ای)" id="mail_use_settings" />
+                    <p class="mt-2 text-xs leading-6 text-amber-700 dark:text-amber-400">
+                        اگر روشن باشد، ایمیل‌های سیستمی با تنظیمات همین صفحه ارسال می‌شوند؛ در غیر این صورت از پیکربندی .env سرور استفاده می‌شود.
+                    </p>
+                </div>
+
                 <div class="grid gap-5 sm:grid-cols-2">
                     <x-field label="آدرس ایمیل فرستنده" for="mail_from_address">
                         <x-input id="mail_from_address" wire:model="form.mail_from_address" type="email" placeholder="no-reply@example.com" icon="mail" dir="ltr" class="{{ $errBag->has('form.mail_from_address') ? 'input-error' : '' }}" />

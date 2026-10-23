@@ -40,5 +40,25 @@ class AppServiceProvider extends ServiceProvider
             \App\Models\Comment::TYPE_PACKAGE  => \App\Models\Package::class,
             \App\Models\Comment::TYPE_TEMPLATE => \App\Models\Template::class,
         ]);
+
+        // اتصال تنظیمات SMTP پنل به پیکربندی ایمیل در زمان اجرا:
+        // فقط وقتی مدیر «استفاده از تنظیمات ایمیل پنل» را روشن کرده و هاست پر باشد.
+        // (پیش‌نیاز ارسال ایمیل‌های سیستمی مثل کد ورود دومرحله‌ای روی هاست اشتراکی)
+        try {
+            if (filter_var(setting('mail_use_settings', '0'), FILTER_VALIDATE_BOOLEAN)
+                && trim((string) setting('mail_host', '')) !== '') {
+                config([
+                    'mail.default'             => 'smtp',
+                    'mail.mailers.smtp.host'   => setting('mail_host'),
+                    'mail.mailers.smtp.port'   => (int) setting('mail_port', '587'),
+                    'mail.mailers.smtp.username' => setting('mail_username'),
+                    'mail.mailers.smtp.password' => setting('mail_password'),
+                    'mail.from.address'        => setting('mail_from_address', config('mail.from.address')),
+                    'mail.from.name'           => setting('mail_from_name', config('mail.from.name')),
+                ]);
+            }
+        } catch (\Throwable) {
+            // جدول settings آماده نیست (نصب تازه/تست) → پیکربندی پیش‌فرض بماند
+        }
     }
 }

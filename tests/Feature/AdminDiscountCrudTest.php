@@ -60,6 +60,7 @@ class AdminDiscountCrudTest extends TestCase
             ->set('form.value', 10)
             ->set('form.applies_packages', false)
             ->set('form.applies_products', false)
+            ->set('form.applies_templates', false) // 🆕 محدودهٔ قالب‌ها (Task 33+) هم باید بسته باشد
             ->set('form.applies_subscriptions', false)
             ->call('save')
             ->assertHasErrors(['form.applies_packages']);

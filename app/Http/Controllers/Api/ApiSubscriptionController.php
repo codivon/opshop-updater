@@ -183,7 +183,7 @@ class ApiSubscriptionController extends Controller
                     ];
 
                     $this->smsManager->send('subscription_paid', $order->customer?->phone, $vars, $order, once: true);
-                    $this->smsManager->notifyAdmin('admin_subscription_paid', $vars, $order);
+                    $this->smsManager->notifyAdminSale('subscription', 'admin_subscription_paid', $vars, $order);
                 } catch (\Throwable) {
                     // پیامک هرگز نباید جریان را بشکند
                 }

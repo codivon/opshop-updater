@@ -13,10 +13,14 @@
                          required autocomplete="current-password" :class="$errors->has('password') ? 'input-error' : ''" />
             </x-field>
 
-            <x-captcha name="captcha" />
+            @if(\App\Support\Features::captcha('admin_login'))
+                <x-captcha name="captcha" />
+            @endif
 
             {{-- هانی‌پات ضدربات — برای انسان نامرئی است --}}
-            <x-honeypot name="website" />
+            @if(\App\Support\Features::honeypot())
+                <x-honeypot name="website" />
+            @endif
 
             <label class="flex cursor-pointer items-center gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
                 <input type="checkbox" name="remember" value="1" class="checkbox" {{ old('remember') ? 'checked' : '' }}>

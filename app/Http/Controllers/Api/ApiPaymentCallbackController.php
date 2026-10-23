@@ -62,7 +62,7 @@ class ApiPaymentCallbackController extends Controller
             ];
 
             $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
-            $this->smsManager->notifyAdmin('admin_purchase_paid', $vars, $purchase);
+            $this->smsManager->notifyAdminSale('package', 'admin_purchase_paid', $vars, $purchase);
         }
 
         // صفحه‌ی نتیجه + شمارش معکوس برای بازگشت به فروشگاه

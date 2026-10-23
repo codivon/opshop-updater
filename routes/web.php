@@ -68,6 +68,9 @@ Route::get('customer/profile', \App\Livewire\Shop\CustomerProfile::class)
 Route::get('subscriptions', \App\Livewire\Shop\SubscriptionsIndex::class)->name('shop.subscriptions');
 Route::get('subscription/result/{order}', \App\Livewire\Shop\SubscriptionResult::class)->name('subscription.result');
 
+// صفحهٔ عمومی تغییرات (changelog) — از پنل «امنیت و امکانات» قابل خاموش‌کردن (خاموش = 404)
+Route::get('changelog', \App\Livewire\Shop\Changelog::class)->name('shop.changelog');
+
 // پرداخت (عمومی)
 Route::get('payment/callback', [\App\Http\Controllers\Front\WebPaymentController::class, 'callback'])->name('payment.callback');
 Route::post('payment/callback', [\App\Http\Controllers\Front\WebPaymentController::class, 'callback'])->name('payment.callback.post');
@@ -123,10 +126,21 @@ Route::get('captcha/refresh', function () {
 
 /*
 |--------------------------------------------------------------------------
+| ورود دومرحله‌ای مدیر (2FA) — بیرون از گروه auth (کاربر هنوز کامل لاگین نیست)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('two-factor', [\App\Http\Controllers\Auth\TwoFactorController::class, 'show'])->name('2fa.challenge');
+    Route::post('two-factor', [\App\Http\Controllers\Auth\TwoFactorController::class, 'verify'])->name('2fa.verify');
+    Route::post('two-factor/resend', [\App\Http\Controllers\Auth\TwoFactorController::class, 'resend'])->name('2fa.resend');
+});
+
+/*
+|--------------------------------------------------------------------------
 | پنل مدیریت – کامپوننت‌های تمام‌صفحه Livewire (SPA با wire:navigate)
 |--------------------------------------------------------------------------
 */
-Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () {
+Route::prefix('admin')->name('admin.')->middleware(['auth', \App\Http\Middleware\EnsureAdminRole::class])->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
 
     // محصولات
@@ -161,6 +175,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth'])->group(function () 
     Route::get('logs', \App\Livewire\Logs\Index::class)->name('logs.index');
     Route::get('settings', \App\Livewire\Settings\Index::class)->name('settings.index');
     Route::get('settings/gateways', \App\Livewire\Gateways::class)->name('settings.gateways');
+    Route::get('settings/security', \App\Livewire\Settings\Security::class)->name('settings.security');
     Route::get('users', \App\Livewire\Users\Index::class)->name('users.index');
     Route::get('backup', \App\Livewire\Tools\Backup::class)->name('tools.backup');
 

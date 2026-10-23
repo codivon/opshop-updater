@@ -28,6 +28,8 @@ class Index extends Component
         'site_logo' => '',
         'theme_color' => '#10b981',
         'mail_enabled' => false,
+        // اتصال تنظیمات SMTP بالا به پیکربندی ایمیل در زمان اجرا (پیش‌نیاز ایمیل‌های سیستمی مثل 2FA)
+        'mail_use_settings' => false,
         'mail_from_address' => '',
         'mail_from_name' => '',
         'mail_host' => '',
@@ -72,6 +74,7 @@ class Index extends Component
         'site_logo' => 'general',
         'theme_color' => 'general',
         'mail_enabled' => 'email',
+        'mail_use_settings' => 'email',
         'mail_from_address' => 'email',
         'mail_from_name' => 'email',
         'mail_host' => 'email',
@@ -109,7 +112,7 @@ class Index extends Component
 
         foreach (array_keys($this->form) as $key) {
             if ($stored->has($key)) {
-                $this->form[$key] = in_array($key, ['mail_enabled', 'sms_enabled', 'sms_notify_admin'], true)
+                $this->form[$key] = in_array($key, ['mail_enabled', 'mail_use_settings', 'sms_enabled', 'sms_notify_admin'], true)
                     ? (bool) filter_var($stored->get($key), FILTER_VALIDATE_BOOLEAN)
                     : (string) $stored->get($key);
             }
@@ -128,7 +131,7 @@ class Index extends Component
         foreach (self::GROUPS as $key => $group) {
             $value = $this->form[$key];
 
-            if (in_array($key, ['mail_enabled', 'sms_enabled', 'sms_notify_admin'], true)) {
+            if (in_array($key, ['mail_enabled', 'mail_use_settings', 'sms_enabled', 'sms_notify_admin'], true)) {
                 $value = $value ? '1' : '0';
             }
 

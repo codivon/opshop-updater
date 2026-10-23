@@ -22,10 +22,14 @@
                 <x-input id="password-confirm" type="password" name="password_confirmation" icon="lock" placeholder="••••••••" required autocomplete="new-password" />
             </x-field>
 
-            <x-captcha name="captcha" />
+            @if(\App\Support\Features::captcha('admin_register'))
+                <x-captcha name="captcha" />
+            @endif
 
             {{-- هانی‌پات ضدربات — برای انسان نامرئی است --}}
-            <x-honeypot name="website" />
+            @if(\App\Support\Features::honeypot())
+                <x-honeypot name="website" />
+            @endif
 
             @if($errors->any())
                 <div class="flex items-center gap-2.5 rounded-xl bg-rose-50 px-3.5 py-3 text-sm font-medium text-rose-700 ring-1 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20" role="alert">

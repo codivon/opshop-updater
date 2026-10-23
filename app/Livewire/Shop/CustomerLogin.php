@@ -5,6 +5,7 @@ namespace App\Livewire\Shop;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Services\CaptchaService;
+use App\Support\Features;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
@@ -15,20 +16,15 @@ use Livewire\Component;
  * ورود مشتری فروشگاه — فقط با «کد آپدیت».
  * جدول مشتریان همان customers است (فیلد update_code).
  *
- * لایه‌های ضدربات: کپچای خودمیزبان + هانی‌پات + قفل تلاش‌های ناموفق
- * (۸ کد اشتباه → قفل ۱۵ دقیقه‌ای برای همان IP — جلوگیری از جست‌وجوی کد).
+ * لایه‌های ضدربات (هرکدام از پنل «امنیت و امکانات» قابل تنظیم):
+ * کپچای خودمیزبان + هانی‌پات + قفل تلاش‌های ناموفق برای هر IP
+ * (جلوگیری از جست‌وجوی کد آپدیت).
  */
 #[Layout('components.layouts.shop')]
 #[Title('ورود مشتری')]
 class CustomerLogin extends Component
 {
     use WithToasts;
-
-    /** حداکثر تلاش ناموفق پیش از قفل */
-    protected const MAX_ATTEMPTS = 8;
-
-    /** مدت قفل (ثانیه) */
-    protected const LOCK_SECONDS = 900;
 
     public string $updateCode = '';
 
@@ -49,7 +45,9 @@ class CustomerLogin extends Component
 
         $this->redirect = (string) request()->query('redirect', '');
 
-        CaptchaService::fresh();
+        if (Features::captcha('customer_login')) {
+            CaptchaService::fresh();
+        }
     }
 
     /** سؤال امنیتی جدید (دکمهٔ «سؤال دیگر» — بدون رفرش صفحه) */
@@ -72,20 +70,21 @@ class CustomerLogin extends Component
 
     public function login(): void
     {
-        $limiterKey = 'cust-login:' . request()->ip();
+        // ۱) قفل تلاش‌های ناموفق (ضد جست‌وجوی کد آپدیت) — اعداد از پنل
+        [$maxAttempts, $decayMinutes] = Features::lockoutConfig('customer_login');
+        $limiterKey = 'cust-login:'.request()->ip();
 
-        // ۱) قفل تلاش‌های ناموفق (ضد جست‌وجوی کد آپدیت)
-        if (RateLimiter::tooManyAttempts($limiterKey, self::MAX_ATTEMPTS)) {
+        if (RateLimiter::tooManyAttempts($limiterKey, $maxAttempts)) {
             $minutes = (int) ceil(RateLimiter::availableIn($limiterKey) / 60);
 
-            $this->addError('captcha', 'تلاش‌های ناموفق بیش از حد مجاز است؛ حدود ' . fa_num(max(1, $minutes)) . ' دقیقهٔ دیگر دوباره تلاش کنید.');
+            $this->addError('updateCode', 'تلاش‌های ناموفق بیش از حد مجاز است؛ حدود '.fa_num(max(1, $minutes)).' دقیقهٔ دیگر دوباره تلاش کنید.');
             return;
         }
 
         $data = $this->validate();
 
         // ۲) هانی‌پات: فیلد مخفی پُر است = ربات → پیام عمومی و خروج
-        if (trim($this->website) !== '') {
+        if (Features::honeypot() && trim($this->website) !== '') {
             CaptchaService::fresh();
             $this->reset('captcha');
             $this->addError('updateCode', 'کد آپدیت نامعتبر است.');
@@ -93,7 +92,7 @@ class CustomerLogin extends Component
         }
 
         // ۳) کپچای خودمیزبان (پاسخ مصرف و سؤال تازه می‌شود)
-        if (! CaptchaService::verify($this->captcha)) {
+        if (Features::captcha('customer_login') && ! CaptchaService::verify($this->captcha)) {
             $this->reset('captcha');
             $this->addError('captcha', 'پاسخ سؤال امنیتی نادرست است؛ سؤال جدید آماده شد.');
             return;
@@ -104,7 +103,7 @@ class CustomerLogin extends Component
             ->first();
 
         if (!$customer) {
-            RateLimiter::hit($limiterKey, self::LOCK_SECONDS);
+            RateLimiter::hit($limiterKey, $decayMinutes * 60);
             $this->addError('updateCode', 'کد آپدیت نامعتبر است.');
             return;
         }
