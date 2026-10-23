@@ -173,6 +173,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', \App\Http\Middleware
     // سیستم
     Route::get('reports', \App\Livewire\Reports\Index::class)->name('reports.index');
     Route::get('logs', \App\Livewire\Logs\Index::class)->name('logs.index');
+    Route::get('api-docs', \App\Livewire\ApiDocs::class)->name('api-docs');
     Route::get('settings', \App\Livewire\Settings\Index::class)->name('settings.index');
     Route::get('settings/gateways', \App\Livewire\Gateways::class)->name('settings.gateways');
     Route::get('settings/security', \App\Livewire\Settings\Security::class)->name('settings.security');

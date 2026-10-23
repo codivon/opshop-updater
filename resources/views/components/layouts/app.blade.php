@@ -18,6 +18,7 @@
                 ['route' => 'admin.projects.index', 'title' => 'پروژه‌ها', 'icon' => 'folder', 'match' => ['admin.projects*']],
                 ['route' => 'admin.updates.index', 'title' => 'آپدیت‌ها', 'icon' => 'git-branch', 'match' => ['admin.updates*']],
                 ['route' => 'admin.packages.index', 'title' => 'پکیج‌ها', 'icon' => 'package', 'match' => ['admin.packages.index', 'admin.packages.show']],
+                ['route' => 'admin.api-docs', 'title' => 'مستندات API', 'icon' => 'braces', 'match' => ['admin.api-docs']],
             ],
         ],
         [
