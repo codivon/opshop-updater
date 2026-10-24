@@ -131,6 +131,10 @@ Query params: `search` (string, optional) · `category` (string slug, optional) 
       "name": "پکیج فروشگاهی",
       "slug": "shop-package",
       "short_description": "...",
+      "thumbnail_url": "https://panel.example.com/uploads/packages/thumbnails/shop_thumb.png",
+      "images": [
+        { "id": 11, "url": "https://panel.example.com/uploads/packages/gallery/shop_1.png", "sort_order": 1 }
+      ],
       "is_free": false,
       "is_purchased": true,
       "purchases_count": 12,
@@ -166,10 +170,15 @@ Query params: `search` (string, optional) · `category` (string slug, optional) 
 UI mapping: `is_purchased=false` → "خرید" button; `true` → "دانلود". Use `category_details.path_slugs`
 to build category trees/filters. Show `gateways` as selectable payment cards at checkout.
 
+**Images are always absolute URLs** — `thumbnail_url` (featured image) and each item of `images`
+(gallery, active only) are full `https://` links on the panel domain, so the buyer site can render
+them directly with `<img src>` without building any path. Display them in the order of `sort_order`.
+
 #### `GET /packages/{slug}` — package details
 
 Full info: `active_versions` (list of `{version, ...}`), `active_pricing_plans`
-(`[{id, title, final_price, is_one_time}]`), images, purchase state. Requires the customer's
+(`[{id, title, final_price, is_one_time}]`), `thumbnail_url` + `images` (gallery with absolute
+URLs, active only), purchase state. Requires the customer's
 subscription to cover the package's project, otherwise 403.
 
 #### `POST /packages/{slug}/purchase` — buy / issue license
@@ -278,10 +287,14 @@ Same conventions as packages; **no licenses**. Two purchase types:
 `purchase_type=exclusive` (full transfer; after the first purchase the template is removed from
 the store — `is_sold_exclusively`).
 
+Every template item carries `thumbnail_url` (featured image) and `gallery`
+(`[{id, url, sort_order}]`) — **both are full absolute URLs** on the panel domain; render them
+with plain `<img src>` on the buyer site.
+
 | Endpoint | Notes |
 |---|---|
-| `GET /templates` | `search`, `category` (int id), `per_page`. Items: `{id, name, slug, is_purchased, purchases_count, latest_version}` + `meta` + `gateways` |
-| `GET /templates/{slug}` | Adds `price`, `discount_price`, `exclusive_price`, `is_sold_exclusively`, `active_versions` |
+| `GET /templates` | `search`, `category` (int id), `per_page`. Items: `{id, name, slug, thumbnail_url, gallery, is_purchased, purchases_count, latest_version}` + `meta` + `gateways`. `thumbnail_url` = absolute featured-image URL; `gallery` = `[{id, url, sort_order}]` with absolute URLs |
+| `GET /templates/{slug}` | Adds `price`, `discount_price`, `exclusive_price`, `is_sold_exclusively`, `active_versions`, `thumbnail_url`, `gallery` |
 | `POST /templates/{slug}/purchase` | Body: `purchase_type` (normal\|exclusive), `callback_url` (if paid), `gateway`. Paid → `payment_url` flow. Repeat normal → direct `download_token` |
 | `POST /templates/payments/{transactionId}/verify` | `{"paid": true, "download_token": "dl_...", "version": "1.4.2", "signature": "...", "message": "پرداخت با موفقیت تأیید شد."}` |
 | `GET /templates/{slug}/check-update?current_version=1.4.0` | `{has_update, latest_version, current_version, changelog, file_size}` |

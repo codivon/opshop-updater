@@ -20,6 +20,12 @@ class TemplateImage extends Model
         'is_active'  => 'boolean',
     ];
 
+    /**
+     * url در هر سریالایز (از جمله API) به‌صورت لینک کامل ارسال می‌شود —
+     * تا پروژهٔ خریدار بتواند تصاویر گالری را مستقیم بارگذاری کند.
+     */
+    protected $appends = ['url'];
+
     public function template(): BelongsTo
     {
         return $this->belongsTo(Template::class);

@@ -131,28 +131,16 @@ class Package extends Model
     /**
      * آدرس تصویر شاخص:
      * - اگر URL کامل باشد → همان برمی‌گردد
-     * - اگر مسیر storage باشد → URL عمومی ساخته می‌شود
-     * - اگر خالی باشد → placeholder برمی‌گردد
+     * - اگر مسیر در public باشد → asset مستقیم
+     * - اگر در fallback (storage/app/public) باشد → همان URL عمومی با کش‌بریک
+     *   (سرو از طریق روت uploads.serve)
+     * - اگر خالی/یافت‌نشده باشد → placeholder برمی‌گردد
      */
     public function getThumbnailUrlAttribute(): string
     {
-        // اگر thumbnail وجود ندارد
-        if (!$this->thumbnail) {
-            return asset('images/package-default.png');
-        }
-
-        // اگر URL کامل است (شروع با http)
-        if (preg_match('#^https?://#', $this->thumbnail)) {
-            return $this->thumbnail;
-        }
-
-        // اگر مسیر در پوشه public است (با asset)
-        if (file_exists(public_path($this->thumbnail))) {
-            return asset($this->thumbnail);
-        }
-
-        // تصویر پیش‌فرض
-        return asset('images/package-default.png');
+        // template_asset_url هر دو محل ذخیره‌سازی (public و fallback) را
+        // پوشش می‌دهد و همیشه لینک کامل (absolute) برمی‌گرداند.
+        return template_asset_url($this->thumbnail, asset('images/package-default.png'));
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Gateway;
 use App\Models\Template;
+use App\Models\TemplateImage;
 use App\Models\TemplatePurchase;
 use App\Services\PackageApiAuthService;
 use App\Services\PaymentService;
@@ -41,7 +42,8 @@ class ApiTemplateController extends Controller
         try {
             $customer = $this->authService->authenticate($request);
 
-            $templates = Template::with(['latestVersion', 'category.parent'])
+            // activeImages: گالری تصاویر فعال — برای نمایش تصاویر قالب در سایت خریدار
+            $templates = Template::with(['latestVersion', 'category.parent', 'activeImages'])
                 // تعداد خریدهای پرداخت‌شدهٔ هر قالب (چند نفر استفاده می‌کنند/خریده‌اند) — درخواست کاربر برای API
                 ->withCount(['purchases as purchases_count' => fn ($q) => $q->where('status', TemplatePurchase::STATUS_PAID)])
                 ->where('status', Template::STATUS_ACTIVE)
@@ -89,7 +91,7 @@ class ApiTemplateController extends Controller
         try {
             $customer = $this->authService->authenticate($request);
 
-            $template = Template::with(['activeVersions', 'category.parent'])
+            $template = Template::with(['activeVersions', 'category.parent', 'activeImages'])
                 ->withCount(['purchases as purchases_count' => fn ($q) => $q->where('status', TemplatePurchase::STATUS_PAID)])
                 ->where('slug', $slug)
                 ->where('status', Template::STATUS_ACTIVE)
@@ -429,7 +431,25 @@ class ApiTemplateController extends Controller
     {
         $purchase = $paidPurchaseIds[$template->id] ?? null;
 
-        return array_merge($template->toArray(), [
+        $data = $template->toArray();
+
+        // رابطهٔ active_images خام حذف می‌شود — خروجی گالری به‌صورت ساختاریافته
+        // با کلید gallery و لینک کامل (absolute) هر تصویر داده می‌شود تا
+        // پروژهٔ خریدار بتواند تصاویر را مستقیم در سایت خودش بارگذاری کند.
+        unset($data['active_images']);
+
+        return array_merge($data, [
+            // لینک کامل تصویر شاخص (تضمینی — حتی اگر appends مدل حذف شود)
+            'thumbnail_url' => $template->thumbnail_url,
+            // گالری تصاویر فعال — مرتب بر اساس sort_order
+            'gallery' => $template->activeImages
+                ->map(fn (TemplateImage $image) => [
+                    'id'         => $image->id,
+                    'url'        => $image->url,
+                    'sort_order' => $image->sort_order,
+                ])
+                ->values()
+                ->all(),
             'is_purchased' => $purchase !== null,
             // تعداد خریدهای موفق (چند نفر این قالب را خریده‌اند/استفاده می‌کنند)
             'purchases_count' => (int) ($template->purchases_count ?? 0),

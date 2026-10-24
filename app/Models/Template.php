@@ -39,6 +39,14 @@ class Template extends Model
         'exclusive_note', 'exclusive_buyer_label', 'is_free', 'status', 'sort_order',
     ];
 
+    /**
+     * اتریبیوت‌های محاسباتی که باید در سریالایز JSON/آرایه (از جمله API)
+     * همیشه حضور داشته باشند — مثل الگوی Package::thumbnail_url.
+     * thumbnail_url لینک کامل (absolute) تصویر شاخص است تا پروژهٔ خریدار
+     * بتواند تصویر را مستقیم در سایت خودش بارگذاری کند.
+     */
+    protected $appends = ['thumbnail_url'];
+
     protected $casts = [
         'price'                => 'integer',
         'discount'             => 'integer',

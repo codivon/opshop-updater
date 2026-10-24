@@ -53,7 +53,9 @@ class ApiPackageController extends Controller
                 ->pluck('project_id')
                 ->unique();
 
-            $packages = Package::with(['latestVersion', 'activePricingPlans', 'images', 'categoryModel.parent'])
+            // فقط تصاویر فعالِ گالری در API ارسال می‌شود (کلید images حفظ شده است)
+            $packages = Package::with(['latestVersion', 'activePricingPlans',
+                'images' => fn ($q) => $q->where('is_active', true), 'categoryModel.parent'])
                 // تعداد خریدهای پرداخت‌شدهٔ هر پکیج (چند نفر خریده‌اند) — درخواست کاربر برای API
                 ->withCount(['purchases as purchases_count' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)])
                 ->whereIn('project_id', $projectIds)
@@ -112,7 +114,8 @@ class ApiPackageController extends Controller
         try {
             $customer = $this->authService->authenticate($request);
 
-            $package = Package::with(['activeVersions', 'activePricingPlans', 'project', 'images', 'categoryModel.parent'])
+            $package = Package::with(['activeVersions', 'activePricingPlans', 'project',
+                'images' => fn ($q) => $q->where('is_active', true), 'categoryModel.parent'])
                 ->withCount(['purchases as purchases_count' => fn ($q) => $q->where('status', PackagePurchase::STATUS_PAID)])
                 ->where('slug', $slug)
                 ->where('status', Package::STATUS_ACTIVE)

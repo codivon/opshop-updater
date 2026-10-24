@@ -34,21 +34,10 @@ class PackageImage extends Model
 
     public function getUrlAttribute(): string
     {
-        if (!$this->path) {
-            return asset('images/default-image.png');
-        }
-
-        // اگر URL کامل است
-        if (preg_match('#^https?://#', $this->path)) {
-            return $this->path;
-        }
-
-        // اگر در پوشه public است
-        if (file_exists(public_path($this->path))) {
-            return asset($this->path);
-        }
-
-        return asset('images/default-image.png');
+        // template_asset_url هر دو محل ذخیره‌سازی (public و fallback
+        // storage/app/public) را پوشش می‌دهد و همیشه لینک کامل (absolute)
+        // برمی‌گرداند — تا API/سایت خریدار بتواند تصویر را مستقیم بارگذاری کند.
+        return template_asset_url($this->path, asset('images/default-image.png'));
     }
 
     public function getSizeHumanAttribute(): string
