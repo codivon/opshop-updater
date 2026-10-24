@@ -79,6 +79,12 @@ class Subscription extends Model
         return Carbon::now()->greaterThan($this->expires_at);
     }
 
+    /** تاریخ انقضای مؤثر — expires_at یا در نبودش end_date (هم‌سو با صفحهٔ اشتراک‌ها) */
+    public function getEffectiveExpiresAtAttribute()
+    {
+        return $this->expires_at ?? $this->end_date;
+    }
+
     // فرمت کردن قیمت به تومان
     public function getFormattedPriceAttribute(): string
     {

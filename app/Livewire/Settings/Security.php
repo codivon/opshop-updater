@@ -110,8 +110,9 @@ class Security extends Component
             // تغییرات عمومی
             'form.feat_changelog_title' => ['nullable', 'string', 'max:100'],
 
-            // داشبورد — آستانهٔ هشدار انقضای لایسنس
+            // داشبورد — آستانهٔ هشدار انقضای لایسنس و اشتراک
             'form.feat_lic_expiry_days' => ['required', 'integer', 'min:1', 'max:365'],
+            'form.feat_sub_expiry_days' => ['required', 'integer', 'min:1', 'max:365'],
 
             // فوتر
             'form.feat_footer_text'        => ['nullable', 'string', 'max:300'],
@@ -144,6 +145,10 @@ class Security extends Component
             'form.feat_lic_expiry_days.integer'     => 'آستانهٔ هشدار باید عدد باشد.',
             'form.feat_lic_expiry_days.min'         => 'آستانهٔ هشدار حداقل ۱ روز است.',
             'form.feat_lic_expiry_days.max'         => 'آستانهٔ هشدار حداکثر ۳۶۵ روز است.',
+            'form.feat_sub_expiry_days.required'    => 'آستانهٔ روزهای هشدار انقضای اشتراک را وارد کنید.',
+            'form.feat_sub_expiry_days.integer'     => 'آستانهٔ هشدار اشتراک باید عدد باشد.',
+            'form.feat_sub_expiry_days.min'         => 'آستانهٔ هشدار اشتراک حداقل ۱ روز است.',
+            'form.feat_sub_expiry_days.max'         => 'آستانهٔ هشدار اشتراک حداکثر ۳۶۵ روز است.',
         ];
     }
 }

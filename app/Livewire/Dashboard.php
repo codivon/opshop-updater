@@ -32,6 +32,14 @@ class Dashboard extends Component
         // همگام‌سازی وضعیت لایسنس‌های گذشته از تاریخ انقضا (active → expired)
         // تا شمارنده‌های داشبورد و فهرست «منقضی» صفحهٔ لایسنس‌ها همیشه دقیق و هم‌خوان باشند.
         app(LicenseService::class)->expireOldLicenses();
+
+        // همگام‌سازی وضعیت اشتراک‌های گذشته از تاریخ انقضا (active → expired)
+        // دسترسی API از قبل بر اساس تاریخ کنترل می‌شود؛ این فقط وضعیت ذخیره‌شده را صادقانه می‌کند.
+        Subscription::query()
+            ->where('status', 'active')
+            ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
+            ->whereRaw("COALESCE(expires_at, end_date) < ?", [now()])
+            ->update(['status' => 'expired']);
     }
 
     public function render()
@@ -420,6 +428,65 @@ class Dashboard extends Component
         return [
             'label' => $days <= 0 ? 'امروز منقضی شد' : fa_num($days) . ' روز پیش',
             'tone'  => 'danger',
+        ];
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Subscription expiry health (در حال اتمام / منقضی‌شده)              */
+    /* ------------------------------------------------------------------ */
+
+    /** آستانهٔ «در حال اتمام» اشتراک‌ها از تنظیمات (روز، بین ۱ تا ۳۶۵) */
+    #[Computed]
+    public function subscriptionExpiryDays(): int
+    {
+        $days = (int) setting('feat_sub_expiry_days', 14);
+
+        return ($days >= 1 && $days <= 365) ? $days : 14;
+    }
+
+    /** اشتراک‌های فعالِ نزدیک به انقضا (expires_at یا در نبودش end_date) */
+    #[Computed]
+    public function expiringSubscriptions()
+    {
+        return Subscription::query()
+            ->with(['customer:id,name', 'project:id,name', 'plan:id,name'])
+            ->where('status', 'active')
+            ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
+            ->whereRaw("COALESCE(expires_at, end_date) BETWEEN ? AND ?", [now(), now()->addDays($this->subscriptionExpiryDays)])
+            ->orderByRaw("COALESCE(expires_at, end_date)")
+            ->limit(6)
+            ->get();
+    }
+
+    /** اشتراک‌های گذشته از تاریخ انقضا — بر اساس تاریخ؛ تعلیق‌شده‌ها نمایش داده نمی‌شوند */
+    #[Computed]
+    public function expiredSubscriptions()
+    {
+        return Subscription::query()
+            ->with(['customer:id,name', 'project:id,name', 'plan:id,name'])
+            ->whereIn('status', ['active', 'expired'])
+            ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
+            ->whereRaw("COALESCE(expires_at, end_date) < ?", [now()])
+            ->orderByRaw("COALESCE(expires_at, end_date) DESC")
+            ->limit(6)
+            ->get();
+    }
+
+    /** شمارنده‌های سربرگ بخش وضعیت اشتراک‌ها */
+    #[Computed]
+    public function subscriptionExpiryCounts(): array
+    {
+        return [
+            'expiring' => Subscription::query()
+                ->where('status', 'active')
+                ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
+                ->whereRaw("COALESCE(expires_at, end_date) BETWEEN ? AND ?", [now(), now()->addDays($this->subscriptionExpiryDays)])
+                ->count(),
+            'expired' => Subscription::query()
+                ->whereIn('status', ['active', 'expired'])
+                ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
+                ->whereRaw("COALESCE(expires_at, end_date) < ?", [now()])
+                ->count(),
         ];
     }
 

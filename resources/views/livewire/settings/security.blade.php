@@ -212,12 +212,19 @@
                         </div>
                     </x-card>
 
-                    {{-- وضعیت لایسنس‌ها در داشبورد --}}
-                    <x-card title="وضعیت لایسنس‌ها در داشبورد" subtitle="پنل‌های «در حال اتمام» و «منقضی‌شده» داشبورد مدیریت.">
-                        <x-field label="آستانهٔ هشدار انقضا (روز)" for="feat_lic_expiry_days"
-                                 hint="لایسنس‌های فعال با انقضای داخل این بازه، در بخش «در حال اتمام» داشبورد دیده می‌شوند.">
-                            <x-input id="feat_lic_expiry_days" wire:model="form.feat_lic_expiry_days" type="number" min="1" max="365" dir="ltr" class="w-28" />
-                        </x-field>
+                    {{-- وضعیت لایسنس‌ها و اشتراک‌ها در داشبورد --}}
+                    <x-card title="وضعیت لایسنس‌ها و اشتراک‌ها در داشبورد" subtitle="پنل‌های «در حال اتمام» و «منقضی‌شده» لایسنس‌ها و اشتراک‌ها در داشبورد مدیریت.">
+                        <div class="grid gap-5 sm:grid-cols-2">
+                            <x-field label="آستانهٔ هشدار انقضای لایسنس (روز)" for="feat_lic_expiry_days"
+                                     hint="لایسنس‌های فعال با انقضای داخل این بازه، در بخش «در حال اتمام» دیده می‌شوند.">
+                                <x-input id="feat_lic_expiry_days" wire:model="form.feat_lic_expiry_days" type="number" min="1" max="365" dir="ltr" class="w-28" />
+                            </x-field>
+
+                            <x-field label="آستانهٔ هشدار انقضای اشتراک (روز)" for="feat_sub_expiry_days"
+                                     hint="اشتراک‌های فعال با انقضای داخل این بازه، در بخش «در حال اتمام» دیده می‌شوند.">
+                                <x-input id="feat_sub_expiry_days" wire:model="form.feat_sub_expiry_days" type="number" min="1" max="365" dir="ltr" class="w-28" />
+                            </x-field>
+                        </div>
                     </x-card>
 
                     {{-- شخصی‌سازی فوتر --}}

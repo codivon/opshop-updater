@@ -240,6 +240,102 @@
         </div>
     </div>
 
+    {{-- subscription health: در حال اتمام / منقضی‌شده --}}
+    <div class="space-y-4">
+        {{-- section header --}}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="flex items-center gap-2.5 text-base font-black text-zinc-900 dark:text-zinc-50">
+                <span class="flex size-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400">
+                    <x-icon name="ticket" class="size-4.5" />
+                </span>
+                وضعیت اشتراک‌ها
+            </h3>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ route('admin.subscriptions.index', ['sort' => 'expires_soon']) }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-bold tabular-nums text-amber-600 transition-colors hover:bg-amber-500/20 dark:bg-amber-500/15 dark:text-amber-400 dark:hover:bg-amber-500/25">
+                    <x-icon name="clock" class="size-3.5" />
+                    {{ fa_num($this->subscriptionExpiryCounts['expiring']) }} در حال اتمام
+                </a>
+                <a href="{{ route('admin.subscriptions.index', ['status' => 'expired']) }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 px-3 py-1.5 text-xs font-bold tabular-nums text-rose-600 transition-colors hover:bg-rose-500/20 dark:bg-rose-500/15 dark:text-rose-400 dark:hover:bg-rose-500/25">
+                    <x-icon name="alert-triangle" class="size-3.5" />
+                    {{ fa_num($this->subscriptionExpiryCounts['expired']) }} منقضی‌شده
+                </a>
+                <a href="{{ route('admin.subscriptions.index') }}" wire:navigate
+                   class="inline-flex items-center gap-1.5 rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-brand-500/10 dark:hover:text-brand-400">
+                    <x-icon name="ticket" class="size-3.5" />
+                    مدیریت اشتراک‌ها
+                </a>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            {{-- expiring subscriptions --}}
+            <x-card title="در حال اتمام"
+                    :subtitle="fa_num($this->subscriptionExpiryDays) . ' روز آینده · ' . fa_num($this->subscriptionExpiryCounts['expiring']) . ' اشتراک'">
+                <div class="-my-2 divide-y divide-zinc-100 dark:divide-zinc-800">
+                    @forelse($this->expiringSubscriptions as $sub)
+                        @php($chip = $this->daysLeftChip($sub->effective_expires_at))
+                        <a href="{{ $sub->customer_id ? route('admin.subscriptions.index', ['customer_id' => $sub->customer_id]) : route('admin.subscriptions.index') }}" wire:navigate
+                           class="group flex items-center gap-3 py-2.5">
+                            <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 transition-colors group-hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:group-hover:bg-amber-500/20">
+                                <x-icon name="clock" class="size-4.5" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-semibold text-zinc-700 transition-colors group-hover:text-amber-600 dark:text-zinc-200 dark:group-hover:text-amber-400">{{ $sub->customer?->name ?? 'بدون مشتری' }}</p>
+                                <p class="truncate text-xs text-zinc-500">{{ $sub->plan?->name ?? $sub->project?->name ?? '—' }} · انقضا: {{ verta_date($sub->effective_expires_at) }}</p>
+                            </div>
+                            <x-badge :variant="$chip['tone']">{{ $chip['label'] }}</x-badge>
+                        </a>
+                    @empty
+                        <x-empty icon="check-circle" title="همه چیز مرتب است"
+                                 :description="'هیچ اشتراکی در ' . fa_num($this->subscriptionExpiryDays) . ' روز آینده منقضی نمی‌شود.'"
+                                 class="py-8" />
+                    @endforelse
+                </div>
+                @if($this->subscriptionExpiryCounts['expiring'] > count($this->expiringSubscriptions))
+                    <a href="{{ route('admin.subscriptions.index', ['sort' => 'expires_soon']) }}" wire:navigate
+                       class="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-zinc-50 py-2.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-amber-50 hover:text-amber-600 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-amber-500/10 dark:hover:text-amber-400">
+                        مشاهده همهٔ اشتراک‌های در حال اتمام
+                        <x-icon name="chevron-left" class="size-3.5" />
+                    </a>
+                @endif
+            </x-card>
+
+            {{-- expired subscriptions --}}
+            <x-card title="منقضی‌شده"
+                    :subtitle="fa_num($this->subscriptionExpiryCounts['expired']) . ' اشتراک گذشته از تاریخ انقضا'">
+                <div class="-my-2 divide-y divide-zinc-100 dark:divide-zinc-800">
+                    @forelse($this->expiredSubscriptions as $sub)
+                        @php($chip = $this->daysAgoChip($sub->effective_expires_at))
+                        <a href="{{ $sub->customer_id ? route('admin.subscriptions.index', ['customer_id' => $sub->customer_id]) : route('admin.subscriptions.index') }}" wire:navigate
+                           class="group flex items-center gap-3 py-2.5">
+                            <div class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 transition-colors group-hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:group-hover:bg-rose-500/20">
+                                <x-icon name="alert-triangle" class="size-4.5" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-semibold text-zinc-700 transition-colors group-hover:text-rose-600 dark:text-zinc-200 dark:group-hover:text-rose-400">{{ $sub->customer?->name ?? 'بدون مشتری' }}</p>
+                                <p class="truncate text-xs text-zinc-500">{{ $sub->plan?->name ?? $sub->project?->name ?? '—' }} · انقضا: {{ verta_date($sub->effective_expires_at) }}</p>
+                            </div>
+                            <x-badge :variant="$chip['tone']">{{ $chip['label'] }}</x-badge>
+                        </a>
+                    @empty
+                        <x-empty icon="check-circle" title="هیچ اشتراکی منقضی نشده"
+                                 description="اشتراک‌های گذشته از تاریخ انقضا اینجا نمایش داده می‌شوند."
+                                 class="py-8" />
+                    @endforelse
+                </div>
+                @if($this->subscriptionExpiryCounts['expired'] > count($this->expiredSubscriptions))
+                    <a href="{{ route('admin.subscriptions.index', ['status' => 'expired']) }}" wire:navigate
+                       class="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-zinc-50 py-2.5 text-xs font-semibold text-zinc-600 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-rose-500/10 dark:hover:text-rose-400">
+                        مشاهده همهٔ اشتراک‌های منقضی‌شده
+                        <x-icon name="chevron-left" class="size-3.5" />
+                    </a>
+                @endif
+            </x-card>
+        </div>
+    </div>
+
     {{-- templates section (فروش قالب‌ها) --}}
     <div class="space-y-4">
         {{-- section header --}}
