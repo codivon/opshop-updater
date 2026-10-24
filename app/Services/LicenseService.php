@@ -159,7 +159,10 @@ class LicenseService
             ->where('expires_at', '<', now())
             ->update(['status' => PackageLicense::STATUS_EXPIRED]);
 
-        Log::info("Expired {$count} licenses");
+        if ($count > 0) {
+            Log::info("Expired {$count} licenses");
+        }
+
         return $count;
     }
 }

@@ -110,6 +110,9 @@ class Security extends Component
             // تغییرات عمومی
             'form.feat_changelog_title' => ['nullable', 'string', 'max:100'],
 
+            // داشبورد — آستانهٔ هشدار انقضای لایسنس
+            'form.feat_lic_expiry_days' => ['required', 'integer', 'min:1', 'max:365'],
+
             // فوتر
             'form.feat_footer_text'        => ['nullable', 'string', 'max:300'],
             'form.feat_footer_description' => ['nullable', 'string', 'max:200'],
@@ -137,6 +140,10 @@ class Security extends Component
             'form.feat_announcement_color.regex'    => 'رنگ متن باید کد HEX باشد (مثل #ffffff).',
             'form.feat_social_email.email'          => 'ایمیل معتبر نیست.',
             'form.feat_maintenance_message.max'     => 'پیام حالت تعمیر حداکثر ۱٬۰۰۰ کاراکتر است.',
+            'form.feat_lic_expiry_days.required'    => 'آستانهٔ روزهای هشدار انقضا را وارد کنید.',
+            'form.feat_lic_expiry_days.integer'     => 'آستانهٔ هشدار باید عدد باشد.',
+            'form.feat_lic_expiry_days.min'         => 'آستانهٔ هشدار حداقل ۱ روز است.',
+            'form.feat_lic_expiry_days.max'         => 'آستانهٔ هشدار حداکثر ۳۶۵ روز است.',
         ];
     }
 }

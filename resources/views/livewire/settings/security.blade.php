@@ -212,6 +212,14 @@
                         </div>
                     </x-card>
 
+                    {{-- وضعیت لایسنس‌ها در داشبورد --}}
+                    <x-card title="وضعیت لایسنس‌ها در داشبورد" subtitle="پنل‌های «در حال اتمام» و «منقضی‌شده» داشبورد مدیریت.">
+                        <x-field label="آستانهٔ هشدار انقضا (روز)" for="feat_lic_expiry_days"
+                                 hint="لایسنس‌های فعال با انقضای داخل این بازه، در بخش «در حال اتمام» داشبورد دیده می‌شوند.">
+                            <x-input id="feat_lic_expiry_days" wire:model="form.feat_lic_expiry_days" type="number" min="1" max="365" dir="ltr" class="w-28" />
+                        </x-field>
+                    </x-card>
+
                     {{-- شخصی‌سازی فوتر --}}
                     <x-card title="شخصی‌سازی فوتر فروشگاه" subtitle="نام سایت از «تنظیمات عمومی» می‌آید؛ متن‌ها و شبکه‌های اجتماعی اینجا.">
                         <div class="grid gap-5 sm:grid-cols-2">

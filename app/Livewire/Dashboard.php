@@ -17,6 +17,7 @@ use App\Models\Template;
 use App\Models\TemplatePurchase;
 use App\Models\Update;
 use App\Models\User;
+use App\Services\LicenseService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -26,6 +27,13 @@ use Livewire\Component;
 #[\Livewire\Attributes\Title('داشبورد')]
 class Dashboard extends Component
 {
+    public function mount(): void
+    {
+        // همگام‌سازی وضعیت لایسنس‌های گذشته از تاریخ انقضا (active → expired)
+        // تا شمارنده‌های داشبورد و فهرست «منقضی» صفحهٔ لایسنس‌ها همیشه دقیق و هم‌خوان باشند.
+        app(LicenseService::class)->expireOldLicenses();
+    }
+
     public function render()
     {
         return view('livewire.dashboard');
@@ -329,6 +337,19 @@ class Dashboard extends Component
             ->get();
     }
 
+    /* ------------------------------------------------------------------ */
+    /*  License expiry health (در حال اتمام / منقضی‌شده)                   */
+    /* ------------------------------------------------------------------ */
+
+    /** آستانهٔ «در حال اتمام» از تنظیمات «امنیت و امکانات» (روز، بین ۱ تا ۳۶۵) */
+    #[Computed]
+    public function licenseExpiryDays(): int
+    {
+        $days = (int) setting('feat_lic_expiry_days', 14);
+
+        return ($days >= 1 && $days <= 365) ? $days : 14;
+    }
+
     #[Computed]
     public function expiringLicenses()
     {
@@ -336,8 +357,70 @@ class Dashboard extends Component
             ->with(['package:id,name', 'customer:id,name'])
             ->where('status', PackageLicense::STATUS_ACTIVE)
             ->whereNotNull('expires_at')
-            ->whereBetween('expires_at', [now(), now()->addDays(14)])
-            ->orderBy('expires_at')->limit(5)->get();
+            ->whereBetween('expires_at', [now(), now()->addDays($this->licenseExpiryDays)])
+            ->orderBy('expires_at')->limit(6)->get();
+    }
+
+    /** لایسنس‌های گذشته از تاریخ انقضا — بر اساس تاریخ؛ لایسنس‌های باطل‌شده نمایش داده نمی‌شوند */
+    #[Computed]
+    public function expiredLicenses()
+    {
+        return PackageLicense::query()
+            ->with(['package:id,name', 'customer:id,name'])
+            ->whereIn('status', [PackageLicense::STATUS_ACTIVE, PackageLicense::STATUS_EXPIRED])
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<', now())
+            ->orderByDesc('expires_at')->limit(6)->get();
+    }
+
+    /** شمارنده‌های سربرگ بخش وضعیت لایسنس‌ها */
+    #[Computed]
+    public function licenseExpiryCounts(): array
+    {
+        return [
+            'expiring' => PackageLicense::query()
+                ->where('status', PackageLicense::STATUS_ACTIVE)
+                ->whereNotNull('expires_at')
+                ->whereBetween('expires_at', [now(), now()->addDays($this->licenseExpiryDays)])
+                ->count(),
+            'expired' => PackageLicense::query()
+                ->whereIn('status', [PackageLicense::STATUS_ACTIVE, PackageLicense::STATUS_EXPIRED])
+                ->whereNotNull('expires_at')
+                ->where('expires_at', '<', now())
+                ->count(),
+        ];
+    }
+
+    /** برچسب روزهای باقی‌مانده تا انقضا (ردیف‌های «در حال اتمام») */
+    public function daysLeftChip($expiresAt): array
+    {
+        $diff = $expiresAt->getTimestamp() - now()->getTimestamp();
+
+        if ($diff <= 0) {
+            return ['label' => 'امروز منقضی می‌شود', 'tone' => 'danger'];
+        }
+
+        if ($diff < 86400) {
+            return ['label' => 'کمتر از ۱ روز مانده', 'tone' => 'danger'];
+        }
+
+        $days = (int) ceil($diff / 86400);
+
+        return [
+            'label' => fa_num($days) . ' روز مانده',
+            'tone'  => $days <= 3 ? 'danger' : 'warning',
+        ];
+    }
+
+    /** برچسب روزهای گذشته از انقضا (ردیف‌های «منقضی‌شده») */
+    public function daysAgoChip($expiresAt): array
+    {
+        $days = (int) floor((now()->getTimestamp() - $expiresAt->getTimestamp()) / 86400);
+
+        return [
+            'label' => $days <= 0 ? 'امروز منقضی شد' : fa_num($days) . ' روز پیش',
+            'tone'  => 'danger',
+        ];
     }
 
     #[Computed]

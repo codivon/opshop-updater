@@ -71,6 +71,9 @@ class Features
         'feat_changelog_enabled'    => '1',
         'feat_changelog_title'      => 'تغییرات و بروزرسانی‌ها',
 
+        // داشبورد — وضعیت لایسنس‌ها (آستانهٔ «در حال اتمام» به روز)
+        'feat_lic_expiry_days'      => '14',
+
         // شخصی‌سازی فوتر فروشگاه (خالی = متن‌های پیش‌فرض)
         'feat_footer_text'          => '',
         'feat_footer_description'   => '',
