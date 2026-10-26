@@ -185,93 +185,6 @@
                     @endif
                 </section>
 
-                {{-- ---------- کارت انتخاب درگاه پرداخت ---------- ----------}}
-                @if($this->paymentStarted)
-                    {{-- تراکنش در جریان: درگاه قطعی شده و قابل تغییر نیست --}}
-                    @if($this->selectedGatewayName)
-                        <section class="card p-5 sm:p-6" aria-label="درگاه پرداخت">
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <p class="flex items-center gap-2 text-sm font-black text-zinc-800 dark:text-zinc-100">
-                                    <span class="flex size-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                        <x-icon name="credit-card" class="size-4" />
-                                    </span>
-                                    درگاه پرداخت
-                                </p>
-                                <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20">
-                                    <x-icon name="check-circle" class="size-3.5" />
-                                    {{ $this->selectedGatewayName }}
-                                </span>
-                            </div>
-                            <p class="mt-3 text-xs leading-6 text-zinc-500 dark:text-zinc-400">تراکنش با این درگاه شروع شده است و دیگر قابل تغییر نیست؛ برای تغییر درگاه، ابتدا از پرداخت انصراف دهید.</p>
-                        </section>
-                    @endif
-                @elseif($this->gateways->count() > 0)
-                    <section class="card p-5 sm:p-6" aria-label="انتخاب درگاه پرداخت">
-                        <p class="flex items-center gap-2 text-sm font-black text-zinc-800 dark:text-zinc-100">
-                            <span class="flex size-8 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
-                                <x-icon name="credit-card" class="size-4" />
-                            </span>
-                            درگاه پرداخت را انتخاب کنید
-                        </p>
-
-                        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2" role="radiogroup" aria-label="درگاه‌های پرداخت فعال">
-                            @foreach($this->gateways as $gateway)
-                                <button type="button"
-                                        wire:click="$set('gatewayKey', '{{ $gateway->key }}')"
-                                        wire:key="gateway-{{ $gateway->key }}"
-                                        role="radio" @if($gatewayKey === $gateway->key) aria-checked="true" @else aria-checked="false" @endif
-                                        @class([
-                                            'relative flex items-center gap-3 rounded-2xl border p-4 text-start transition-all duration-150',
-                                            'border-brand-500/70 bg-brand-50/50 ring-2 ring-brand-500/60 dark:border-brand-500/50 dark:bg-brand-500/10 dark:ring-brand-500/40' => $gatewayKey === $gateway->key,
-                                            'border-zinc-200 bg-white hover:border-brand-400/60 hover:bg-brand-50/30 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/5' => $gatewayKey !== $gateway->key,
-                                        ])>
-                                    {{-- تیک انتخاب (مطابق طرح: دایرهٔ سبز گوشهٔ کارت) --}}
-                                    @if($gatewayKey === $gateway->key)
-                                        <span class="absolute end-2.5 top-2.5 flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
-                                            <x-icon name="check" class="size-3" />
-                                        </span>
-                                    @endif
-
-                                    {{-- لوگو/آیکون درگاه --}}
-                                    @if($gateway->logo)
-                                        <img src="{{ $gateway->logo }}" alt="لوگوی {{ $gateway->name }}" class="size-10 shrink-0 rounded-xl bg-white object-contain ring-1 ring-zinc-200/80 dark:bg-zinc-800 dark:ring-zinc-700" />
-                                    @else
-                                        <span @class([
-                                                    'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                                                    'bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' => $gatewayKey === $gateway->key,
-                                                    'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500' => $gatewayKey !== $gateway->key,
-                                                ])>
-                                            <x-icon name="credit-card" class="size-5" />
-                                        </span>
-                                    @endif
-
-                                    <span class="min-w-0 flex-1">
-                                        <span class="block truncate text-sm font-black text-zinc-900 dark:text-zinc-50">{{ $gateway->name }}</span>
-                                        @if($gateway->description)
-                                            <span class="mt-0.5 block truncate text-[11px] text-zinc-500 dark:text-zinc-400">{{ $gateway->description }}</span>
-                                        @endif
-                                    </span>
-
-                                    {{-- نشان درگاه --}}
-                                    @if($gateway->key === 'local')
-                                        <span class="shrink-0 rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700 ring-1 ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20">تست</span>
-                                    @else
-                                        <span class="shrink-0 rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20">فعال</span>
-                                    @endif
-                                </button>
-                            @endforeach
-                        </div>
-                    </section>
-                @else
-                    {{-- هیچ درگاه فعالی نیست --}}
-                    <section class="card p-5 sm:p-6" aria-label="درگاه پرداخت">
-                        <div class="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-600/15 dark:bg-amber-500/10 dark:ring-amber-400/20">
-                            <x-icon name="alert-triangle" class="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                            <p class="text-xs leading-6 font-medium text-amber-800 dark:text-amber-200">در حال حاضر هیچ درگاه پرداخت فعالی وجود ندارد؛ لطفاً بعداً تلاش کنید یا با پشتیبانی تماس بگیرید.</p>
-                        </div>
-                    </section>
-                @endif
-
                 {{-- ---------- کارت کد تخفیف ---------- --}}
                 <section class="card p-5 sm:p-6" aria-label="کد تخفیف">
                     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -337,8 +250,96 @@
                 </section>
             </div>
 
-            {{-- ================= ستون خلاصه سفارش (چپ — چسبان) ================= --}}
-            <aside class="space-y-4 lg:sticky lg:top-24 lg:col-span-2" aria-label="خلاصه سفارش و پرداخت">
+            {{-- ================= ستون کنار (چپ): انتخاب درگاه + خلاصه سفارش ================= --}}
+            <aside class="space-y-4 lg:col-span-2" aria-label="انتخاب درگاه و خلاصه سفارش">
+
+                {{-- ---------- کارت انتخاب درگاه پرداخت (سمت چپ) ---------- --}}
+                @if($this->paymentStarted)
+                    {{-- تراکنش در جریان: درگاه قطعی شده و قابل تغییر نیست --}}
+                    @if($this->selectedGatewayName)
+                        <section class="card p-5" aria-label="درگاه پرداخت">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <p class="flex items-center gap-2 text-sm font-black text-zinc-800 dark:text-zinc-100">
+                                    <span class="flex size-8 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                        <x-icon name="credit-card" class="size-4" />
+                                    </span>
+                                    درگاه پرداخت
+                                </p>
+                                <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20">
+                                    <x-icon name="check-circle" class="size-3.5" />
+                                    {{ $this->selectedGatewayName }}
+                                </span>
+                            </div>
+                            <p class="mt-3 text-xs leading-6 text-zinc-500 dark:text-zinc-400">تراکنش با این درگاه شروع شده است و دیگر قابل تغییر نیست؛ برای تغییر درگاه، ابتدا از پرداخت انصراف دهید.</p>
+                        </section>
+                    @endif
+                @elseif($this->gateways->count() > 0)
+                    <section class="card p-5" aria-label="انتخاب درگاه پرداخت">
+                        <p class="flex items-center gap-2 text-sm font-black text-zinc-800 dark:text-zinc-100">
+                            <span class="flex size-8 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400">
+                                <x-icon name="credit-card" class="size-4" />
+                            </span>
+                            درگاه پرداخت را انتخاب کنید
+                        </p>
+
+                        <div class="mt-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2" role="radiogroup" aria-label="درگاه‌های پرداخت فعال">
+                            @foreach($this->gateways as $gateway)
+                                <button type="button"
+                                        wire:click="$set('gatewayKey', '{{ $gateway->key }}')"
+                                        wire:key="gateway-{{ $gateway->key }}"
+                                        role="radio" @if($gatewayKey === $gateway->key) aria-checked="true" @else aria-checked="false" @endif
+                                        @class([
+                                            'relative flex flex-col gap-2 rounded-2xl border p-3.5 text-start transition-all duration-150',
+                                            'border-brand-500/70 bg-brand-50/50 ring-2 ring-brand-500/60 dark:border-brand-500/50 dark:bg-brand-500/10 dark:ring-brand-500/40' => $gatewayKey === $gateway->key,
+                                            'border-zinc-200 bg-white hover:border-brand-400/60 hover:bg-brand-50/30 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/5' => $gatewayKey !== $gateway->key,
+                                        ])>
+                                    {{-- تیک انتخاب (مطابق طرح: دایرهٔ سبز گوشهٔ کارت) --}}
+                                    @if($gatewayKey === $gateway->key)
+                                        <span class="absolute end-2 top-2 flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
+                                            <x-icon name="check" class="size-3" />
+                                        </span>
+                                    @endif
+
+                                    <span class="flex items-center justify-between gap-2">
+                                        {{-- لوگو/آیکون درگاه --}}
+                                        @if($gateway->logo)
+                                            <img src="{{ $gateway->logo }}" alt="لوگوی {{ $gateway->name }}" class="size-9 shrink-0 rounded-xl bg-white object-contain ring-1 ring-zinc-200/80 dark:bg-zinc-800 dark:ring-zinc-700" />
+                                        @else
+                                            <span @class([
+                                                        'flex size-9 shrink-0 items-center justify-center rounded-xl',
+                                                        'bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300' => $gatewayKey === $gateway->key,
+                                                        'bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500' => $gatewayKey !== $gateway->key,
+                                                    ])>
+                                                <x-icon name="credit-card" class="size-5" />
+                                            </span>
+                                        @endif
+
+                                        {{-- نشان درگاه --}}
+                                        @if($gateway->key === 'local')
+                                            <span class="shrink-0 rounded-lg bg-amber-50 px-2 py-0.5 text-[10px] font-black text-amber-700 ring-1 ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20">تست</span>
+                                        @else
+                                            <span class="shrink-0 rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20">فعال</span>
+                                        @endif
+                                    </span>
+
+                                    <span class="block truncate text-sm font-black text-zinc-900 dark:text-zinc-50">{{ $gateway->name }}</span>
+                                    @if($gateway->description)
+                                        <span class="block truncate text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">{{ $gateway->description }}</span>
+                                    @endif
+                                </button>
+                            @endforeach
+                        </div>
+                    </section>
+                @else
+                    {{-- هیچ درگاه فعالی نیست --}}
+                    <section class="card p-5" aria-label="درگاه پرداخت">
+                        <div class="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-600/15 dark:bg-amber-500/10 dark:ring-amber-400/20">
+                            <x-icon name="alert-triangle" class="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                            <p class="text-xs leading-6 font-medium text-amber-800 dark:text-amber-200">در حال حاضر هیچ درگاه پرداخت فعالی وجود ندارد؛ لطفاً بعداً تلاش کنید یا با پشتیبانی تماس بگیرید.</p>
+                        </div>
+                    </section>
+                @endif
+
                 <section class="card overflow-hidden p-0">
                     <div class="border-b border-zinc-200/80 bg-gradient-to-b from-brand-50/60 to-transparent px-5 py-4 dark:border-zinc-800 dark:from-brand-500/10">
                         <h3 class="flex items-center gap-2 text-sm font-black text-zinc-900 dark:text-zinc-50">
@@ -415,7 +416,13 @@
                             <x-btn variant="primary" size="lg" icon="lock" wire:click="pay" :loading="true" class="w-full">
                                 پرداخت {{ money($this->payableAmount, false) }} تومان
                             </x-btn>
-                            <p class="text-center text-[11px] leading-5 text-zinc-400">با زدن دکمه پرداخت، به درگاه بانک منتقل می‌شوید.</p>
+                            <p class="text-center text-[11px] leading-5 text-zinc-400">
+                                @if($this->selectedGatewayName)
+                                    پرداخت از طریق درگاه «{{ $this->selectedGatewayName }}» انجام می‌شود.
+                                @else
+                                    با زدن دکمه پرداخت، به درگاه بانک منتقل می‌شوید.
+                                @endif
+                            </p>
                         @endif
 
                         <x-btn variant="secondary" icon="x" wire:click="cancel" :loading="true" class="w-full">
@@ -444,13 +451,6 @@
                         </span>
                         <p class="text-xs leading-6 font-medium text-zinc-600 dark:text-zinc-300">لایسنس پکیج بلافاصله پس از تأیید پرداخت فعال می‌شود</p>
                     </div>
-
-                    @if($this->selectedGatewayName && $this->payableAmount > 0)
-                        <div class="flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">
-                            <span class="text-[11px] font-medium text-zinc-400">درگاه پرداخت</span>
-                            <span class="rounded-lg bg-zinc-100 px-2 py-0.5 text-[10px] font-black text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{{ $this->selectedGatewayName }}</span>
-                        </div>
-                    @endif
                 </section>
             </aside>
         </div>
