@@ -168,8 +168,11 @@ class ApiPackageController extends Controller
      *      days_remaining, download_token, message } (idempotent برای لایسنس موجود)
      *  - gateway اختیاری است (پیش‌فرض zarinpal)؛ کلاینت می‌تواند درگاه فعال دیگری
      *    را انتخاب کند (مثلاً «local» برای تست جریان پرداخت).
-     *  - payment_url برای درایورهای URL مستقیم است؛ برای درایورهای فرم‌محور
-     *    یک مسیر امضادار روی پنل است که فرم را رندر و خودکار به درگاه POST می‌کند.
+     *  - ⭐ جریان دو مرحله‌ای (صفحه تسویه): خرید پولی دیگر مستقیم به درگاه نمی‌رود؛
+     *    payment_url به «صفحه تسویه» پنل اشاره می‌کند که کاربر در آن نام/تصویر پکیج،
+     *    طرح انتخابی، مبلغ و کد تخفیف را می‌بیند و با دکمه پرداخت وارد درگاه می‌شود
+     *    (یا با انصراف برمی‌گردد). transaction_id پس از شروع پرداخت در صفحه تسویه صادر
+     *    می‌شود و از طریق ریدایرکت کال‌بک به پروژه خریدار می‌رسد.
      * =================================================================== */
     public function purchase(Request $request, string $slug): JsonResponse
     {
@@ -298,31 +301,40 @@ class ApiPackageController extends Controller
                 return response()->json(['error' => 'آدرس بازگشت (callback_url) برای پرداخت الزامی است.'], 422);
             }
 
-            // ایجاد رکورد purchase
+            // درگاه پیش‌فرض (برای پاسخ API) — تراکنش واقعی در صفحه تسویه و هنگام کلیک پرداخت ساخته می‌شود
+            $resolvedGateway = $gatewayKey
+                ?? \App\Models\Gateway::where('is_active', true)->orderBy('id')->first()?->key
+                ?? 'zarinpal';
+
+            // ایجاد رکورد purchase (در انتظار پرداخت) — بدون تماس با درگاه؛
+            // تراکنش درگاه پس از تأیید کاربر در صفحه تسویه ساخته می‌شود تا
+            // کد تخفیف پیش از شارژ درگاه روی مبلغ اعمال شود.
             $purchase = PackagePurchase::create([
                 'package_id'      => $package->id,
                 'version_id'      => $latestVersion->id,
                 'pricing_plan_id' => $plan->id,
                 'customer_id'     => $customer->id,
                 'callback_url'    => $request->callback_url,
-                'amount'          => $plan->final_price,
+                'gateway'         => $resolvedGateway,
+                'original_amount' => (int) $plan->final_price,
+                'amount'          => (int) $plan->final_price,
                 'status'          => PackagePurchase::STATUS_PENDING,
             ]);
 
-            // ایجاد پرداخت در درگاه (gateway اختیاری کلاینت یا پیش‌فرض)
-            // اگر درگاه تراکنش نسازد، رکورد pending یتیم باقی نماند.
-            try {
-                $payment = $this->paymentService->createPayment($purchase, $gatewayKey);
-            } catch (\Throwable $e) {
-                $purchase->delete();
-                throw $e;
-            }
+            // صفحه تسویه: نام/تصویر پکیج + طرح + کد تخفیف + دکمه پرداخت/انصراف
+            $checkoutUrl = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                'shop.checkout',
+                now()->addHours(24),
+                ['purchase' => $purchase->id]
+            );
 
             return response()->json([
-                'payment_url'    => $payment['payment_url'],
-                'transaction_id' => $payment['transaction_id'],
-                'amount'         => $payment['amount'],
-                'gateway'        => $payment['gateway'],
+                // صفحه تسویه (جدید) — همان مقدار payment_url برای سازگاری با کلاینت‌های فعلی
+                'checkout_url'   => $checkoutUrl,
+                'payment_url'    => $checkoutUrl,
+                'transaction_id' => null, // پس از شروع پرداخت در صفحه تسویه صادر و از طریق کال‌بک ارسال می‌شود
+                'amount'         => (int) $plan->final_price, // مبلغ پیش از کد تخفیف
+                'gateway'        => $resolvedGateway,
                 'purchase_id'    => $purchase->id,
             ]);
         } catch (RuntimeException $e) {

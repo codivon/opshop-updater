@@ -355,10 +355,16 @@ async function buyPage(slug: string, planId: number, gateway: string | null): Pr
   }
 
   // ثبت تراکنش برای کال‌بک — معادل جدول purchased_packages در فروشگاه شما
-  trxToSlug.set(String(json.transaction_id), slug);
+  // نکته: در جریان جدیدِ «صفحه تسویه»، transaction_id هنوز صادر نشده (null) و
+  // تراکنش واقعی پس از تأیید کاربر در صفحه تسویه ساخته می‌شود؛ شناسه واقعی
+  // از طریق پارامترهای ریدایرکت کال‌بک به فروشگاه می‌رسد.
+  if (json.transaction_id) {
+    trxToSlug.set(String(json.transaction_id), slug);
+  }
   saveState();
 
-  // ریدایرکت مرورگر به درگاه (payment_url ممکن است مستقیم به بانک باشد یا مسیر رندر فرم روی پنل)
+  // ریدایرکت مرورگر به صفحه تسویه پنل (جریان جدید): کاربر آنجا سفارش را می‌بیند،
+  // کد تخفیف وارد می‌کند و با «پرداخت» وارد درگاه می‌شود یا با «انصراف» برمی‌گردد
   return new Response(null, { status: 302, headers: { Location: json.payment_url } });
 }
 
@@ -369,6 +375,14 @@ async function callbackPage(url: URL, method: string): Promise<Response> {
     ?? url.searchParams.get('transaction_id')
     ?? url.searchParams.get('Authority');
   const cancel = url.searchParams.get('cancel') === 'true';
+
+  // انصراف کاربر در صفحه تسویه پنل (status=canceled) — قبل از ساخت تراکنش
+  if (!trx && url.searchParams.get('status') === 'canceled') {
+    return new Response(null, {
+      status: 302,
+      headers: { Location: `/result?canceled=1` },
+    });
+  }
 
   if (!trx) {
     return new Response(page('خطا', `<div class="result"><div class="alert alert-err">پارامتر تراکنش در بازگشت درگاه یافت نشد.</div><a class="btn btn-buy" href="/">بازگشت</a></div>`), { status: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
@@ -413,10 +427,28 @@ async function callbackPage(url: URL, method: string): Promise<Response> {
 function resultPage(url: URL): Response {
   const ok = url.searchParams.get('ok') === '1';
   const free = url.searchParams.get('free') === '1';
+  const canceled = url.searchParams.get('canceled') === '1';
   const trx = url.searchParams.get('trx');
   const fail = url.searchParams.get('fail');
   const slug = url.searchParams.get('slug') ?? (trx ? trxToSlug.get(trx) : undefined);
   const lic = slug ? installedModules.get(slug) : undefined;
+
+  // انصراف کاربر در صفحه تسویه پنل
+  if (canceled) {
+    const body = `<div class="result">
+      <div class="result-card">
+        <div class="result-head fail" style="background:#fffbeb">
+          <div class="icon" style="background:#fef3c7">🚫</div>
+          <h2 style="color:#92400e">خرید لغو شد</h2>
+        </div>
+        <div class="result-body">
+          <div class="alert" style="background:#fef9c3;color:#854d0e;border:1px solid #fde047">شما در صفحه تسویه پنل از خرید انصراف دادید. مبلغی از حساب شما کسر نشده است.</div>
+          <div style="margin-top:16px"><a class="btn btn-buy" href="/">تلاش مجدد از لیست پکیج‌ها</a></div>
+        </div>
+      </div>
+    </div>`;
+    return new Response(page('نتیجه خرید', body), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  }
 
   if (ok || free) {
     const body = `<div class="result">

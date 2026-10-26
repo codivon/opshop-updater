@@ -76,6 +76,13 @@ Route::get('payment/callback', [\App\Http\Controllers\Front\WebPaymentController
 Route::post('payment/callback', [\App\Http\Controllers\Front\WebPaymentController::class, 'callback'])->name('payment.callback.post');
 Route::get('payment/result/{purchase}', \App\Livewire\Shop\PaymentResult::class)->name('payment.result');
 
+// صفحه تسویه خریدهای API (مرحله میانی پیش از درگاه):
+// نام/تصویر پکیج + طرح انتخابی + کد تخفیف + دکمه پرداخت/انصراف
+// لینک امضادار ۲۴ساعته از پاسخ API (checkout_url) می‌آید.
+Route::get('checkout/package/{purchase}', \App\Livewire\Shop\PackageCheckout::class)
+    ->name('shop.checkout')
+    ->middleware('signed');
+
 // صفحه «نتیجه پرداخت» (مرحله میانی پس از درگاه):
 // وضعیت پرداخت + شمارش معکوس ۱۰ ثانیه‌ای + دکمه بازگشت به callback_url فروشگاه
 Route::get('payment/return/{purchase}', [\App\Http\Controllers\Front\PaymentReturnController::class, 'show'])

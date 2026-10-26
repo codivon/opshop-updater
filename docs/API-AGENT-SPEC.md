@@ -31,6 +31,8 @@ Your storefront must handle:
 1. **Catalog pages** — list packages/templates/categories from the API
 2. **Product detail pages** — versions, pricing plans, purchase state
 3. **Checkout** — pricing plan + gateway selection, then redirect the user to `payment_url`
+   (for paid packages this is now the panel's **checkout page**: the user reviews the order,
+   can apply a discount code, and pays or cancels there)
 4. **Payment result page** — receive the user back via `callback_url` and verify via API
 5. **Licenses & downloads area** — show licenses, generate one-time download links
 6. **Auto-update module** — `verify-license` → `check-update` → download → SHA-256 check
@@ -188,9 +190,16 @@ paid) · `gateway` (string, optional — panel default if omitted, `local` for t
 
 **Three outcomes:**
 
-1. **Paid** → `200 {"payment_url": "...", "transaction_id": "tr_9f8a2b1c", "amount": 980000, "gateway": "zarinpal", "purchase_id": 42}`
-   → redirect the user to `payment_url` (full-page redirect; `payment_url` may be a direct URL
-   or a panel page that auto-submits a form for form-based gateways).
+1. **Paid** → `200 {"checkout_url": "https://panel/checkout/package/42?expires=...&signature=...", "payment_url": "<same as checkout_url>", "transaction_id": null, "amount": 980000, "gateway": "zarinpal", "purchase_id": 42}`
+   → redirect the user to `payment_url`. It now points to the panel's **checkout page** (signed
+   link, valid 24h): the user sees the package name/image, the selected plan, the amount, and a
+   **discount code field** (apply / remove), then clicks «پرداخت» (goes to the gateway — the
+   gateway transaction is created at that moment, so `transaction_id` is issued only after the
+   user confirms) or «انصراف» (order is canceled and the user is sent back to your
+   `callback_url?status=canceled`). Keep backward compatibility: just follow `payment_url` as
+   before — no change needed in your code.
+   Note: `transaction_id` is `null` in this response; your project receives the real
+   `transaction_id` via the `callback_url` redirect parameters after payment (unchanged).
 2. **Free** (`package.is_free` or plan price 0) →
    `200 {"is_free": true, "license_key": "...", "expires_at": "...", "download_token": "dl_..."}`
 3. **Covered by active subscription** (idempotent) →
@@ -442,16 +451,22 @@ No domain header; token via query param.
 ### Flow A — Paid package purchase (canonical)
 
 ```
-Storefront                    Panel API                      Gateway
+Storefront                    Panel API / Checkout           Gateway
    │  GET /packages             │                              │
    │───────────────────────────▶│  (catalog + gateways + plans)│
    │  POST /packages/{slug}/purchase                                 │
    │  {pricing_plan_id, callback_url, gateway}                       │
    │───────────────────────────▶│                              │
-   │◀─── {payment_url, transaction_id}                         │
-   │  redirect user ────────────────────────────────────────────▶ │
-   │                             │◀── user pays, gateway hits /payments/callback
-   │                             │  verify → result page (10s countdown)
+   │◀─── {checkout_url, payment_url, transaction_id: null}     │
+   │  redirect user ───────────▶│  CHECKOUT PAGE (24h signed)  │
+   │                            │  package name/image + plan   │
+   │                            │  + discount code + amount    │
+   │                            │  [پرداخت]           [انصراف] │
+   │                            │   │                          │
+   │                            │   │ pay: create gateway trx  │
+   │                            │   └──────────────────────────▶ │
+   │                            │◀── user pays, gateway hits /payments/callback
+   │                            │  verify → result page (10s countdown)
    │◀── user redirected to callback_url?transaction_id=...&status=success
    │  POST /payments/{transaction_id}/verify                          │
    │───────────────────────────▶│                              │
@@ -462,7 +477,9 @@ Storefront                    Panel API                      Gateway
 
 Implementation rules:
 
-1. Persist `transaction_id` ↔ local order mapping before redirecting.
+1. Follow `payment_url` (the checkout page). The `transaction_id` in the purchase response is
+   `null`; your project receives the real `transaction_id` on `callback_url` redirect params
+   after payment. No need to persist a mapping upfront anymore.
 2. On `callback_url`, read `status` but **always** call the verify endpoint server-side.
 3. If verify returns 400 `paid:false` (gateway lag), retry 3–5 times with 3–10s backoff, then
    show "در انتظار تأیید" and let the user retry from their purchases page.

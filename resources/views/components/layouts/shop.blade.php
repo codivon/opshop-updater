@@ -79,8 +79,9 @@
 
             <span class="hidden h-6 w-px bg-zinc-200 sm:block dark:bg-zinc-800" aria-hidden="true"></span>
 
-            {{-- nav --}}
-            <nav class="flex items-center gap-1">
+            {{-- nav — FIX (سرریز افقی موبایل): برچسب متنی لینک‌ها زیر sm مخفی می‌شود (فقط آیکون) +
+                 خود nav در عرض‌های خیلی کوچک اسکرول افقی می‌گیرد تا هرگز صفحه را عریض نکند --}}
+            <nav class="flex max-w-full items-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="ناوبری فروشگاه">
                 <a href="{{ route('shop.home') }}" wire:navigate
                    @class([
                        'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
@@ -89,7 +90,7 @@
                    ])
                    @if(request()->routeIs('shop.home')) aria-current="page" @endif>
                     <x-icon name="home" class="size-4.5" />
-                    خانه
+                    <span class="hidden sm:block">خانه</span>
                 </a>
                 <a href="{{ route('shop.packages') }}" wire:navigate
                    @class([
@@ -99,7 +100,7 @@
                    ])
                    @if(request()->routeIs('shop.packages') || request()->routeIs('shop.package')) aria-current="page" @endif>
                     <x-icon name="package" class="size-4.5" />
-                    پکیج‌ها
+                    <span class="hidden sm:block">پکیج‌ها</span>
                 </a>
                 <a href="{{ route('shop.products') }}" wire:navigate
                    @class([
@@ -109,7 +110,7 @@
                    ])
                    @if(request()->routeIs('shop.products') || request()->routeIs('shop.product')) aria-current="page" @endif>
                     <x-icon name="rocket" class="size-4.5" />
-                    پروژه‌ها
+                    <span class="hidden sm:block">پروژه‌ها</span>
                 </a>
                 <a href="{{ route('shop.templates') }}" wire:navigate
                    @class([
@@ -119,7 +120,7 @@
                    ])
                    @if(request()->routeIs('shop.templates') || request()->routeIs('shop.template')) aria-current="page" @endif>
                     <x-icon name="layout-template" class="size-4.5" />
-                    قالب‌ها
+                    <span class="hidden sm:block">قالب‌ها</span>
                 </a>
                 @if(\App\Support\Features::changelog())
                     <a href="{{ route('shop.changelog') }}" wire:navigate
@@ -130,7 +131,7 @@
                        ])
                        @if(request()->routeIs('shop.changelog')) aria-current="page" @endif>
                         <x-icon name="history" class="size-4.5" />
-                        تغییرات
+                        <span class="hidden sm:block">تغییرات</span>
                     </a>
                 @endif
                 <a href="{{ route('shop.subscriptions') }}" wire:navigate
@@ -141,7 +142,7 @@
                    ])
                    @if(request()->routeIs('shop.subscriptions') || request()->routeIs('subscription.*')) aria-current="page" @endif>
                     <x-icon name="crown" class="size-4.5" />
-                    طرح‌های اشتراک
+                    <span class="hidden sm:block">طرح‌های اشتراک</span>
                 </a>
             </nav>
 
