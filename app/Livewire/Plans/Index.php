@@ -34,17 +34,14 @@ class Index extends Component
     public ?int $editingId = null;
     public ?int $deleteId = null;
 
-    /** فرم اصلی طرح */
+    /** فرم اصلی طرح — مدت/قیمت/تخفیف دیگر اینجا نیست؛ همه از مدت‌های اعتبار می‌آیند */
     public array $form = [
-        'name'            => '',
-        'slug'            => '',
-        'description'     => '',
-        'duration_months' => '1',
-        'price'           => '0',
-        'discount_price'  => '',
-        'is_one_time'     => false,
-        'is_active'       => true,
-        'sort_order'      => '0',
+        'name'        => '',
+        'slug'        => '',
+        'description' => '',
+        'is_one_time' => false,
+        'is_active'   => true,
+        'sort_order'  => '0',
     ];
 
     /** قابلیت‌های طرح (لیست رشته‌ای) */
@@ -53,8 +50,14 @@ class Index extends Component
     /** پکیج‌های همراه: [['package_id' => '', 'free_months' => '1'], …] */
     public array $formPackages = [];
 
-    /** مدت‌های اعتبار: [['duration_months' => '1', 'price' => '0', 'discount_price' => '', 'is_active' => true], …] */
+    /** مدت‌های اعتبار (حداقل یک ردیف الزامی): [['duration_months' => '1', 'price' => '0', 'discount_price' => '', 'is_active' => true], …] */
     public array $formDurations = [];
+
+    /** یک ردیف خالی برای ریپیتر مدت‌های اعتبار */
+    protected function emptyDurationRow(): array
+    {
+        return ['duration_months' => '', 'price' => '', 'discount_price' => '', 'is_active' => true];
+    }
 
     public function updatedSearch(): void
     {
@@ -133,12 +136,34 @@ class Index extends Component
 
     public function addDurationRow(): void
     {
-        $this->formDurations[] = ['duration_months' => '', 'price' => '', 'discount_price' => '', 'is_active' => true];
+        $this->formDurations[] = $this->emptyDurationRow();
     }
 
     public function removeDurationRow(int $index): void
     {
         unset($this->formDurations[$index]);
+        $this->formDurations = array_values($this->formDurations);
+    }
+
+    /** انتقال یک ردیف مدت به بالا (ترتیب نمایش در فروشگاه) */
+    public function moveDurationUp(int $index): void
+    {
+        if ($index <= 0 || $index >= count($this->formDurations)) {
+            return;
+        }
+
+        [$this->formDurations[$index - 1], $this->formDurations[$index]] = [$this->formDurations[$index], $this->formDurations[$index - 1]];
+        $this->formDurations = array_values($this->formDurations);
+    }
+
+    /** انتقال یک ردیف مدت به پایین (ترتیب نمایش در فروشگاه) */
+    public function moveDurationDown(int $index): void
+    {
+        if ($index < 0 || $index >= count($this->formDurations) - 1) {
+            return;
+        }
+
+        [$this->formDurations[$index + 1], $this->formDurations[$index]] = [$this->formDurations[$index], $this->formDurations[$index + 1]];
         $this->formDurations = array_values($this->formDurations);
     }
 
@@ -150,19 +175,17 @@ class Index extends Component
     {
         $this->reset(['editingId', 'deleteId']);
         $this->form = [
-            'name'            => '',
-            'slug'            => '',
-            'description'     => '',
-            'duration_months' => '1',
-            'price'           => '0',
-            'discount_price'  => '',
-            'is_one_time'     => false,
-            'is_active'       => true,
-            'sort_order'      => '0',
+            'name'        => '',
+            'slug'        => '',
+            'description' => '',
+            'is_one_time' => false,
+            'is_active'   => true,
+            'sort_order'  => '0',
         ];
         $this->formFeatures = [''];
         $this->formPackages = [];
-        $this->formDurations = [];
+        // حداقل یک مدت الزامی است — یک ردیف خالی از ابتدا آماده است
+        $this->formDurations = [$this->emptyDurationRow()];
         $this->showModal = true;
     }
 
@@ -173,15 +196,12 @@ class Index extends Component
         $this->reset(['deleteId']);
         $this->editingId = $plan->id;
         $this->form = [
-            'name'            => $plan->name,
-            'slug'            => $plan->slug,
-            'description'     => (string) $plan->description,
-            'duration_months' => (string) $plan->duration_months,
-            'price'           => (string) $plan->price,
-            'discount_price'  => $plan->discount_price !== null ? (string) $plan->discount_price : '',
-            'is_one_time'     => (bool) $plan->is_one_time,
-            'is_active'       => (bool) $plan->is_active,
-            'sort_order'      => (string) $plan->sort_order,
+            'name'        => $plan->name,
+            'slug'        => $plan->slug,
+            'description' => (string) $plan->description,
+            'is_one_time' => (bool) $plan->is_one_time,
+            'is_active'   => (bool) $plan->is_active,
+            'sort_order'  => (string) $plan->sort_order,
         ];
         $this->formFeatures = array_values($plan->features ?: ['']);
         $this->formPackages = $plan->packages
@@ -197,6 +217,17 @@ class Index extends Component
             ])
             ->values()
             ->all();
+
+        // طرح‌های قدیمی بدون مدت ثبت‌شده: فیلدهای تک‌مدتِ خود طرح به‌صورت یک ردیف آماده وارد فرم می‌شوند
+        if (count($this->formDurations) === 0) {
+            $this->formDurations = [[
+                'duration_months' => (string) $plan->duration_months,
+                'price'           => (string) $plan->price,
+                'discount_price'  => $plan->discount_price !== null ? (string) $plan->discount_price : '',
+                'is_active'       => true,
+            ]];
+        }
+
         $this->showModal = true;
     }
 
@@ -216,14 +247,12 @@ class Index extends Component
             'form.name'            => ['required', 'string', 'max:100'],
             'form.slug'            => ['nullable', 'string', 'max:120', 'alpha_dash', \Illuminate\Validation\Rule::unique('subscription_plans', 'slug')->ignore($planId)],
             'form.description'     => ['nullable', 'string', 'max:2000'],
-            'form.duration_months' => ['required', 'integer', 'min:0', 'max:120'],
-            'form.price'           => ['required', 'integer', 'min:0'],
-            'form.discount_price'  => ['nullable', 'integer', 'min:0', 'lt:form.price'],
             'form.sort_order'      => ['nullable', 'integer', 'min:0', 'max:999'],
             'formPackages.*.package_id' => ['nullable', 'integer', 'exists:packages,id'],
             'formPackages.*.free_months' => ['required_with:formPackages.*.package_id', 'integer', 'min:0', 'max:120'],
 
-            'formDurations'                       => ['array', 'max:12'],
+            // مدت‌های اعتبار: حداقل یک ردیف الزامی است (مدت/قیمت/تخفیف پیش‌فرض جداگانه وجود ندارد)
+            'formDurations'                       => ['required', 'array', 'min:1', 'max:12'],
             'formDurations.*.duration_months'     => ['required', 'integer', 'min:0', 'max:120', 'distinct'],
             'formDurations.*.price'               => ['required', 'integer', 'min:0'],
             'formDurations.*.discount_price'      => ['nullable', 'integer', 'min:0', 'lt:formDurations.*.price'],
@@ -233,16 +262,12 @@ class Index extends Component
             'form.name.max'               => 'نام طرح حداکثر ۱۰۰ کاراکتر است.',
             'form.slug.alpha_dash'        => 'شناسه فقط می‌تواند شامل حروف، عدد، خط تیره و زیرخط باشد.',
             'form.slug.unique'            => 'این شناسه قبلاً استفاده شده است.',
-            'form.duration_months.required' => 'مدت اعتبار الزامی است.',
-            'form.duration_months.integer'  => 'مدت اعتبار باید عدد صحیح باشد.',
-            'form.duration_months.max'    => 'مدت اعتبار حداکثر ۱۲۰ ماه است.',
-            'form.price.required'         => 'قیمت الزامی است.',
-            'form.price.integer'          => 'قیمت باید عدد صحیح باشد.',
-            'form.discount_price.lt'      => 'تخفیف باید کمتر از قیمت باشد.',
             'formPackages.*.free_months.required_with' => 'مدت دسترسی رایگان هر پکیج را مشخص کنید.',
             'formPackages.*.free_months.integer'       => 'مدت دسترسی رایگان باید عدد صحیح باشد.',
             'formPackages.*.free_months.max'           => 'مدت دسترسی رایگان حداکثر ۱۲۰ ماه است.',
 
+            'formDurations.required'                 => 'حداقل یک مدت اعتبار برای طرح الزامی است (مثلاً ۱ ماهه).',
+            'formDurations.min'                      => 'حداقل یک مدت اعتبار برای طرح الزامی است (مثلاً ۱ ماهه).',
             'formDurations.array'                    => 'ساختار مدت‌های اعتبار نامعتبر است.',
             'formDurations.max'                      => 'حداکثر ۱۲ مدت اعتبار برای هر طرح می‌توانید ثبت کنید.',
             'formDurations.*.duration_months.required' => 'مدت هر ردیف الزامی است (۰ = نامحدود).',
@@ -263,13 +288,30 @@ class Index extends Component
             fn ($f) => $f !== ''
         ));
 
+        // همگام‌سازی مدت‌های اعتبار (چندگزینه‌ای) — بازسازی کامل از ردیف‌های فرم؛
+        // ترتیبِ ردیف‌ها در فرم = ترتیب نمایش گزینه‌ها (sort_order از جایگاه ردیف)
+        $durationRows = collect($this->formDurations)
+            ->map(fn ($row, $i) => [
+                'duration_months' => (int) $row['duration_months'],
+                'price'           => (int) ($row['price'] ?: 0),
+                'discount_price'  => blank($row['discount_price'] ?? null) ? null : (int) $row['discount_price'],
+                'is_active'       => (bool) ($row['is_active'] ?? true),
+                'sort_order'      => $i + 1,
+            ])
+            ->values()
+            ->all();
+
+        // فیلدهای تک‌مدتِ طرح (برای سازگاری با فال‌بک‌های قدیمی، مرتب‌سازی بر اساس قیمت و آمار «رایگان»)
+        // از «اولین ردیف مدت» مشتق می‌شوند تا همیشه هم‌راستا با گزینهٔ اول فروشگاه باشند.
+        $firstRow = $durationRows[0] ?? ['duration_months' => 1, 'price' => 0, 'discount_price' => null];
+
         $data = [
             'name'            => trim($this->form['name']),
             'slug'            => $this->form['slug'] !== '' ? trim($this->form['slug']) : SubscriptionPlan::generateSlug($this->form['name']),
             'description'     => $this->form['description'] !== '' ? $this->form['description'] : null,
-            'duration_months' => (int) $this->form['duration_months'],
-            'price'           => (int) $this->form['price'],
-            'discount_price'  => $this->form['discount_price'] !== '' ? (int) $this->form['discount_price'] : null,
+            'duration_months' => (int) $firstRow['duration_months'],
+            'price'           => (int) $firstRow['price'],
+            'discount_price'  => $firstRow['discount_price'],
             'is_one_time'     => (bool) $this->form['is_one_time'],
             'is_active'       => (bool) $this->form['is_active'],
             'sort_order'      => (int) ($this->form['sort_order'] ?: 0),
@@ -290,18 +332,6 @@ class Index extends Component
             }
         }
         $plan->packages()->sync($sync);
-
-        // همگام‌سازی مدت‌های اعتبار (چندگزینه‌ای) — بازسازی کامل از ردیف‌های فرم
-        $durationRows = collect($this->formDurations)
-            ->map(fn ($row, $i) => [
-                'duration_months' => (int) $row['duration_months'],
-                'price'           => (int) ($row['price'] ?: 0),
-                'discount_price'  => blank($row['discount_price'] ?? null) ? null : (int) $row['discount_price'],
-                'is_active'       => (bool) ($row['is_active'] ?? true),
-                'sort_order'      => $i + 1,
-            ])
-            ->values()
-            ->all();
 
         $plan->durations()->delete();
         foreach ($durationRows as $row) {

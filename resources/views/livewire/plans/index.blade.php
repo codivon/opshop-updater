@@ -213,20 +213,10 @@
                 <x-textarea wire:model="form.description" rows="2" placeholder="توضیح کوتاه طرح برای صفحه فروشگاه…" />
             </x-field>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <x-field label="مدت پیش‌فرض (ماه) *" error="form.duration_months">
-                    <x-input wire:model="form.duration_months" type="number" min="0" max="120" />
-                    <p class="mt-1 text-xs text-zinc-400">۰ = نامحدود — وقتی مدت‌های اختصاصی ثبت نشده باشد ملاک است</p>
-                </x-field>
-                <x-field label="قیمت پیش‌فرض (تومان) *" error="form.price">
-                    <x-input wire:model="form.price" type="number" min="0" />
-                    <p class="mt-1 text-xs text-zinc-400">۰ = رایگان</p>
-                </x-field>
-                <x-field label="مبلغ تخفیف پیش‌فرض" error="form.discount_price">
-                    <x-input wire:model="form.discount_price" type="number" min="0" placeholder="اختیاری" />
-                </x-field>
-                <x-field label="ترتیب نمایش" error="form.sort_order">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <x-field label="ترتیب نمایش طرح" error="form.sort_order">
                     <x-input wire:model="form.sort_order" type="number" min="0" />
+                    <p class="mt-1 text-xs text-zinc-400">ترتیب کارت طرح در فروشگاه (عدد کوچک‌تر = بالاتر)</p>
                 </x-field>
             </div>
 
@@ -239,8 +229,8 @@
                             مدت‌های اعتبار (چندگزینه‌ای)
                         </div>
                         <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                            هر ردیف یک گزینه برای مشتری است (مثلاً ۱ ماهه / ۳ ماهه / سالانه) با قیمت مستقل.
-                            اگر ردیفی ثبت نشود، فقط مدت و قیمت پیش‌فرض بالا به مشتری نمایش داده می‌شود.
+                            هر ردیف یک گزینه برای مشتری است (مثلاً ۱ ماهه / ۳ ماهه / سالانه) با قیمت و تخفیف مستقل؛
+                            <span class="font-bold text-zinc-600 dark:text-zinc-300">حداقل یک مدت الزامی است</span> و ترتیب نمایش با فلش‌ها تغییر می‌کند (ردیف اول = گزینهٔ پیش‌فرض فروشگاه و API).
                         </p>
                     </div>
                     <x-btn variant="soft" size="sm" icon="plus" wire:click="addDurationRow">افزودن مدت</x-btn>
@@ -266,11 +256,27 @@
                                 <x-toggle wire:model="formDurations.{{ $i }}.is_active" />
                                 <span class="whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">فعال</span>
                             </label>
-                            <button type="button" wire:click="removeDurationRow({{ $i }})"
-                                    class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
-                                    title="حذف مدت">
-                                <x-icon name="trash" class="size-4" />
-                            </button>
+                            <div class="flex items-center gap-0.5">
+                                @if($i > 0)
+                                    <button type="button" wire:click="moveDurationUp({{ $i }})"
+                                            class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                            title="انتقال به بالا — نمایش زودتر در فروشگاه" aria-label="انتقال این مدت به بالا">
+                                        <x-icon name="chevron-up" class="size-4" />
+                                    </button>
+                                @endif
+                                @if($i < count($formDurations) - 1)
+                                    <button type="button" wire:click="moveDurationDown({{ $i }})"
+                                            class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                            title="انتقال به پایین — نمایش دیرتر در فروشگاه" aria-label="انتقال این مدت به پایین">
+                                        <x-icon name="chevron-down" class="size-4" />
+                                    </button>
+                                @endif
+                                <button type="button" wire:click="removeDurationRow({{ $i }})"
+                                        class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                                        title="حذف مدت">
+                                    <x-icon name="trash" class="size-4" />
+                                </button>
+                            </div>
                             @foreach(['duration_months', 'price', 'discount_price'] as $field)
                                 @error('formDurations.' . $i . '.' . $field)
                                     <p class="w-full text-xs font-bold text-rose-500">{{ $message }}</p>
@@ -279,8 +285,11 @@
                         </div>
                     @endforeach
                     @if(count($formDurations) === 0)
-                        <p class="text-xs text-zinc-400">مدتی ثبت نشده — «افزودن مدت» را بزنید تا مشتری بتواند چند گزینه داشته باشد.</p>
+                        <p class="text-xs font-bold text-amber-600">مدتی ثبت نشده — حداقل یک مدت اعتبار الزامی است؛ «افزودن مدت» را بزنید.</p>
                     @endif
+                    @error('formDurations')
+                        <p class="text-xs font-bold text-rose-500">{{ $message }}</p>
+                    @enderror
                 </div>
             </div>
 

@@ -144,14 +144,23 @@ class SubscriptionsIndex extends Component
             $this->appliedCode = '';
         }
 
-        // باز کردن فرم خرید: اگر مدتی انتخاب نشده، اولین گزینهٔ فعال پیش‌انتخاب می‌شود
+        // باز کردن فرم خرید: پیش‌فرضِ انتخاب مدت = گزینهٔ اول؛
+        // اگر انتخاب قبلی دیگر معتبر نباشد (مثلاً آن مدت در پنل حذف شده) هم گزینهٔ اول جایگزین می‌شود
         $plan = SubscriptionPlan::active()->where('slug', trim($slug))->first();
 
-        if ($plan && $plan->hasDurations() && !isset($this->selectedDurations[$plan->id])) {
-            $first = $plan->durationOptions()->first();
+        if ($plan && $plan->hasDurations()) {
+            $current = isset($this->selectedDurations[$plan->id])
+                ? $plan->durationOption((int) $this->selectedDurations[$plan->id])
+                : null;
 
-            if ($first) {
-                $this->selectedDurations[$plan->id] = (int) $first->duration_months;
+            if (!$current) {
+                $first = $plan->durationOptions()->first();
+
+                if ($first) {
+                    $this->selectedDurations[$plan->id] = (int) $first->duration_months;
+                } else {
+                    unset($this->selectedDurations[$plan->id]);
+                }
             }
         }
 

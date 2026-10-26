@@ -63,24 +63,34 @@
                 @foreach($this->plans as $plan)
                     @php($myOrder = $this->myOrders->get($plan->id))
                     @php($durOpt = $this->displayDurationFor($plan))
-                    @php($cardFinal = $durOpt?->final_price ?? $plan->final_price)
-                    @php($cardPrice = $durOpt?->price ?? $plan->price)
-                    @php($cardHasDiscount = $durOpt ? $durOpt->has_discount : ($plan->discount_price > 0 && $plan->price > $plan->final_price))
-                    @php($cardDurationLabel = $durOpt?->duration_label ?? $plan->duration_label)
+                    @php($durOpts = $plan->durationOptions())
+                    @php($hasDurs = $durOpts->isNotEmpty())
+                    @php($maxDisc = $hasDurs ? (int) $durOpts->max('discount_percent') : 0)
+                    @php($allFree = $hasDurs && $durOpts->every(fn ($d) => $d->final_price <= 0))
                     <div class="card relative flex flex-col overflow-hidden transition-all hover:shadow-card-lg {{ $buyingSlug === $plan->slug ? 'ring-2 ring-brand-500' : '' }}"
                          wire:key="plan-{{ $plan->id }}">
 
                         {{-- ribbon --}}
-                        @if($cardFinal <= 0)
+                        @if($hasDurs && $allFree)
                             <span class="absolute end-4 top-4 z-10 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-400/30">
                                 <x-icon name="gift" class="size-3.5" />
                                 رایگان
                             </span>
-                        @elseif($cardHasDiscount)
-                            @php($cardDiscPercent = $durOpt ? $durOpt->discount_percent : round(($plan->discount_price / max(1, $plan->price)) * 100))
+                        @elseif($hasDurs && $maxDisc > 0)
                             <span class="absolute end-4 top-4 z-10 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-700 ring-1 ring-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-400/30">
                                 <x-icon name="tag" class="size-3.5" />
-                                {{ fa_num($cardDiscPercent) }}٪ تخفیف
+                                تا {{ fa_num($maxDisc) }}٪ تخفیف
+                            </span>
+                        @elseif(!$hasDurs && $plan->final_price <= 0)
+                            <span class="absolute end-4 top-4 z-10 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700 ring-1 ring-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-400/30">
+                                <x-icon name="gift" class="size-3.5" />
+                                رایگان
+                            </span>
+                        @elseif(!$hasDurs && $plan->discount_price > 0 && $plan->price > $plan->final_price)
+                            @php($legacyDisc = round(($plan->discount_price / max(1, $plan->price)) * 100))
+                            <span class="absolute end-4 top-4 z-10 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-black text-amber-700 ring-1 ring-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-400/30">
+                                <x-icon name="tag" class="size-3.5" />
+                                {{ fa_num($legacyDisc) }}٪ تخفیف
                             </span>
                         @endif
 
@@ -93,11 +103,14 @@
                                 <div class="min-w-0 flex-1">
                                     <h3 class="truncate text-lg font-black text-zinc-900 dark:text-zinc-50">{{ $plan->name }}</h3>
                                     <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                        <span class="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
-                                              title="{{ $plan->hasDurations() ? 'مدت انتخاب‌شده — قابل تغییر' : 'مدت اعتبار طرح' }}">
-                                            <x-icon name="calendar-clock" class="size-3.5" />
-                                            {{ $cardDurationLabel }}
-                                        </span>
+                                        @unless($hasDurs)
+                                            {{-- طرح‌های چندمدتی مدت‌ها را با تایل‌ها نشان می‌دهند؛ این نشان فقط برای تک‌مدتی است --}}
+                                            <span class="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
+                                                  title="مدت اعتبار طرح">
+                                                <x-icon name="calendar-clock" class="size-3.5" />
+                                                {{ $plan->duration_label }}
+                                            </span>
+                                        @endunless
                                         @if($plan->is_one_time)
                                             <span class="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20">
                                                 <x-icon name="zap" class="size-3.5" />
@@ -112,42 +125,54 @@
                                 <p class="text-sm leading-6 text-zinc-500 dark:text-zinc-400">{{ $plan->description }}</p>
                             @endif
 
-                            {{-- price --}}
-                            <div class="flex items-end gap-2">
-                                @if($cardFinal <= 0)
-                                    <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">رایگان</span>
-                                @else
-                                    <span class="text-2xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($cardFinal) }}</span>
-                                    @if($cardHasDiscount)
-                                        <span class="text-sm font-bold tabular-nums text-zinc-400 line-through">{{ money($cardPrice) }}</span>
-                                    @endif
-                                    <span class="text-xs text-zinc-400">/ یک‌بار پرداخت</span>
-                                @endif
-                            </div>
-
-                            {{-- مدت‌های اعتبار — انتخاب گزینه، قیمت کارت به‌روز می‌شود --}}
-                            @if($plan->hasDurations())
-                                <div role="group" aria-label="انتخاب مدت اعتبار">
-                                    <p class="mb-1.5 flex items-center gap-1 text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
-                                        <x-icon name="calendar-clock" class="size-3.5" />
-                                        مدت اعتبار را انتخاب کنید:
+                            {{-- قیمت — طرح‌های چندمدتی: تایل هر مدت با قیمت اصلی و تخفیف؛ تک‌مدتی: قیمت بزرگ --}}
+                            @if($hasDurs)
+                                <div class="rounded-2xl bg-zinc-50/80 p-3.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
+                                    <p class="mb-2.5 flex items-center gap-1.5 text-[11px] font-black text-zinc-500 dark:text-zinc-400">
+                                        <x-icon name="calendar-clock" class="size-3.5 text-brand-600 dark:text-brand-400" />
+                                        مدت‌های اعتبار و قیمت‌ها
                                     </p>
-                                    <div class="flex flex-wrap gap-1.5">
-                                        @foreach($plan->durationOptions() as $d)
-                                            @php($isSelected = ($durOpt?->duration_months ?? -1) === (int) $d->duration_months)
-                                            <button type="button" wire:click="selectDuration({{ $plan->id }}, {{ $d->duration_months }})"
-                                                    wire:key="dur-{{ $plan->id }}-{{ $d->duration_months }}"
-                                                    aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
-                                                    @class([
-                                                        'inline-flex cursor-pointer items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-                                                        'bg-brand-600 text-white shadow-sm' => $isSelected,
-                                                        'bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-brand-50 hover:text-brand-700 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700 dark:hover:bg-brand-500/10 dark:hover:text-brand-400' => !$isSelected,
-                                                    ])>
-                                                {{ $d->duration_label }}
-                                                <span @class(['text-white/70' => $isSelected, 'text-zinc-400' => !$isSelected]) class="tabular-nums">{{ $d->final_price <= 0 ? 'رایگان' : money($d->final_price, false) }}</span>
-                                            </button>
+                                    <div class="grid grid-cols-2 gap-2" role="list" aria-label="گزینه‌های مدت اعتبار">
+                                        @foreach($durOpts as $d)
+                                            <div class="rounded-xl bg-white p-2.5 ring-1 ring-zinc-200/80 transition-shadow hover:shadow-sm dark:bg-zinc-800 dark:ring-zinc-700/60"
+                                                 role="listitem"
+                                                 title="هنگام خرید می‌توانید این مدت را انتخاب کنید">
+                                                <div class="flex items-center justify-between gap-1">
+                                                    <span class="text-xs font-black text-zinc-700 dark:text-zinc-200">{{ $d->duration_label }}</span>
+                                                    @if($d->discount_percent > 0)
+                                                        <span class="shrink-0 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">{{ fa_num($d->discount_percent) }}٪</span>
+                                                    @endif
+                                                </div>
+                                                <div class="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                                                    @if($d->final_price <= 0)
+                                                        <span class="text-sm font-black text-emerald-600 dark:text-emerald-400">رایگان</span>
+                                                    @else
+                                                        <span class="text-base font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($d->final_price, false) }}</span>
+                                                        @if($d->has_discount)
+                                                            <span class="text-[11px] tabular-nums text-zinc-400 line-through">{{ money($d->price, false) }}</span>
+                                                        @endif
+                                                        <span class="text-[10px] text-zinc-400">تومان</span>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         @endforeach
                                     </div>
+                                    <p class="mt-2.5 flex items-center justify-center gap-1 text-center text-[10px] leading-4 text-zinc-400">
+                                        <x-icon name="shopping-cart" class="size-3" />
+                                        هنگام خرید، مدت اعتبار را انتخاب می‌کنید
+                                    </p>
+                                </div>
+                            @else
+                                <div class="flex items-end gap-2">
+                                    @if($plan->final_price <= 0)
+                                        <span class="text-2xl font-black text-emerald-600 dark:text-emerald-400">رایگان</span>
+                                    @else
+                                        <span class="text-2xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($plan->final_price) }}</span>
+                                        @if($plan->discount_price > 0 && $plan->price > $plan->final_price)
+                                            <span class="text-sm font-bold tabular-nums text-zinc-400 line-through">{{ money($plan->price) }}</span>
+                                        @endif
+                                        <span class="text-xs text-zinc-400">/ یک‌بار پرداخت</span>
+                                    @endif
                                 </div>
                             @endif
 
@@ -218,12 +243,12 @@
                             @php($checkoutFree = $pw['final'] <= 0)
                             <form wire:submit="buy" class="space-y-3 border-t border-zinc-100 bg-brand-50/50 p-5 dark:border-zinc-800 dark:bg-brand-500/5">
 
-                                {{-- انتخاب مدت اعتبار (طرح‌های چندمدتی) --}}
+                                {{-- انتخاب مدت اعتبار (طرح‌های چندمدتی) — پیش‌فرض: گزینهٔ اول --}}
                                 @if($plan->hasDurations())
                                     <div role="group" aria-label="انتخاب مدت اعتبار">
                                         <label class="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-200">
                                             <x-icon name="calendar-clock" class="size-3.5 text-brand-600 dark:text-brand-400" />
-                                            مدت اعتبار — یکی را انتخاب کنید
+                                            مدت اعتبار — انتخاب الزامی است (پیش‌فرض: گزینهٔ اول)
                                         </label>
                                         <div class="grid gap-2 sm:grid-cols-2">
                                             @foreach($plan->durationOptions() as $d)
