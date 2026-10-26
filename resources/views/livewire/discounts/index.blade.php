@@ -146,6 +146,7 @@
                 </x-field>
                 <x-field label="مقدار تخفیف" for="form.value" required hint="{{ $form['type'] === \App\Models\DiscountCode::TYPE_PERCENT ? 'عدد بین ۱ تا ۱۰۰' : 'مبلغ به تومان (حداقل ۱٬۰۰۰)' }}">
                     <x-input id="form.value" type="number" wire:model="form.value" min="1" />
+                    <x-money-preview target="form.value" :suffix="$form['type'] === \App\Models\DiscountCode::TYPE_PERCENT ? '٪ تخفیف' : 'تومان تخفیف'" />
                     @error('form.value') <p class="mt-1 text-xs font-bold text-rose-600 dark:text-rose-400">{{ $message }}</p> @enderror
                 </x-field>
             </div>

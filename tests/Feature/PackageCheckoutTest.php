@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Shop\PackageCheckout;
 use App\Models\DiscountCode;
+use App\Models\Gateway;
 use App\Models\PackageLicense;
 use App\Models\PackagePurchase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -321,5 +322,115 @@ class PackageCheckoutTest extends TestCase
         $this->get($url)
             ->assertOk()
             ->assertSee('این سفارش پرداخت شده است');
+    }
+
+    public function test_checkout_page_lists_active_gateways_with_default_selection(): void
+    {
+        // درگاه دومِ فعال + یک درگاه غیرفعال (نباید در لیست بیاید)
+        Gateway::create(['name' => 'زیبال', 'key' => 'zibal', 'is_active' => true, 'ordering' => 10]);
+        Gateway::create(['name' => 'غیرفعال', 'key' => 'off', 'is_active' => false, 'ordering' => 1]);
+
+        $package  = $this->makePackage();
+        $this->makePackageVersion($package);
+        $plan     = $this->makePlan($package, ['price' => 100000]);
+        $customer = $this->makeCustomer();
+
+        $purchase = PackagePurchase::create([
+            'package_id'      => $package->id,
+            'version_id'      => $package->latestVersion()->first()->id,
+            'pricing_plan_id' => $plan->id,
+            'customer_id'     => $customer->id,
+            'callback_url'    => 'https://example.com/pay/callback',
+            'gateway'         => 'local',
+            'amount'          => 100000,
+            'original_amount' => 100000,
+            'status'          => PackagePurchase::STATUS_PENDING,
+        ]);
+
+        $url = URL::temporarySignedRoute('shop.checkout', now()->addHour(), ['purchase' => $purchase->id]);
+
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('درگاه پرداخت را انتخاب کنید')
+            ->assertSee('زیبال')
+            ->assertSee('تست')
+            ->assertDontSee('غیرفعال');
+
+        Livewire::test(PackageCheckout::class, ['purchase' => $purchase])
+            // پیش‌فرض = درگاه ثبت‌شدهٔ خرید
+            ->assertSet('gatewayKey', 'local')
+            // کاربر می‌تواند درگاه را عوض کند
+            ->set('gatewayKey', 'zibal')
+            ->assertSet('gatewayKey', 'zibal')
+            // نام درگاه انتخابی در خروجی رندر می‌شود
+            ->assertSee('زیبال');
+    }
+
+    public function test_pay_rejects_invalid_gateway_selection(): void
+    {
+        $package  = $this->makePackage();
+        $this->makePackageVersion($package);
+        $plan     = $this->makePlan($package, ['price' => 100000]);
+        $customer = $this->makeCustomer();
+
+        $purchase = PackagePurchase::create([
+            'package_id'      => $package->id,
+            'version_id'      => $package->latestVersion()->first()->id,
+            'pricing_plan_id' => $plan->id,
+            'customer_id'     => $customer->id,
+            'gateway'         => 'local',
+            'amount'          => 100000,
+            'original_amount' => 100000,
+            'status'          => PackagePurchase::STATUS_PENDING,
+        ]);
+
+        Livewire::test(PackageCheckout::class, ['purchase' => $purchase])
+            ->set('gatewayKey', 'not-exists')
+            ->call('pay')
+            ->assertNoRedirect()
+            ->assertSee('درگاه');
+
+        $fresh = $purchase->fresh();
+
+        // تراکنشی ساخته نشده و خرید هنوز pending است
+        $this->assertNull($fresh->transaction_id);
+        $this->assertNull($fresh->payment_url);
+        $this->assertTrue($fresh->status === PackagePurchase::STATUS_PENDING);
+    }
+
+    public function test_pay_creates_transaction_with_selected_gateway(): void
+    {
+        Gateway::create(['name' => 'زیبال', 'key' => 'zibal', 'is_active' => true, 'ordering' => 10]);
+
+        $package  = $this->makePackage();
+        $this->makePackageVersion($package);
+        $plan     = $this->makePlan($package, ['price' => 100000]);
+        $customer = $this->makeCustomer();
+
+        // خرید بدون درگاهِ ثبت‌شده (رکوردهای قدیمی) → پیش‌فرض اولین درگاه فعال
+        $purchase = PackagePurchase::create([
+            'package_id'      => $package->id,
+            'version_id'      => $package->latestVersion()->first()->id,
+            'pricing_plan_id' => $plan->id,
+            'customer_id'     => $customer->id,
+            'callback_url'    => 'https://example.com/pay/callback',
+            'amount'          => 100000,
+            'original_amount' => 100000,
+            'status'          => PackagePurchase::STATUS_PENDING,
+        ]);
+
+        // بدون انتخاب کاربر → اولین درگاه فعال (زیبال با ordering=10 جلوتر از local=99)
+        Livewire::test(PackageCheckout::class, ['purchase' => $purchase])
+            ->assertSet('gatewayKey', 'zibal')
+            // انتخاب صریح درگاه تست
+            ->set('gatewayKey', 'local')
+            ->call('pay')
+            ->assertRedirect();
+
+        $fresh = $purchase->fresh();
+
+        $this->assertNotNull($fresh->transaction_id);
+        $this->assertSame('local', $fresh->gateway);
+        $this->assertStringContainsString('/payment/form/', (string) $fresh->payment_url);
     }
 }

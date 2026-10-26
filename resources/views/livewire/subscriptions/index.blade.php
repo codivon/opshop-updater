@@ -213,11 +213,13 @@
                 </x-field>
 
                 <x-field label="قیمت (تومان)" required>
-                    <x-input wire:model="form.price" type="number" min="0" step="any" inputmode="numeric" placeholder="350000" icon="banknote" dir="ltr" :class="$errors->has('form.price') ? 'input-error' : ''" />
+                    <x-input id="form.price" wire:model="form.price" type="number" min="0" step="any" inputmode="numeric" placeholder="350000" icon="banknote" dir="ltr" :class="$errors->has('form.price') ? 'input-error' : ''" />
+                    <x-money-preview target="form.price" />
                 </x-field>
 
                 <x-field label="تخفیف (تومان)">
-                    <x-input wire:model="form.discount" type="number" min="0" step="any" inputmode="numeric" placeholder="0" icon="tag" dir="ltr" :class="$errors->has('form.discount') ? 'input-error' : ''" />
+                    <x-input id="form.discount" wire:model="form.discount" type="number" min="0" step="any" inputmode="numeric" placeholder="0" icon="tag" dir="ltr" :class="$errors->has('form.discount') ? 'input-error' : ''" />
+                    <x-money-preview target="form.discount" suffix="تومان تخفیف" />
                 </x-field>
 
                 <x-field label="تاریخ شروع" required>

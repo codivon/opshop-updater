@@ -253,7 +253,8 @@
                 <x-toggle wire:model="form.is_free" label="این پکیج رایگان است" />
                 <div class="mt-4" x-show="! $wire.form.is_free" x-cloak>
                     <x-field label="قیمت پیش‌فرض (تومان)">
-                        <x-input wire:model="form.default_price" type="number" min="0" placeholder="950000" icon="banknote" dir="ltr" :class="$errors->has('form.default_price') ? 'input-error' : ''" />
+                        <x-input id="form.default_price" wire:model="form.default_price" type="number" min="0" placeholder="950000" icon="banknote" dir="ltr" :class="$errors->has('form.default_price') ? 'input-error' : ''" />
+                        <x-money-preview target="form.default_price" />
                     </x-field>
                 </div>
             </div>

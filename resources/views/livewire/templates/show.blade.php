@@ -660,6 +660,7 @@
                         <div class="grid grid-cols-2 gap-3">
                             <x-field label="قیمت (تومان)" for="eform.price">
                                 <x-input id="eform.price" type="number" min="0" wire:model="form.price" />
+                                <x-money-preview target="eform.price" />
                             </x-field>
                             <x-field label="تخفیف (٪)" for="eform.discount">
                                 <x-input id="eform.discount" type="number" min="0" max="100" wire:model="form.discount" />
@@ -674,6 +675,7 @@
                         <div class="grid grid-cols-2 gap-3">
                             <x-field label="قیمت (تومان)" for="eform.exclusive_price" hint="صفر = غیرفعال">
                                 <x-input id="eform.exclusive_price" type="number" min="0" wire:model="form.exclusive_price" />
+                                <x-money-preview target="eform.exclusive_price" />
                             </x-field>
                             <x-field label="تخفیف (٪)" for="eform.exclusive_discount">
                                 <x-input id="eform.exclusive_discount" type="number" min="0" max="100" wire:model="form.exclusive_discount" />

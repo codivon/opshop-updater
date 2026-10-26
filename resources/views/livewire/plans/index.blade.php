@@ -243,14 +243,20 @@
                                        class="input w-24" title="مدت اعتبار (ماه) — ۰ = نامحدود" aria-label="مدت اعتبار (ماه)" />
                                 <span class="whitespace-nowrap text-xs text-zinc-400">ماه</span>
                             </div>
-                            <div class="flex flex-1 items-center gap-1.5">
-                                <input type="number" wire:model="formDurations.{{ $i }}.price" min="0" placeholder="قیمت"
-                                       class="input flex-1" title="قیمت این مدت (تومان)" aria-label="قیمت این مدت" />
-                                <span class="whitespace-nowrap text-xs text-zinc-400">تومان</span>
+                            <div class="flex min-w-40 flex-1 flex-col">
+                                <div class="flex items-center gap-1.5">
+                                    <input id="plan-dur-{{ $i }}-price" type="number" wire:model="formDurations.{{ $i }}.price" min="0" placeholder="قیمت"
+                                           class="input flex-1" title="قیمت این مدت (تومان)" aria-label="قیمت این مدت" />
+                                    <span class="whitespace-nowrap text-xs text-zinc-400">تومان</span>
+                                </div>
+                                <x-money-preview target="plan-dur-{{ $i }}-price" />
                             </div>
-                            <div class="flex items-center gap-1.5">
-                                <input type="number" wire:model="formDurations.{{ $i }}.discount_price" min="0" placeholder="تخفیف"
-                                       class="input w-28" title="مبلغ تخفیف (اختیاری)" aria-label="مبلغ تخفیف" />
+                            <div class="flex min-w-32 flex-col">
+                                <div class="flex items-center gap-1.5">
+                                    <input id="plan-dur-{{ $i }}-disc" type="number" wire:model="formDurations.{{ $i }}.discount_price" min="0" placeholder="تخفیف"
+                                           class="input w-28" title="مبلغ تخفیف (اختیاری)" aria-label="مبلغ تخفیف" />
+                                </div>
+                                <x-money-preview target="plan-dur-{{ $i }}-disc" suffix="تومان تخفیف" />
                             </div>
                             <label class="flex cursor-pointer items-center gap-1.5" title="نمایش در فروشگاه">
                                 <x-toggle wire:model="formDurations.{{ $i }}.is_active" />

@@ -174,6 +174,7 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <x-field label="قیمت (تومان)" for="form.price">
                     <x-input id="form.price" type="number" min="0" wire:model="form.price" />
+                    <x-money-preview target="form.price" />
                 </x-field>
                 <x-field label="تخفیف (٪)" for="form.discount">
                     <x-input id="form.discount" type="number" min="0" max="100" wire:model="form.discount" />

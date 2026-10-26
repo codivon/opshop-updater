@@ -733,7 +733,8 @@
                 <x-toggle wire:model="form.is_free" label="این پکیج رایگان است" />
                 <div class="mt-4" x-show="! $wire.form.is_free" x-cloak>
                     <x-field label="قیمت پیش‌فرض (تومان)">
-                        <x-input wire:model="form.default_price" type="number" min="0" icon="banknote" dir="ltr" :class="$errors->has('form.default_price') ? 'input-error' : ''" />
+                        <x-input id="form.default_price" wire:model="form.default_price" type="number" min="0" icon="banknote" dir="ltr" :class="$errors->has('form.default_price') ? 'input-error' : ''" />
+                        <x-money-preview target="form.default_price" />
                     </x-field>
                 </div>
             </div>
@@ -918,11 +919,13 @@
 
             <div class="grid gap-4 sm:grid-cols-2">
                 <x-field label="قیمت (تومان)" required>
-                    <x-input wire:model="planForm.price" type="number" min="0" placeholder="950000" icon="banknote" dir="ltr" :class="$errors->has('planForm.price') ? 'input-error' : ''" />
+                    <x-input id="planForm.price" wire:model="planForm.price" type="number" min="0" placeholder="950000" icon="banknote" dir="ltr" :class="$errors->has('planForm.price') ? 'input-error' : ''" />
+                    <x-money-preview target="planForm.price" />
                 </x-field>
 
                 <x-field label="قیمت با تخفیف (تومان)" hint="اختیاری — باید کمتر از قیمت اصلی باشد.">
-                    <x-input wire:model="planForm.discount_price" type="number" min="0" placeholder="807500" dir="ltr" :class="$errors->has('planForm.discount_price') ? 'input-error' : ''" />
+                    <x-input id="planForm.discount_price" wire:model="planForm.discount_price" type="number" min="0" placeholder="807500" dir="ltr" :class="$errors->has('planForm.discount_price') ? 'input-error' : ''" />
+                    <x-money-preview target="planForm.discount_price" suffix="تومان تخفیف" />
                 </x-field>
             </div>
 

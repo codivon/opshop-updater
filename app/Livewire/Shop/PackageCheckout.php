@@ -4,10 +4,12 @@ namespace App\Livewire\Shop;
 
 use App\Livewire\Concerns\WithToasts;
 use App\Models\DiscountCode;
+use App\Models\Gateway;
 use App\Models\PackagePurchase;
 use App\Services\DiscountService;
 use App\Services\LicenseService;
 use App\Services\PaymentService;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -18,14 +20,16 @@ use RuntimeException;
  *
  *  کاربرِ پروژه خریدار با لینک امضادار (checkout_url پاسخ API) به این صفحه می‌آید و:
  *   - نام/تصویر پکیج، طرح انتخابی و مبلغ را می‌بیند
+ *   - یکی از درگاه‌های فعال را انتخاب می‌کند
  *   - می‌تواند کد تخفیف وارد و اعمال کند (پیش‌نمایش لحظه‌ای مبلغ)
  *   - با «پرداخت» وارد درگاه می‌شود (تراکنش درگاه همین‌جا ساخته می‌شود تا مبلغ
  *     نهایی پس از کد تخفیف مبنای شارژ باشد)
  *   - با «انصراف» خرید لغو و به فروشگاه مبدأ بازمی‌گردد
  *
  *  مسیر با middleware('signed') محافظت شده است (لینک ۲۴ ساعته از API).
+ *  لایوت مینیمال checkout — بدون هدر/فوتر فروشگاه؛ فقط دکمهٔ تم روشن/تیره.
  */
-#[Layout('components.layouts.shop')]
+#[Layout('components.layouts.checkout')]
 #[Title('تسویه سفارش')]
 class PackageCheckout extends Component
 {
@@ -51,6 +55,9 @@ class PackageCheckout extends Component
     /** خطای عمومی صفحه (مثلاً شکست ساخت تراکنش درگاه) */
     public ?string $pageError = null;
 
+    /** درگاه پرداخت انتخابی کاربر (key از جدول gateways) */
+    public string $gatewayKey = '';
+
     public function mount(PackagePurchase $purchase): void
     {
         $purchase->load([
@@ -67,6 +74,11 @@ class PackageCheckout extends Component
             $this->appliedCode = $this->purchase->discountCode?->code;
             $this->codeDiscount = (int) $this->purchase->discount_amount;
         }
+
+        // پیش‌انتخاب درگاه: درگاه ثبت‌شدهٔ خرید (تراکنش در جریان) یا اولین درگاه فعال
+        $this->gatewayKey = (string) ($this->purchase->gateway
+            ?: $this->gateways->first()?->key
+            ?: '');
     }
 
     /* ------------------------------------------------------------------ */
@@ -97,6 +109,30 @@ class PackageCheckout extends Component
     public function getIsPayableProperty(): bool
     {
         return $this->purchase->status === PackagePurchase::STATUS_PENDING;
+    }
+
+    /** درگاه‌های فعال پنل (به ترتیب ordering) */
+    #[Computed]
+    public function gateways()
+    {
+        return Gateway::query()
+            ->active()
+            ->orderBy('ordering')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /** نام درگاه مرتبط با وضعیت فعلی (انتخاب زنده یا درگاه تراکنشِ در جریان) */
+    public function getSelectedGatewayNameProperty(): ?string
+    {
+        $key = $this->paymentStarted ? (string) $this->purchase->gateway : $this->gatewayKey;
+
+        if ($key === '') {
+            return null;
+        }
+
+        return $this->gateways->firstWhere('key', $key)?->name
+            ?? strtoupper($key);
     }
 
     /* ------------------------------------------------------------------ */
@@ -215,7 +251,7 @@ class PackageCheckout extends Component
             }
 
             $licenseService->issueLicense($this->purchase, $plan);
-            $this->purchase->markAsPaid($this->purchase->gateway);
+            $this->purchase->markAsPaid($this->gatewayKey ?: $this->purchase->gateway);
 
             $this->toast('کد تخفیف کل مبلغ را پوشش داد — لایسنس شما صادر شد.');
 
@@ -227,8 +263,17 @@ class PackageCheckout extends Component
             return $this->redirectToGateway($this->purchase->payment_url);
         }
 
+        // اعتبارسنجی درگاه انتخابی (فقط وقتی تراکنش هنوز شروع نشده)
+        if (! $this->paymentStarted) {
+            if ($this->gatewayKey === '' || ! $this->gateways->firstWhere('key', $this->gatewayKey)) {
+                $this->pageError = 'لطفاً یکی از درگاه‌های پرداخت فعال را انتخاب کنید.';
+
+                return null;
+            }
+        }
+
         try {
-            $payment = $paymentService->createPayment($this->purchase, $this->purchase->gateway ?: null);
+            $payment = $paymentService->createPayment($this->purchase, $this->gatewayKey ?: null);
         } catch (RuntimeException $e) {
             $this->pageError = $e->getMessage();
 
