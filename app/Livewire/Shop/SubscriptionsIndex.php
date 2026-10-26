@@ -8,6 +8,7 @@ use App\Models\DiscountCode;
 use App\Models\Gateway;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanDuration;
 use App\Services\DiscountService;
 use App\Services\SubscriptionService;
 use Livewire\Attributes\Computed;
@@ -36,6 +37,9 @@ class SubscriptionsIndex extends Component
     /** کد تخفیف اعمال‌شده (پس از اعتبارسنجی سمت سرور — کد نرمال‌شده) */
     public string $appliedCode = '';
 
+    /** مدت اعتبار انتخابی هر طرح: [plan_id => duration_months] */
+    public array $selectedDurations = [];
+
     public function mount(): void
     {
         $this->updateCode = (string) session('shop_update_code', '');
@@ -47,10 +51,57 @@ class SubscriptionsIndex extends Component
     {
         return SubscriptionPlan::query()
             ->active()
-            ->with(['packages:id,name,slug,category'])
+            ->with(['packages:id,name,slug,category', 'durations'])
             ->orderBy('sort_order')
             ->orderByDesc('id')
             ->get();
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  مدت اعتبار (چندگزینه‌ای)                                          */
+    /* ---------------------------------------------------------------- */
+
+    /** مدت انتخاب‌شدهٔ یک طرح — یا null (فال‌بک به تک‌مدت پیش‌فرض طرح) */
+    public function selectedDurationFor(SubscriptionPlan $plan): ?SubscriptionPlanDuration
+    {
+        $months = $this->selectedDurations[$plan->id] ?? null;
+
+        return $months === null ? null : $plan->durationOption((int) $months);
+    }
+
+    /**
+     * مدتِ نمایشی کارت/فرم: انتخاب مشتری، وگرنه اولین گزینهٔ فعال طرح
+     * (هم‌راستا با پیش‌انتخاب فرم خرید — کارت هرگز قیمت گمراه‌کننده نشان نمی‌دهد)
+     */
+    public function displayDurationFor(SubscriptionPlan $plan): ?SubscriptionPlanDuration
+    {
+        if (!$plan->hasDurations()) {
+            return null;
+        }
+
+        return $this->selectedDurationFor($plan) ?? $plan->durationOptions()->first();
+    }
+
+    /** مبلغ نهایی مؤثر طرح (مدت انتخابی یا پیش‌فرض) — پایهٔ محاسبهٔ کد تخفیف و پرداخت */
+    public function effectiveBaseFor(SubscriptionPlan $plan): int
+    {
+        $option = $this->selectedDurationFor($plan);
+
+        return $option ? $option->final_price : $plan->final_price;
+    }
+
+    /** انتخاب مدت اعتبار از کارت/فرم خرید */
+    public function selectDuration(int $planId, int $months): void
+    {
+        /** @var SubscriptionPlan|null $plan */
+        $plan = $this->plans->firstWhere('id', $planId);
+
+        if (!$plan || !$plan->durationOption($months)) {
+            return; // مدت نامعتبر نادیده گرفته می‌شود
+        }
+
+        // با تغییر مدت، پیش‌نمایش تخفیف قبلی بر اساس مبلغ جدید به‌روز می‌شود
+        $this->selectedDurations[$planId] = $months;
     }
 
     #[Computed]
@@ -93,6 +144,17 @@ class SubscriptionsIndex extends Component
             $this->appliedCode = '';
         }
 
+        // باز کردن فرم خرید: اگر مدتی انتخاب نشده، اولین گزینهٔ فعال پیش‌انتخاب می‌شود
+        $plan = SubscriptionPlan::active()->where('slug', trim($slug))->first();
+
+        if ($plan && $plan->hasDurations() && !isset($this->selectedDurations[$plan->id])) {
+            $first = $plan->durationOptions()->first();
+
+            if ($first) {
+                $this->selectedDurations[$plan->id] = (int) $first->duration_months;
+            }
+        }
+
         $this->buyingSlug = $this->buyingSlug === $slug ? '' : $slug;
     }
 
@@ -112,7 +174,7 @@ class SubscriptionsIndex extends Component
     public function applyDiscount(DiscountService $discountService): void
     {
         $plan = $this->buyingPlan();
-        $base = $plan ? (int) $plan->final_price : 0;
+        $base = $plan ? $this->effectiveBaseFor($plan) : 0;
 
         if ($base <= 0) {
             $this->toast('ابتدا طرح موردنظر را برای خرید انتخاب کنید.', 'warning');
@@ -146,11 +208,12 @@ class SubscriptionsIndex extends Component
 
     /**
      * مبلغ نهایی طرح با احتساب کد تخفیف اعمال‌شده (برای نمایش در فرم خرید).
+     * پایهٔ محاسبه: مدت اعتبار انتخابی مشتری (یا تک‌مدت پیش‌فرض طرح).
      * خروجی: [base, discount, final] — بدون تخفیف معتبر → discount = 0
      */
     public function priceWithDiscount(SubscriptionPlan $plan): array
     {
-        $base = (int) $plan->final_price;
+        $base = $this->effectiveBaseFor($plan);
 
         if ($this->appliedCode === '' || $base <= 0) {
             return ['base' => $base, 'discount' => 0, 'final' => $base];
@@ -177,7 +240,7 @@ class SubscriptionsIndex extends Component
         }
 
         $plan = $this->buyingPlan();
-        $base = $plan ? (int) $plan->final_price : 0;
+        $base = $plan ? $this->effectiveBaseFor($plan) : 0;
 
         if ($base <= 0) {
             return null;
@@ -220,9 +283,24 @@ class SubscriptionsIndex extends Component
             return;
         }
 
+        // ---- مدت اعتبار انتخابی (طرح‌های چندمدتی) ----
+        /** @var SubscriptionPlanDuration|null $durationOption */
+        $durationOption = $this->selectedDurationFor($plan);
+
+        if ($plan->hasDurations() && !$durationOption) {
+            $this->toast('یک مدت اعتبار برای این طرح انتخاب کنید.', 'error');
+
+            return;
+        }
+
+        $durationMonths = $durationOption ? (int) $durationOption->duration_months : null;
+
+        // مبلغ مؤثر بر اساس مدت انتخابی (فال‌بک: تک‌مدت پیش‌فرض طرح)
+        $effectiveFinal = $durationOption ? $durationOption->final_price : $plan->final_price;
+
         // ---- کد تخفیف (راستی‌آزمایی مجدد سمت سرور) ----
         $coupon = null;
-        $base   = (int) $plan->final_price;
+        $base   = $effectiveFinal;
 
         if ($base > 0) {
             $couponResult = $discountService->resolve(
@@ -245,9 +323,10 @@ class SubscriptionsIndex extends Component
             $result = $service->purchase(
                 $customer,
                 $plan,
-                $plan->final_price > 0 ? $this->gatewayKey : null,
+                $effectiveFinal > 0 && $this->gatewayKey !== '' ? $this->gatewayKey : null,
                 null,
-                $coupon
+                $coupon,
+                $durationMonths,
             );
         } catch (\Throwable $e) {
             $this->toast($e->getMessage(), 'error');

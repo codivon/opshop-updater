@@ -45,7 +45,7 @@ class ApiSubscriptionController extends Controller
 
             $plans = SubscriptionPlan::query()
                 ->active()
-                ->with(['packages:id,name,slug,category,short_description'])
+                ->with(['packages:id,name,slug,category,short_description', 'durations'])
                 ->orderBy('sort_order')
                 ->orderByDesc('id')
                 ->when($request->filled('search'), function ($q) use ($request) {
@@ -80,8 +80,9 @@ class ApiSubscriptionController extends Controller
     public function purchase(Request $request, string $slug): JsonResponse
     {
         $request->validate([
-            'callback_url' => 'required|url',
-            'gateway'      => 'nullable|string|max:32',
+            'callback_url'    => 'required|url',
+            'gateway'         => 'nullable|string|max:32',
+            'duration_months' => 'nullable|integer|min:0|max:120',
         ]);
 
         try {
@@ -116,7 +117,9 @@ class ApiSubscriptionController extends Controller
                 $customer,
                 $plan,
                 $gatewayKey,
-                $request->callback_url
+                $request->callback_url,
+                null,
+                $request->filled('duration_months') ? (int) $request->duration_months : null,
             );
 
             /** @var SubscriptionOrder $order */
@@ -124,12 +127,13 @@ class ApiSubscriptionController extends Controller
 
             if (($result['is_free'] ?? false) || $order->isPaid()) {
                 return response()->json([
-                    'is_free'       => true,
-                    'order_id'      => $order->id,
-                    'plan'          => $order->plan_name,
-                    'admin_status'  => $order->admin_status,   // pending → در انتظار تأیید مدیر
-                    'status'        => $order->status,
-                    'message'       => $result['message'] ?? 'درخواست اشتراک ثبت شد؛ پس از تأیید مدیر فعال می‌شود.',
+                    'is_free'        => true,
+                    'order_id'       => $order->id,
+                    'plan'           => $order->plan_name,
+                    'duration_months' => $order->duration_months,
+                    'admin_status'   => $order->admin_status,   // pending → در انتظار تأیید مدیر
+                    'status'         => $order->status,
+                    'message'        => $result['message'] ?? 'درخواست اشتراک ثبت شد؛ پس از تأیید مدیر فعال می‌شود.',
                 ]);
             }
 
@@ -139,6 +143,7 @@ class ApiSubscriptionController extends Controller
                 'amount'         => $result['amount'],
                 'gateway'        => $result['gateway'],
                 'order_id'       => $order->id,
+                'duration_months' => $order->duration_months,
             ]);
         } catch (RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], exception_status($e, 422));
@@ -346,6 +351,8 @@ class ApiSubscriptionController extends Controller
 
     private function presentPlan(SubscriptionPlan $plan): array
     {
+        $durations = $plan->durationOptions()->values();
+
         return [
             'id'              => $plan->id,
             'name'            => $plan->name,
@@ -358,6 +365,21 @@ class ApiSubscriptionController extends Controller
             'final_price'     => $plan->final_price,
             'is_free'         => $plan->is_free,
             'is_one_time'     => (bool) $plan->is_one_time,
+            // مدت‌های اعتبار چندگزینه‌ای — مشتری هنگام خرید یکی را انتخاب می‌کند
+            // (duration_months = 0 یعنی نامحدود)؛ خالی = طرح تک‌مدتی از فیلدهای پیش‌فرض
+            'has_durations'   => $durations->isNotEmpty(),
+            'durations'       => $durations->map(fn (
+                \App\Models\SubscriptionPlanDuration $d
+            ) => [
+                'id'              => $d->id,
+                'duration_months' => (int) $d->duration_months,
+                'duration_label'  => $d->duration_label,
+                'price'           => (int) $d->price,
+                'discount_price'  => $d->discount_price !== null ? (int) $d->discount_price : null,
+                'final_price'     => $d->final_price,
+                'is_free'         => $d->final_price <= 0,
+                'sort_order'      => (int) $d->sort_order,
+            ])->values()->all(),
             'features'        => $plan->features ?? [],
             'packages'        => $plan->packages->map(fn ($p) => [
                 'slug'        => $p->slug,

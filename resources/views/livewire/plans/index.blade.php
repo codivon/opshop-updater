@@ -104,7 +104,21 @@
                                     @endif
                                 </td>
                                 <td class="whitespace-nowrap">
-                                    @if((int) $plan->duration_months === 0)
+                                    @if($plan->durations->where('is_active', true)->isNotEmpty())
+                                        {{-- چندگزینه‌ای: چیپ هر مدت + قیمت نهایی آن --}}
+                                        <div class="flex max-w-xs flex-wrap items-center gap-1">
+                                            @foreach($plan->durations->filter(fn ($d) => $d->is_active)->take(4) as $duration)
+                                                <span class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2 py-0.5 text-[11px] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                                                      title="{{ fa_num(money($duration->final_price)) }} تومان">
+                                                    {{ $duration->duration_label }}
+                                                    <span class="tabular-nums text-zinc-400">{{ $duration->final_price <= 0 ? 'رایگان' : fa_num(money($duration->final_price)) }}</span>
+                                                </span>
+                                            @endforeach
+                                            @if($plan->durations->where('is_active', true)->count() > 4)
+                                                <span class="text-[11px] font-bold text-zinc-400">+{{ fa_num($plan->durations->where('is_active', true)->count() - 4) }}</span>
+                                            @endif
+                                        </div>
+                                    @elseif((int) $plan->duration_months === 0)
                                         <span class="inline-flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400">
                                             <x-icon name="infinity" class="size-3.5" />
                                             نامحدود
@@ -200,20 +214,74 @@
             </x-field>
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <x-field label="مدت اعتبار (ماه) *" error="form.duration_months">
+                <x-field label="مدت پیش‌فرض (ماه) *" error="form.duration_months">
                     <x-input wire:model="form.duration_months" type="number" min="0" max="120" />
-                    <p class="mt-1 text-xs text-zinc-400">۰ = نامحدود</p>
+                    <p class="mt-1 text-xs text-zinc-400">۰ = نامحدود — وقتی مدت‌های اختصاصی ثبت نشده باشد ملاک است</p>
                 </x-field>
-                <x-field label="قیمت (تومان) *" error="form.price">
+                <x-field label="قیمت پیش‌فرض (تومان) *" error="form.price">
                     <x-input wire:model="form.price" type="number" min="0" />
                     <p class="mt-1 text-xs text-zinc-400">۰ = رایگان</p>
                 </x-field>
-                <x-field label="مبلغ تخفیف" error="form.discount_price">
+                <x-field label="مبلغ تخفیف پیش‌فرض" error="form.discount_price">
                     <x-input wire:model="form.discount_price" type="number" min="0" placeholder="اختیاری" />
                 </x-field>
                 <x-field label="ترتیب نمایش" error="form.sort_order">
                     <x-input wire:model="form.sort_order" type="number" min="0" />
                 </x-field>
+            </div>
+
+            {{-- مدت‌های اعتبار (چندگزینه‌ای) --}}
+            <div class="rounded-2xl ring-1 ring-zinc-200/70 dark:ring-zinc-700/50">
+                <div class="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
+                    <div>
+                        <div class="flex items-center gap-2 text-sm font-bold text-zinc-800 dark:text-zinc-100">
+                            <x-icon name="clock" class="size-4 text-brand-600 dark:text-brand-400" />
+                            مدت‌های اعتبار (چندگزینه‌ای)
+                        </div>
+                        <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                            هر ردیف یک گزینه برای مشتری است (مثلاً ۱ ماهه / ۳ ماهه / سالانه) با قیمت مستقل.
+                            اگر ردیفی ثبت نشود، فقط مدت و قیمت پیش‌فرض بالا به مشتری نمایش داده می‌شود.
+                        </p>
+                    </div>
+                    <x-btn variant="soft" size="sm" icon="plus" wire:click="addDurationRow">افزودن مدت</x-btn>
+                </div>
+                <div class="space-y-2 p-4">
+                    @foreach($formDurations as $i => $row)
+                        <div class="flex flex-wrap items-center gap-2 rounded-xl bg-zinc-50/60 p-2 dark:bg-zinc-800/40" wire:key="plan-duration-{{ $i }}">
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" wire:model="formDurations.{{ $i }}.duration_months" min="0" max="120" placeholder="مدت"
+                                       class="input w-24" title="مدت اعتبار (ماه) — ۰ = نامحدود" aria-label="مدت اعتبار (ماه)" />
+                                <span class="whitespace-nowrap text-xs text-zinc-400">ماه</span>
+                            </div>
+                            <div class="flex flex-1 items-center gap-1.5">
+                                <input type="number" wire:model="formDurations.{{ $i }}.price" min="0" placeholder="قیمت"
+                                       class="input flex-1" title="قیمت این مدت (تومان)" aria-label="قیمت این مدت" />
+                                <span class="whitespace-nowrap text-xs text-zinc-400">تومان</span>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <input type="number" wire:model="formDurations.{{ $i }}.discount_price" min="0" placeholder="تخفیف"
+                                       class="input w-28" title="مبلغ تخفیف (اختیاری)" aria-label="مبلغ تخفیف" />
+                            </div>
+                            <label class="flex cursor-pointer items-center gap-1.5" title="نمایش در فروشگاه">
+                                <x-toggle wire:model="formDurations.{{ $i }}.is_active" />
+                                <span class="whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">فعال</span>
+                            </label>
+                            <button type="button" wire:click="removeDurationRow({{ $i }})"
+                                    class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                                    title="حذف مدت">
+                                <x-icon name="trash" class="size-4" />
+                            </button>
+                            @foreach(['duration_months', 'price', 'discount_price'] as $field)
+                                @error('formDurations.' . $i . '.' . $field)
+                                    <p class="w-full text-xs font-bold text-rose-500">{{ $message }}</p>
+                                @enderror
+                            @endforeach
+                        </div>
+                    @endforeach
+                    @if(count($formDurations) === 0)
+                        <p class="text-xs text-zinc-400">مدتی ثبت نشده — «افزودن مدت» را بزنید تا مشتری بتواند چند گزینه داشته باشد.</p>
+                    @endif
+                </div>
             </div>
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">

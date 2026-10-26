@@ -512,7 +512,7 @@ JSON,
                         'method' => 'GET',
                         'path' => '/subscription-plans',
                         'title' => 'لیست طرح‌های اشتراک',
-                        'desc' => 'طرح‌های فعال با امکانات (features)، پکیج‌های همراه (با مدت رایگان هر کدام) و درگاه‌های فعال — برای رندر صفحهٔ فروش اشتراک در پروژهٔ خریدار.',
+                        'desc' => 'طرح‌های فعال با امکانات (features)، پکیج‌های همراه (با مدت رایگان هر کدام)، مدت‌های اعتبار چندگزینه‌ای (durations) و درگاه‌های فعال — برای رندر صفحهٔ فروش اشتراک در پروژهٔ خریدار.',
                         'params' => [
                             ['name' => 'search', 'in' => 'query', 'type' => 'string', 'required' => false, 'desc' => 'جست‌وجو در نام و نامک طرح'],
                             ['name' => 'per_page', 'in' => 'query', 'type' => 'integer', 'required' => false, 'desc' => 'تعداد در هر صفحه (پیش‌فرض ۱۵)'],
@@ -533,6 +533,12 @@ JSON,
       "final_price": 3900000,
       "is_free": false,
       "is_one_time": false,
+      "has_durations": true,
+      "durations": [
+        { "id": 7, "duration_months": 1, "duration_label": "۱ ماه", "price": 490000, "discount_price": null, "final_price": 490000, "is_free": false, "sort_order": 1 },
+        { "id": 8, "duration_months": 3, "duration_label": "۳ ماه", "price": 1290000, "discount_price": 100000, "final_price": 1190000, "is_free": false, "sort_order": 2 },
+        { "id": 9, "duration_months": 12, "duration_label": "۱۲ ماه", "price": 4900000, "discount_price": 1000000, "final_price": 3900000, "is_free": false, "sort_order": 3 }
+      ],
       "features": ["پشتیبانی ویژه", "آپدیت نامحدود"],
       "packages": [
         { "slug": "shop-package", "name": "پکیج فروشگاهی", "free_months": 6, "free_label": "۶ ماه رایگان" }
@@ -548,20 +554,22 @@ JSON,
                         'method' => 'POST',
                         'path' => '/subscription-plans/{slug}/purchase',
                         'title' => 'خرید اشتراک',
-                        'desc' => 'طرح پولی → payment_url (همان قرارداد خرید پکیج). طرح رایگان → سفارش با admin_status=pending ثبت می‌شود و پس از تأیید مدیر فعال می‌گردد.',
+                        'desc' => 'طرح پولی → payment_url (همان قرارداد خرید پکیج). طرح رایگان → سفارش با admin_status=pending ثبت می‌شود و پس از تأیید مدیر فعال می‌گردد. برای طرح‌های چندمدتی، مدت انتخابی را با duration_months بفرستید (از لیست durations پاسخ subscription-plans).',
                         'params' => [
                             ['name' => 'callback_url', 'in' => 'body', 'type' => 'url', 'required' => true, 'desc' => 'آدرس بازگشت پس از پرداخت'],
                             ['name' => 'gateway', 'in' => 'body', 'type' => 'string', 'required' => false, 'desc' => 'کلید درگاه فعال'],
+                            ['name' => 'duration_months', 'in' => 'body', 'type' => 'integer', 'required' => false, 'desc' => 'مدت اعتبار انتخابی (۰ = نامحدود) — برای طرح‌های چندمدتی؛ خالی = مدت پیش‌فرض طرح'],
                         ],
-                        'request' => $auth($b.'/subscription-plans/gold/purchase', '  -X POST '."\n".'  -H "Content-Type: application/json" '."\n".'  -d \'{"callback_url": "https://your-site.com/payment-result"}\''),
-                        'sample' => $this->samples('POST', $b.'/subscription-plans/gold/purchase', ['callback_url' => 'https://your-site.com/payment-result']),
+                        'request' => $auth($b.'/subscription-plans/gold/purchase', '  -X POST '."\n".'  -H "Content-Type: application/json" '."\n".'  -d \'{"callback_url": "https://your-site.com/payment-result", "duration_months": 3}\''),
+                        'sample' => $this->samples('POST', $b.'/subscription-plans/gold/purchase', ['callback_url' => 'https://your-site.com/payment-result', 'duration_months' => 3]),
                         'response' => <<<'JSON'
 {
   "payment_url": "https://gateway.example.com/start?...",
   "transaction_id": "tr_7g8h9i0j",
-  "amount": 3900000,
+  "amount": 1190000,
   "gateway": "zarinpal",
-  "order_id": 12
+  "order_id": 12,
+  "duration_months": 3
 }
 JSON,
                         'alt_response_label' => 'پاسخ طرح رایگان',

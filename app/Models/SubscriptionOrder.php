@@ -151,4 +151,28 @@ class SubscriptionOrder extends Model
             ?? $this->meta['plan']['name']
             ?? 'طرح حذف‌شده';
     }
+
+    /** مدت اعتبار این سفارش (ماه) — اولویت با مدت انتخاب‌شدهٔ مشتری، سپس مدت فعلی طرح */
+    public function getDurationMonthsAttribute(): ?int
+    {
+        $months = $this->meta['chosen_duration']['duration_months']
+            ?? $this->plan?->duration_months
+            ?? $this->meta['plan']['duration_months']
+            ?? null;
+
+        return $months === null ? null : (int) $months;
+    }
+
+    /** برچسب مدت اعتبار سفارش (مثل «۳ ماه» یا «نامحدود») */
+    public function getDurationLabelAttribute(): string
+    {
+        $months = $this->duration_months;
+
+        return match (true) {
+            $months === null => '—',
+            $months === 0    => 'نامحدود',
+            $months === 1    => '۱ ماه',
+            default          => fa_num($months) . ' ماه',
+        };
+    }
 }

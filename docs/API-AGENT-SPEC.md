@@ -320,6 +320,12 @@ with plain `<img src>` on the buyer site.
       "final_price": 3900000,
       "is_free": false,
       "is_one_time": false,
+      "has_durations": true,
+      "durations": [
+        { "id": 7, "duration_months": 1, "duration_label": "۱ ماه", "price": 490000, "discount_price": null, "final_price": 490000, "is_free": false, "sort_order": 1 },
+        { "id": 8, "duration_months": 3, "duration_label": "۳ ماه", "price": 1290000, "discount_price": 100000, "final_price": 1190000, "is_free": false, "sort_order": 2 },
+        { "id": 9, "duration_months": 12, "duration_label": "۱۲ ماه", "price": 4900000, "discount_price": 1000000, "final_price": 3900000, "is_free": false, "sort_order": 3 }
+      ],
       "features": ["پشتیبانی ویژه", "آپدیت نامحدود"],
       "packages": [
         { "slug": "shop-package", "name": "پکیج فروشگاهی", "free_months": 6, "free_label": "۶ ماه رایگان" }
@@ -331,12 +337,20 @@ with plain `<img src>` on the buyer site.
 }
 ```
 
+**Multi-duration plans**: a plan may define several validity periods (1/3/6/12 months…),
+each with its own `price`/`discount_price`/`final_price`. Render one selectable option per entry
+of `durations` and send the chosen `duration_months` at purchase. `duration_months: 0` = unlimited.
+If `has_durations` is `false`, the plan uses its single default `final_price` and no
+`duration_months` body param is needed.
+
 #### `POST /subscription-plans/{slug}/purchase`
 
-Body: `callback_url` (required), `gateway` (optional).
+Body: `callback_url` (required), `gateway` (optional), `duration_months` (optional int —
+chosen validity period for multi-duration plans; omit for single-duration plans; `0` = unlimited).
+Invalid duration → 422 `"مدت اعتبار انتخاب‌شده برای این طرح معتبر نیست."`
 
-- Paid → `{"payment_url": "...", "transaction_id": "tr_7g8h9i0j", "amount": 3900000, "gateway": "zarinpal", "order_id": 12}`
-- Free plan → `{"is_free": true, "order_id": 13, "plan": "طرح آزمایشی", "admin_status": "pending", "status": "pending", "message": "درخواست اشتراک ثبت شد؛ پس از تأیید مدیر فعال می‌شود."}`
+- Paid → `{"payment_url": "...", "transaction_id": "tr_7g8h9i0j", "amount": 1190000, "gateway": "zarinpal", "order_id": 12, "duration_months": 3}`
+- Free plan → `{"is_free": true, "order_id": 13, "plan": "طرح آزمایشی", "duration_months": 1, "admin_status": "pending", "status": "pending", "message": "درخواست اشتراک ثبت شد؛ پس از تأیید مدیر فعال می‌شود."}`
 
 #### `POST /subscriptions/payments/{transactionId}/verify`
 

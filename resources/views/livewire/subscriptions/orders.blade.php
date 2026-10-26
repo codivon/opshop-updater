@@ -126,14 +126,13 @@
                                         <x-icon name="crown" class="size-4 shrink-0 text-amber-500" />
                                         <div class="min-w-0">
                                             <p class="truncate text-sm font-medium text-zinc-700 dark:text-zinc-200">{{ $order->plan_name }}</p>
-                                            @if($order->plan)
-                                                <p class="text-xs text-zinc-400">
-                                                    {{ $order->plan->duration_label }}
-                                                    @if(!empty($order->meta['plan']['packages']))
-                                                        · {{ fa_num(count($order->meta['plan']['packages'])) }} پکیج رایگان
-                                                    @endif
-                                                </p>
-                                            @endif
+                                            <p class="text-xs text-zinc-400">
+                                                {{-- مدت انتخاب‌شدهٔ مشتری (meta) یا مدت فعلی طرح --}}
+                                                {{ $order->duration_label }}
+                                                @if(!empty($order->meta['plan']['packages']))
+                                                    · {{ fa_num(count($order->meta['plan']['packages'])) }} پکیج رایگان
+                                                @endif
+                                            </p>
                                         </div>
                                     </div>
                                 </td>

@@ -84,6 +84,12 @@
             <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 @foreach($this->plans as $plan)
                     @php($isBestValue = $plan->id === $bestValueId)
+                    @php($durationOption = $this->selectedDurationFor($plan))
+                    @php($cardFinal = $durationOption?->final_price ?? $plan->final_price)
+                    @php($cardPrice = $durationOption?->price ?? $plan->price)
+                    @php($cardHasDiscount = $durationOption ? $durationOption->has_discount : $plan->has_discount)
+                    @php($cardDiscountPercent = $durationOption ? $durationOption->discount_percent : $plan->discount_percent)
+                    @php($cardDurationLabel = $durationOption?->duration_label ?? $plan->duration_label)
                     <article wire:key="plan-{{ $plan->id }}" @class([
                         'card relative flex flex-col overflow-hidden transition-all hover:shadow-card-lg',
                         'ring-2 ring-brand-500/60' => $isBestValue,
@@ -103,13 +109,13 @@
                             <div class="space-y-2.5">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <h3 class="text-base font-black text-zinc-900 dark:text-zinc-50">{{ $plan->name }}</h3>
-                                    @if($plan->final_price <= 0)
+                                    @if($cardFinal <= 0)
                                         <x-badge variant="info" icon="gift">رایگان</x-badge>
                                     @endif
                                     @if($plan->is_one_time)
                                         <x-badge variant="warning" icon="ticket">یک‌بار مصرف</x-badge>
                                     @endif
-                                    <x-badge variant="neutral" icon="clock">{{ fa_num($plan->duration_label) }}</x-badge>
+                                    <x-badge variant="neutral" icon="clock" :title="$plan->hasDurations() ? 'مدت انتخاب‌شده — قابل تغییر' : 'مدت اعتبار طرح'">{{ $cardDurationLabel }}</x-badge>
                                 </div>
 
                                 @if($plan->description)
@@ -117,24 +123,47 @@
                                 @endif
                             </div>
 
-                            {{-- ---- قیمت ---- --}}
+                            {{-- ---- قیمت + انتخاب مدت اعتبار ---- --}}
                             <div class="rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200/80 dark:bg-zinc-800/60 dark:ring-zinc-700">
-                                @if($plan->final_price <= 0)
+                                @if($cardFinal <= 0)
                                     <p class="text-2xl font-black text-emerald-600">رایگان</p>
                                     <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">بدون پرداخت — فقط تأیید مدیر</p>
                                 @else
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                                        <span class="text-2xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($plan->final_price, false) }}</span>
+                                        <span class="text-2xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($cardFinal, false) }}</span>
                                         <span class="text-xs font-medium text-zinc-400">تومان</span>
-                                        @if($plan->has_discount)
-                                            <span class="text-sm tabular-nums text-zinc-400 line-through">{{ money($plan->price, false) }}</span>
+                                        @if($cardHasDiscount)
+                                            <span class="text-sm tabular-nums text-zinc-400 line-through">{{ money($cardPrice, false) }}</span>
                                         @endif
                                     </div>
-                                    @if($plan->has_discount)
+                                    @if($cardHasDiscount)
                                         <div class="mt-2">
-                                            <x-badge variant="danger" icon="trending-down">{{ fa_num($plan->discount_percent) }}٪ تخفیف</x-badge>
+                                            <x-badge variant="danger" icon="trending-down">{{ fa_num($cardDiscountPercent) }}٪ تخفیف</x-badge>
                                         </div>
                                     @endif
+                                @endif
+
+                                {{-- مدت‌های اعتبار طرح — انتخاب گزینه، قیمت کارت به‌روز می‌شود --}}
+                                @if($plan->hasDurations())
+                                    <div class="mt-3" role="group" aria-label="انتخاب مدت اعتبار">
+                                        <p class="mb-1.5 text-[11px] font-bold text-zinc-500 dark:text-zinc-400">مدت اعتبار را انتخاب کنید:</p>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @foreach($plan->durationOptions() as $d)
+                                                @php($isSelected = ($durationOption?->duration_months ?? -1) === (int) $d->duration_months)
+                                                <button type="button" wire:click="selectDuration({{ $plan->id }}, {{ $d->duration_months }})"
+                                                        wire:key="dur-{{ $plan->id }}-{{ $d->duration_months }}"
+                                                        aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
+                                                        @class([
+                                                            'inline-flex cursor-pointer items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
+                                                            'bg-brand-600 text-white shadow-sm' => $isSelected,
+                                                            'bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-brand-50 hover:text-brand-700 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700 dark:hover:bg-brand-500/10 dark:hover:text-brand-400' => !$isSelected,
+                                                        ])>
+                                                    {{ $d->duration_label }}
+                                                    <span @class(['text-white/70' => $isSelected, 'text-zinc-400' => !$isSelected]) class="tabular-nums">{{ $d->final_price <= 0 ? 'رایگان' : money($d->final_price, false) }}</span>
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    </div>
                                 @endif
                             </div>
 
@@ -249,7 +278,12 @@
     <x-modal wire:model="showCheckout" title="خرید طرح اشتراک" :subtitle="$checkoutPlan?->name">
         @if($checkoutPlan)
             @php($gatewayOptions = $this->gateways->mapWithKeys(fn ($g) => [$g->key => $g->name . ' (' . $g->key . ')'])->all())
-            @php($isFreePlan = $checkoutPlan->final_price <= 0)
+            @php($checkoutDuration = $this->selectedDurationFor($checkoutPlan))
+            @php($checkoutFinal = $checkoutDuration?->final_price ?? $checkoutPlan->final_price)
+            @php($checkoutPrice = $checkoutDuration?->price ?? $checkoutPlan->price)
+            @php($checkoutHasDiscount = $checkoutDuration ? $checkoutDuration->has_discount : $checkoutPlan->has_discount)
+            @php($checkoutDurationLabel = $checkoutDuration?->duration_label ?? $checkoutPlan->duration_label)
+            @php($isFreePlan = $checkoutFinal <= 0)
             @php($buyDisabled = !$isFreePlan && $this->gateways->isEmpty())
             <div class="space-y-5">
                 {{-- خلاصه طرح --}}
@@ -257,7 +291,7 @@
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <p class="text-sm font-black text-zinc-900 dark:text-zinc-50">{{ $checkoutPlan->name }}</p>
-                            <x-badge variant="neutral" icon="clock">{{ fa_num($checkoutPlan->duration_label) }}</x-badge>
+                            <x-badge variant="neutral" icon="clock">{{ $checkoutDurationLabel }}</x-badge>
                             @if($checkoutPlan->is_one_time)
                                 <x-badge variant="warning" icon="ticket">یک‌بار مصرف</x-badge>
                             @endif
@@ -270,13 +304,55 @@
                         @if($isFreePlan)
                             <p class="text-lg font-black text-emerald-600">رایگان</p>
                         @else
-                            @if($checkoutPlan->has_discount)
-                                <p class="text-xs tabular-nums text-zinc-400 line-through">{{ money($checkoutPlan->price, false) }}</p>
+                            @if($checkoutHasDiscount)
+                                <p class="text-xs tabular-nums text-zinc-400 line-through">{{ money($checkoutPrice, false) }}</p>
                             @endif
-                            <p class="text-lg font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($checkoutPlan->final_price) }}</p>
+                            <p class="text-lg font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($checkoutFinal) }}</p>
                         @endif
                     </div>
                 </div>
+
+                {{-- انتخاب مدت اعتبار (طرح‌های چندمدتی) --}}
+                @if($checkoutPlan->hasDurations())
+                    <div role="group" aria-label="انتخاب مدت اعتبار">
+                        <p class="mb-2 flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-200">
+                            <x-icon name="clock" class="size-4 text-brand-500" />
+                            مدت اعتبار — یکی را انتخاب کنید
+                        </p>
+                        <div class="grid gap-2 sm:grid-cols-2">
+                            @foreach($checkoutPlan->durationOptions() as $d)
+                                @php($isSelected = ($checkoutDuration?->duration_months ?? -1) === (int) $d->duration_months)
+                                <button type="button" wire:click="selectDuration({{ $checkoutPlan->id }}, {{ $d->duration_months }})"
+                                        wire:key="cdur-{{ $d->duration_months }}"
+                                        aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
+                                        @class([
+                                            'flex cursor-pointer items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-start transition-all',
+                                            'bg-brand-600/5 ring-2 ring-brand-500' => $isSelected,
+                                            'bg-zinc-50 ring-1 ring-zinc-200 hover:ring-brand-300 dark:bg-zinc-800/60 dark:ring-zinc-700 dark:hover:ring-brand-400/40' => !$isSelected,
+                                        ])>
+                                    <span>
+                                        <span @class([
+                                            'block text-sm font-black',
+                                            'text-brand-700 dark:text-brand-400' => $isSelected,
+                                            'text-zinc-800 dark:text-zinc-100' => !$isSelected,
+                                        ])>{{ $d->duration_label }}</span>
+                                        <span class="mt-0.5 block text-[11px] text-zinc-400">{{ $d->duration_months === 0 ? 'بدون انقضا' : 'اعتبار از زمان تأیید مدیر' }}</span>
+                                    </span>
+                                    <span class="text-end">
+                                        @if($d->final_price <= 0)
+                                            <span class="block text-sm font-black text-emerald-600">رایگان</span>
+                                        @else
+                                            @if($d->has_discount)
+                                                <span class="block text-[11px] tabular-nums text-zinc-400 line-through">{{ money($d->price, false) }}</span>
+                                            @endif
+                                            <span @class(['block text-sm font-black tabular-nums', 'text-brand-700 dark:text-brand-400' => $isSelected, 'text-zinc-800 dark:text-zinc-100' => !$isSelected])>{{ money($d->final_price, false) }}</span>
+                                        @endif
+                                    </span>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
                 {{-- درگاه پرداخت (فقط طرح‌های پولی) --}}
                 @if(!$isFreePlan)
@@ -300,13 +376,15 @@
                 {{-- ثبت درخواست --}}
                 <x-btn wire:click="buy({{ $checkoutPlan->id }})" :loading="true" :disabled="$buyDisabled"
                        icon="{{ $isFreePlan ? 'gift' : 'wallet' }}" class="w-full">
-                    {{ $isFreePlan ? 'ثبت درخواست رایگان' : 'پرداخت و ثبت درخواست' }}
+                    {{ $isFreePlan
+                        ? 'ثبت درخواست رایگان'
+                        : 'پرداخت و ثبت درخواست — ' . money($checkoutFinal) . ' تومان' }}
                 </x-btn>
 
                 <p class="flex items-center justify-center gap-1.5 text-center text-xs leading-5 text-zinc-400">
                     <x-icon name="{{ $isFreePlan ? 'check-circle' : 'shield-check' }}" class="size-4 shrink-0 {{ $isFreePlan ? 'text-emerald-500' : 'text-emerald-500' }}" />
                     {{ $isFreePlan
-                        ? 'این طرح رایگان است؛ درخواست شما مستقیماً در انتظار تأیید مدیر قرار می‌گیرد.'
+                        ? 'این گزینه رایگان است؛ درخواست شما مستقیماً در انتظار تأیید مدیر قرار می‌گیرد.'
                         : 'پرداخت از طریق درگاه‌های بانکی امن انجام می‌شود؛ فعال‌سازی پس از تأیید مدیر.' }}
                 </p>
             </div>

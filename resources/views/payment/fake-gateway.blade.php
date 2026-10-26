@@ -107,7 +107,8 @@
                 </div>
                 <div class="gw-row">
                     <span class="k">مدت اعتبار</span>
-                    <span class="v">{{ $subscriptionPlan?->duration_label ?? ($order->meta['plan']['duration_months'] ?? '-') }}</span>
+                    {{-- مدت انتخاب‌شدهٔ مشتری (meta سفارش) یا مدت فعلی طرح --}}
+                    <span class="v">{{ $order->duration_label }}</span>
                 </div>
             @elseif(isset($template) && $template)
                 {{-- خرید قالب --}}

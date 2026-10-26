@@ -9,6 +9,7 @@ use App\Models\PackageLicense;
 use App\Models\Subscription;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanDuration;
 use App\Services\Sms\SmsManager;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -42,11 +43,13 @@ class SubscriptionService
      *
      * @param  string|null $callbackUrl آدرس بازگشت فروشگاه مشتری (API) — در مسیر وب خالی است.
      * @param  DiscountCode|null $coupon کد تخفیف اعمال‌شده (از قبل اعتبارسنجی‌شده توسط DiscountService)
+     * @param  int|null $durationMonths مدت اعتبار انتخابی مشتری (از طرح‌هایی که چند مدت دارند) —
+     *                                    null = فال‌بک به تک‌مدت پیش‌فرض طرح (سازگاری با داده‌های قدیمی)
      * @return array{order: SubscriptionOrder, payment_url?: string, transaction_id?: string, is_free?: bool, message?: string}
      *
-     * @throws RuntimeException (طرح غیرفعال / یک‌بارمصرفِ استفاده‌شده / خطای درگاه)
+     * @throws RuntimeException (طرح غیرفعال / یک‌بارمصرفِ استفاده‌شده / مدت نامعتبر / خطای درگاه)
      */
-    public function purchase(Customer $customer, SubscriptionPlan $plan, ?string $gatewayKey = null, ?string $callbackUrl = null, ?DiscountCode $coupon = null): array
+    public function purchase(Customer $customer, SubscriptionPlan $plan, ?string $gatewayKey = null, ?string $callbackUrl = null, ?DiscountCode $coupon = null, ?int $durationMonths = null): array
     {
         if (!$plan->is_active) {
             throw new RuntimeException('این طرح اشتراک فعال نیست.');
@@ -61,9 +64,22 @@ class SubscriptionService
             throw new RuntimeException('شما قبلاً از این طرح استفاده کرده‌اید؛ این طرح فقط یک‌بار قابل خریداری است.');
         }
 
-        $amount    = (int) $plan->price;
-        $discount  = (int) ($plan->discount_price ?? 0); // تخفیف خودِ طرح (مبلغ)
-        $baseFinal = $plan->final_price;
+        // ---- مدت اعتبار انتخابی (طرح‌های چندمدتی) ----
+        /** @var SubscriptionPlanDuration|null $durationOption */
+        $durationOption = null;
+        if ($durationMonths !== null) {
+            $durationOption = $plan->durationOption($durationMonths);
+
+            if (!$durationOption) {
+                throw new RuntimeException('مدت اعتبار انتخاب‌شده برای این طرح معتبر نیست.');
+            }
+        }
+
+        // مبلغ: گزینهٔ مدت انتخابی (اگر هست) وگرنه تک‌مدت پیش‌فرض طرح
+        $amount    = $durationOption ? (int) $durationOption->price : (int) $plan->price;
+        $discount  = $durationOption ? (int) ($durationOption->discount_price ?? 0) : (int) ($plan->discount_price ?? 0); // تخفیف مبلغی
+        $chosenMonths = $durationOption ? (int) $durationOption->duration_months : (int) $plan->duration_months;
+        $baseFinal = max(0, $amount - $discount);
 
         // ---- کد تخفیف (کوپن) ----
         // تخفیف کد روی مبلغِ پس از تخفیف طرح محاسبه می‌شود؛ مبلغ نهایی هرگز منفی نمی‌شود.
@@ -80,7 +96,7 @@ class SubscriptionService
             'plan' => [
                 'name'            => $plan->name,
                 'slug'            => $plan->slug,
-                'duration_months' => (int) $plan->duration_months,
+                'duration_months' => $chosenMonths,
                 'features'        => $plan->features ?? [],
                 'price'           => $amount,
                 'final_price'     => $final,
@@ -92,6 +108,17 @@ class SubscriptionService
                     ->all(),
             ],
         ];
+
+        // مدت انتخاب‌شدهٔ مشتری — تأیید مدیر از این مدت استفاده می‌کند (نه مدت پیش‌فرض طرح)
+        if ($durationOption) {
+            $snapshot['chosen_duration'] = [
+                'duration_months' => $chosenMonths,
+                'label'           => $durationOption->duration_label,
+                'price'           => $amount,
+                'discount_price'  => $discount,
+                'final_price'     => $baseFinal,
+            ];
+        }
 
         // snapshot کد تخفیف (برای گزارش بعدی حتی پس از حذف کد)
         if ($coupon && $couponDiscount > 0) {
@@ -221,7 +248,12 @@ class SubscriptionService
         $customer = $order->customer;
 
         return DB::transaction(function () use ($order, $plan, $customer) {
-            $months    = (int) ($plan?->duration_months ?? $order->meta['plan']['duration_months'] ?? 1);
+            // مدت اعتبار: اولویت با مدتِ انتخاب‌شدهٔ مشتری (meta)؛ سپس مدت فعلی طرح؛
+            // اگر طرح حذف شده باشد از snapshot سفارش — نهایتاً ۱ ماه
+            $months    = (int) ($order->meta['chosen_duration']['duration_months']
+                ?? $plan?->duration_months
+                ?? $order->meta['plan']['duration_months']
+                ?? 1);
             $startsAt  = now();
             $expiresAt = $months > 0 ? (clone $startsAt)->addMonths($months) : null;
 

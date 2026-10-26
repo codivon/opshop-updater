@@ -58,6 +58,20 @@ class SubscriptionPlan extends Model
         return $this->hasMany(SubscriptionOrder::class, 'subscription_plan_id');
     }
 
+    /** مدت‌های اعتبار طرح (چندگزینه‌ای) — مرتب بر اساس ترتیب نمایش و مدت */
+    public function durations(): HasMany
+    {
+        return $this->hasMany(SubscriptionPlanDuration::class, 'subscription_plan_id')
+            ->orderBy('sort_order')
+            ->orderBy('duration_months');
+    }
+
+    /** فقط مدت‌های فعال (گزینه‌های قابل انتخاب در فروشگاه/API) */
+    public function activeDurations(): HasMany
+    {
+        return $this->durations()->where('is_active', true);
+    }
+
     /* ---------------------------------------------------------------- */
     /*  Attributes                                                       */
     /* ---------------------------------------------------------------- */
@@ -81,6 +95,36 @@ class SubscriptionPlan extends Model
             (int) $this->duration_months === 1 => '۱ ماه',
             default => fa_num($this->duration_months) . ' ماه',
         };
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  مدت‌های اعتبار (چندگزینه‌ای)                                      */
+    /* ---------------------------------------------------------------- */
+
+    /** آیا طرح حداقل یک مدت اعتبار فعال دارد؟ */
+    public function hasDurations(): bool
+    {
+        if ($this->relationLoaded('durations')) {
+            return $this->durations->contains(fn (SubscriptionPlanDuration $d) => $d->is_active);
+        }
+
+        return $this->durations()->where('is_active', true)->exists();
+    }
+
+    /** گزینه‌های مدت فعال (مرتب) */
+    public function durationOptions()
+    {
+        if ($this->relationLoaded('durations')) {
+            return $this->durations->filter(fn (SubscriptionPlanDuration $d) => $d->is_active)->values();
+        }
+
+        return $this->activeDurations()->get();
+    }
+
+    /** گزینهٔ مدت فعال با مدت مشخص — یا null (فال‌بک به تک‌مدت طرح) */
+    public function durationOption(int $months): ?SubscriptionPlanDuration
+    {
+        return $this->durationOptions()->first(fn (SubscriptionPlanDuration $d) => (int) $d->duration_months === $months);
     }
 
     /** برچسب مدت دسترسی رایگان یک پکیج همراه */
