@@ -17,6 +17,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // اگر روی MySQL تلاش قبلیِ همین مایگریشن وسط کار شکست خورده باشد
+        // (CREATE TABLE انجام شده ولی ایندکس unique به‌خاطر نامِ بلندِ بیش از ۶۴ کاراکتر ساخته نشده)
+        // جدولِ نیمه‌کاره را پاک می‌کنیم تا مایگریشن از نو به‌صورت تمیز اجرا شود.
+        Schema::dropIfExists('subscription_plan_durations');
+
         Schema::create('subscription_plan_durations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('subscription_plan_id')->constrained('subscription_plans')->cascadeOnDelete();
@@ -27,7 +32,8 @@ return new class extends Migration
             $table->integer('sort_order')->default(0);                 // ترتیب نمایش گزینه‌ها
             $table->timestamps();
 
-            $table->unique(['subscription_plan_id', 'duration_months']); // هر مدت فقط یک‌بار در هر طرح
+            // نام صریح و کوتاه برای ایندکس — نامِ خودکارِ لاراول بیش از حد ۶۴ کاراکتری MySQL است
+            $table->unique(['subscription_plan_id', 'duration_months'], 'plan_durations_plan_months_unique'); // هر مدت فقط یک‌بار در هر طرح
         });
     }
 
