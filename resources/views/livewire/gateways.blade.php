@@ -70,37 +70,46 @@
                     @endphp
 
                     <div wire:key="gw-{{ $gw['id'] }}" class="card flex flex-col">
-                        {{-- gateway header: logo + title --}}
-                        <div class="flex items-center gap-3 border-b border-zinc-200/80 p-4 dark:border-zinc-800">
-                            <input type="checkbox" class="checkbox shrink-0" aria-label="انتخاب این درگاه"
-                                   wire:model.live="selectedIds" value="{{ $gw['id'] }}" />
-                            {{-- logo (اختصاصی یا پیش‌فرض) --}}
-                            @php($logoUrl = \App\Livewire\Gateways::logoUrl($gw))
-                            <div class="h-11 w-[110px] shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200/80 dark:ring-zinc-700/60">
-                                @if($logoUrl)
-                                    <img src="{{ $logoUrl }}" alt="لوگوی {{ $gw['name'] }}" class="h-full w-full object-contain" />
-                                @else
-                                    <div class="flex h-full w-full items-center justify-center text-zinc-400">
-                                        <x-icon name="credit-card" class="size-5.5" />
-                                    </div>
-                                @endif
+                        {{-- gateway header: ردیف اول هویت (چک‌باکس + لوگو + عنوان کامل)، ردیف دوم کنترل‌ها --}}
+                        <div class="border-b border-zinc-200/80 p-4 dark:border-zinc-800">
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" class="checkbox shrink-0" aria-label="انتخاب این درگاه"
+                                       wire:model.live="selectedIds" value="{{ $gw['id'] }}" />
+                                {{-- logo (اختصاصی یا پیش‌فرض) --}}
+                                @php($logoUrl = \App\Livewire\Gateways::logoUrl($gw))
+                                <div class="h-11 w-[110px] shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200/80 dark:ring-zinc-700/60">
+                                    @if($logoUrl)
+                                        <img src="{{ $logoUrl }}" alt="لوگوی {{ $meta['label'] ?? $gw['name'] }}" class="h-full w-full object-contain" />
+                                    @else
+                                        <div class="flex h-full w-full items-center justify-center text-zinc-400">
+                                            <x-icon name="credit-card" class="size-5.5" />
+                                        </div>
+                                    @endif
+                                </div>
+                                {{-- عنوان درگاه — تا دو خط کامل نمایش داده می‌شود و بریده نمی‌شود --}}
+                                <div class="min-w-0 flex-1">
+                                    <p class="line-clamp-2 text-[15px] font-black leading-6 text-zinc-900 dark:text-zinc-50" title="{{ $meta['label'] ?? $gw['name'] }}">
+                                        {{ $meta['label'] ?? $gw['name'] }}
+                                    </p>
+                                    <p class="mt-0.5 truncate font-mono text-[11px] text-zinc-400" dir="ltr">{{ $gw['key'] }}</p>
+                                </div>
                             </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="truncate font-bold text-zinc-800 dark:text-zinc-100">{{ $meta['label'] ?? $gw['name'] }}</p>
-                                <div class="mt-1 flex flex-wrap items-center gap-2">
+                            <div class="mt-3 flex items-center justify-between gap-3">
+                                <div class="flex flex-wrap items-center gap-2">
                                     <x-badge :variant="$gw['is_active'] ? 'success' : 'danger'">{{ $gw['is_active'] ? 'فعال' : 'غیرفعال' }}</x-badge>
                                     @if($gw['is_test'] ?? false)
                                         <x-badge variant="warning" icon="flask">درگاه تست</x-badge>
                                     @endif
-                                    <span class="font-mono text-[11px] text-zinc-400" dir="ltr">{{ $gw['key'] }}</span>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-1.5">
+                                    <x-toggle wire:model.live="gateways.{{ $index }}.is_active" id="gw-active-{{ $gw['id'] }}" />
+                                    <button type="button" wire:click="$set('deleteId', {{ $gw['id'] }})"
+                                            class="shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                                            title="حذف درگاه" aria-label="حذف {{ $meta['label'] ?? $gw['name'] }}">
+                                        <x-icon name="trash" class="size-4.5" />
+                                    </button>
                                 </div>
                             </div>
-                            <x-toggle wire:model.live="gateways.{{ $index }}.is_active" id="gw-active-{{ $gw['id'] }}" />
-                            <button type="button" wire:click="$set('deleteId', {{ $gw['id'] }})"
-                                    class="shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
-                                    title="حذف درگاه">
-                                <x-icon name="trash" class="size-4.5" />
-                            </button>
                         </div>
 
                         {{-- gateway body --}}
