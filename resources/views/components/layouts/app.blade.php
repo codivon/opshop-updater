@@ -51,6 +51,7 @@
                 ['route' => 'admin.settings.index', 'title' => 'تنظیمات', 'icon' => 'settings', 'match' => ['admin.settings.index', 'admin.settings.gateways']],
                 ['route' => 'admin.settings.security', 'title' => 'امنیت و امکانات', 'icon' => 'shield', 'match' => ['admin.settings.security']],
                 ['route' => 'admin.users.index', 'title' => 'کاربران', 'icon' => 'shield-check', 'match' => ['admin.users*']],
+                ['route' => 'admin.profile', 'title' => 'پروفایل مدیر', 'icon' => 'user-check', 'match' => ['admin.profile']],
             ],
         ],
         [
@@ -148,14 +149,19 @@
             @endforeach
         </nav>
 
-        {{-- footer: user --}}
+        {{-- footer: user (کلیک روی کارت → پروفایل مدیر) --}}
         <div class="shrink-0 border-t border-white/5 p-3">
             <div class="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-white/5">
-                <x-avatar :name="auth()->user()?->name ?? 'مدیر'" size="sm" />
-                <div x-show="! collapsed" x-cloak class="min-w-0 flex-1">
-                    <p class="truncate text-xs font-bold text-zinc-100">{{ auth()->user()?->name ?? 'مدیر سیستم' }}</p>
-                    <p class="truncate text-[10px] text-zinc-500">{{ auth()->user()?->email }}</p>
-                </div>
+                <a href="{{ route('admin.profile') }}" wire:navigate title="پروفایل مدیر"
+                   @click="mobileOpen = false"
+                   class="group flex min-w-0 flex-1 items-center gap-3 rounded-xl"
+                   aria-label="پروفایل مدیر">
+                    <x-avatar :name="auth()->user()?->name ?? 'مدیر'" size="sm" />
+                    <div x-show="! collapsed" x-cloak class="min-w-0 flex-1">
+                        <p class="truncate text-xs font-bold text-zinc-100">{{ auth()->user()?->name ?? 'مدیر سیستم' }}</p>
+                        <p class="truncate text-[10px] text-zinc-500">{{ auth()->user()?->email }}</p>
+                    </div>
+                </a>
                 <form method="POST" action="{{ route('logout') }}" x-show="! collapsed" x-cloak>
                     @csrf
                     <button type="submit" class="rounded-lg p-2 text-zinc-500 transition-colors hover:bg-rose-500/10 hover:text-rose-400" title="خروج" aria-label="خروج از حساب">
@@ -214,6 +220,11 @@
                         <p class="truncate text-sm font-bold text-zinc-800 dark:text-zinc-100">{{ auth()->user()?->name ?? 'مدیر سیستم' }}</p>
                         <p class="truncate text-xs text-zinc-500">{{ auth()->user()?->email }}</p>
                     </div>
+                    <a href="{{ route('admin.profile') }}" wire:navigate
+                       class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-start text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700/60 dark:hover:text-zinc-100">
+                        <x-icon name="user-check" class="size-4 shrink-0 opacity-70" />
+                        پروفایل مدیر
+                    </a>
                     <form method="POST" action="{{ route('logout') }}" class="pt-1">
                         @csrf
                         <button type="submit" class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-start text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">

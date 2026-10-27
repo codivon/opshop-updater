@@ -150,6 +150,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
 Route::prefix('admin')->name('admin.')->middleware(['auth', \App\Http\Middleware\EnsureAdminRole::class])->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
 
+    // پروفایل مدیر (ویرایش نام/ایمیل + تغییر رمز عبور)
+    Route::get('profile', \App\Livewire\Settings\Profile::class)->name('profile');
+
     // محصولات
     Route::get('projects', \App\Livewire\Projects\Index::class)->name('projects.index');
     Route::get('updates', \App\Livewire\Updates\Index::class)->name('updates.index');
