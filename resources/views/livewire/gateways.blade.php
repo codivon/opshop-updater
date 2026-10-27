@@ -70,7 +70,7 @@
                     @endphp
 
                     <div wire:key="gw-{{ $gw['id'] }}" class="card flex flex-col">
-                        {{-- gateway header: ردیف اول هویت (چک‌باکس + لوگو + عنوان کامل)، ردیف دوم کنترل‌ها --}}
+                        {{-- gateway header: ردیف ۱ هویت/کنترل‌ها، ردیف ۲ عنوان کامل در یک سطر زیر تصویر --}}
                         <div class="border-b border-zinc-200/80 p-4 dark:border-zinc-800">
                             <div class="flex items-center gap-3">
                                 <input type="checkbox" class="checkbox shrink-0" aria-label="انتخاب این درگاه"
@@ -86,22 +86,7 @@
                                         </div>
                                     @endif
                                 </div>
-                                {{-- عنوان درگاه — تا دو خط کامل نمایش داده می‌شود و بریده نمی‌شود --}}
-                                <div class="min-w-0 flex-1">
-                                    <p class="line-clamp-2 text-[15px] font-black leading-6 text-zinc-900 dark:text-zinc-50" title="{{ $meta['label'] ?? $gw['name'] }}">
-                                        {{ $meta['label'] ?? $gw['name'] }}
-                                    </p>
-                                    <p class="mt-0.5 truncate font-mono text-[11px] text-zinc-400" dir="ltr">{{ $gw['key'] }}</p>
-                                </div>
-                            </div>
-                            <div class="mt-3 flex items-center justify-between gap-3">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <x-badge :variant="$gw['is_active'] ? 'success' : 'danger'">{{ $gw['is_active'] ? 'فعال' : 'غیرفعال' }}</x-badge>
-                                    @if($gw['is_test'] ?? false)
-                                        <x-badge variant="warning" icon="flask">درگاه تست</x-badge>
-                                    @endif
-                                </div>
-                                <div class="flex shrink-0 items-center gap-1.5">
+                                <div class="ms-auto flex shrink-0 items-center gap-1.5">
                                     <x-toggle wire:model.live="gateways.{{ $index }}.is_active" id="gw-active-{{ $gw['id'] }}" />
                                     <button type="button" wire:click="$set('deleteId', {{ $gw['id'] }})"
                                             class="shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
@@ -109,6 +94,17 @@
                                         <x-icon name="trash" class="size-4.5" />
                                     </button>
                                 </div>
+                            </div>
+                            {{-- عنوان کامل درگاه — یک سطر تمام‌عرض زیر لوگو، بدون بریدگی --}}
+                            <p class="mt-3 text-base font-black leading-6 text-zinc-900 dark:text-zinc-50">
+                                {{ $meta['label'] ?? $gw['name'] }}
+                            </p>
+                            <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                                <x-badge :variant="$gw['is_active'] ? 'success' : 'danger'">{{ $gw['is_active'] ? 'فعال' : 'غیرفعال' }}</x-badge>
+                                @if($gw['is_test'] ?? false)
+                                    <x-badge variant="warning" icon="flask">درگاه تست</x-badge>
+                                @endif
+                                <span class="font-mono text-[11px] text-zinc-400" dir="ltr">{{ $gw['key'] }}</span>
                             </div>
                         </div>
 
