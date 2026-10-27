@@ -56,7 +56,7 @@
         x-transition:leave="transition ease-in duration-150"
         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
         x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-        class="relative flex w-full {{ $sizes[$size] ?? $sizes['md'] }} max-h-[90vh] flex-col overflow-hidden rounded-2xl bg-white shadow-pop ring-1 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-white/10"
+        class="relative flex w-full {{ $sizes[$size] ?? $sizes['md'] }} max-h-[90vh] flex-col overflow-clip rounded-2xl bg-white shadow-pop ring-1 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-white/10"
     >
         @if($title || isset($header))
             <header class="flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
