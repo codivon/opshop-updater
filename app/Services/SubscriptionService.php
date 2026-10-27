@@ -497,4 +497,41 @@ class SubscriptionService
             ->with('plan')
             ->get();
     }
+
+    /* ===================================================================
+     *  گیت اشتراک برای API (منطق مشترک لیست/نمایش/دانلود پکیج و قالب)
+     *  الگو: همان شرطی که UpdateController و لیست پکیج‌ها استفاده می‌کنند —
+     *  اشتراک باید فعال + پرداخت‌شده + منقضی‌نشده باشد.
+     * =================================================================== */
+
+    /**
+     * آیا مشتری حداقل یک اشتراکِ فعال دارد؟ (پرداخت‌شده + منقضی‌نشده)
+     * برای API قالب‌ها — قالب به پروژه‌ای گره نخورده؛ اشتراکِ معتبرِ «هر» پروژه‌ای کافی است.
+     */
+    public function hasActiveSubscription(Customer $customer): bool
+    {
+        return $customer->subscriptions()
+            ->where('status', 'active')
+            ->where('payment_status', 'paid')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->exists();
+    }
+
+    /**
+     * آیا مشتری اشتراکِ فعالِ پوشش‌دهندهٔ این پروژه دارد؟
+     * برای API پکیج‌ها — همان شرط گیت لیست و نمایش تک‌پکیج.
+     */
+    public function hasActiveSubscriptionForProject(Customer $customer, int $projectId): bool
+    {
+        return $customer->subscriptions()
+            ->where('project_id', $projectId)
+            ->where('status', 'active')
+            ->where('payment_status', 'paid')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->exists();
+    }
 }

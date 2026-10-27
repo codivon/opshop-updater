@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Template;
 use App\Models\TemplateDownloadToken;
+use App\Models\TemplatePurchase;
 use App\Services\PackageApiAuthService;
+use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -20,12 +22,17 @@ use RuntimeException;
  *  - لینک یک‌بارمصرف: توکن ۱۵دقیقه‌ای، حتی بدون هدرهای احراز کار می‌کند
  *    (خودِ توکن معتبر گواهی دسترسی است) اما اگر هدرهای احراز ارسال شود،
  *    تعلق توکن به همان مشتری هم کنترل می‌شود.
+ *  - 🚩 گیت اشتراک: همهٔ مسیرهای دانلود فقط با اشتراکِ فعالِ پرداخت‌شده و
+ *    منقضی‌نشده کار می‌کنند — حتی با توکن معتبر.
  *  - دانلود مستقیم با slug: احراز هویت کامل + خریدِ پرداخت‌شده‌ی همان مشتری لازم است.
  *  - issueDownloadUrl: ساخت لینک یک‌بارمصرف برای قالبِ خریداری‌شده.
  */
 class ApiTemplateDownloadController extends Controller
 {
-    public function __construct(private PackageApiAuthService $authService) {}
+    public function __construct(
+        private PackageApiAuthService $authService,
+        private SubscriptionService $subscriptionService,
+    ) {}
 
     /* ===================================================================
      *  GET /api/v1/templates/download/{token}
@@ -64,6 +71,14 @@ class ApiTemplateDownloadController extends Controller
 
             if ($customer && $customer->status !== 'active') {
                 return response()->json(['error' => 'حساب مشتری غیرفعال است.'], 403);
+            }
+
+            // 🚩 گیت اشتراک: حتی با توکن معتبر، بدون اشتراکِ فعالِ پرداخت‌شده و
+            // منقضی‌نشده دانلود مجاز نیست (مشتریِ توکن ملاک است).
+            if (!$customer || !$this->subscriptionService->hasActiveSubscription($customer)) {
+                return response()->json([
+                    'error' => 'اشتراک فعالی وجود ندارد؛ دانلود قالب فقط با اشتراک فعال امکان‌پذیر است.',
+                ], 403);
             }
 
             if (!$downloadToken->isValid()) {
@@ -187,6 +202,13 @@ class ApiTemplateDownloadController extends Controller
 
         if (!$template) {
             return response()->json(['error' => 'قالب یافت نشد.'], 404);
+        }
+
+        // 🚩 گیت اشتراک: دانلود/ساخت لینک فقط با اشتراکِ فعالِ پرداخت‌شده و منقضی‌نشده
+        if (!$this->subscriptionService->hasActiveSubscription($customer)) {
+            return response()->json([
+                'error' => 'اشتراک فعالی وجود ندارد؛ دانلود قالب فقط با اشتراک فعال امکان‌پذیر است.',
+            ], 403);
         }
 
         $purchase = TemplatePurchase::where('customer_id', $customer->id)

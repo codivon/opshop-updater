@@ -10,6 +10,7 @@ use App\Models\TemplateImage;
 use App\Models\TemplatePurchase;
 use App\Services\PackageApiAuthService;
 use App\Services\PaymentService;
+use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -20,6 +21,9 @@ use RuntimeException;
  *
  *  - احراز هویت: توکن (Bearer / X-Project-Key / ?token=) = update_code مشتری
  *    + هدر X-Project-Url (بررسی دامنه با PackageApiAuthService — همان سرویس پکیج‌ها)
+ *  - 🚩 گیت اشتراک: لیست/نمایش/خرید فقط برای مشتریِ دارای اشتراکِ فعال
+ *    (پرداخت‌شده و منقضی‌نشده) — اشتراک منقضی/پایان‌یافته/ناموجود مثل پکیج‌ها
+ *    لیست خالی (و در نمایش تکی ۴۰۳) می‌دهد.
  *  - فقط قالب‌های «فعال» دیده می‌شوند
  *  - دانلود فقط برای خریدِ پرداخت‌شده (is_purchased) مجاز است
  *  - لینک دانلود: یک‌بارمصرف با انقضای ۱۵ دقیقه
@@ -30,6 +34,7 @@ class ApiTemplateController extends Controller
     public function __construct(
         private PackageApiAuthService $authService,
         private PaymentService $paymentService,
+        private SubscriptionService $subscriptionService,
     ) {}
 
     /* ===================================================================
@@ -41,6 +46,21 @@ class ApiTemplateController extends Controller
     {
         try {
             $customer = $this->authService->authenticate($request);
+
+            // 🚩 گیت اشتراک (مثل لیست پکیج‌ها): بدون اشتراکِ فعالِ پرداخت‌شده و
+            // منقضی‌نشده، هیچ قالبی برگردانده نمی‌شود — پاسخ موفق اما خالی.
+            if (! $this->subscriptionService->hasActiveSubscription($customer)) {
+                return response()->json([
+                    'data' => [],
+                    'meta' => [
+                        'current_page' => 1,
+                        'last_page'    => 1,
+                        'total'        => 0,
+                        'per_page'     => (int) $request->input('per_page', 15),
+                    ],
+                    'gateways' => $this->presentGateways(),
+                ]);
+            }
 
             // activeImages: گالری تصاویر فعال — برای نمایش تصاویر قالب در سایت خریدار
             $templates = Template::with(['latestVersion', 'category.parent', 'activeImages'])
@@ -99,6 +119,12 @@ class ApiTemplateController extends Controller
 
             if (!$template) {
                 return response()->json(['error' => 'قالب یافت نشد.'], 404);
+            }
+
+            // 🚩 گیت اشتراک (مثل نمایش تک‌پکیج): بدون اشتراکِ فعالِ پرداخت‌شده و
+            // منقضی‌نشده، نمایش جزئیات قالب هم مجاز نیست.
+            if (! $this->subscriptionService->hasActiveSubscription($customer)) {
+                return response()->json(['error' => 'دسترسی غیرمجاز.'], 403);
             }
 
             $paidPurchaseIds = $this->paidPurchaseIdsFor($customer, [$template->id]);

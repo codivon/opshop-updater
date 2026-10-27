@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Package;
 use App\Models\PackageDownloadToken;
 use App\Services\PackageApiAuthService;
+use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -15,7 +16,10 @@ use RuntimeException;
 
 class ApiPackageDownloadController extends Controller
 {
-    public function __construct(private PackageApiAuthService $authService) {}
+    public function __construct(
+        private PackageApiAuthService $authService,
+        private SubscriptionService $subscriptionService,
+    ) {}
 
     /* ===================================================================
      *  GET /api/v1/packages/download/{token}
@@ -63,6 +67,14 @@ class ApiPackageDownloadController extends Controller
             $version = $downloadToken->version;
             if (!$version || !Storage::disk('local')->exists($version->file_path)) {
                 return response()->json(['error' => 'فایل پکیج یافت نشد.'], 404);
+            }
+
+            // 🚩 گیت اشتراک: حتی با توکن معتبر، بدون اشتراکِ فعالِ پرداخت‌شده و
+            // منقضی‌نشدهٔ پوشش‌دهندهٔ پروژهٔ این پکیج، دانلود مجاز نیست.
+            if (!$this->subscriptionService->hasActiveSubscriptionForProject($customer, (int) $version->package->project_id)) {
+                return response()->json([
+                    'error' => 'اشتراک فعالی وجود ندارد؛ دانلود پکیج فقط با اشتراک فعال امکان‌پذیر است.',
+                ], 403);
             }
 
             // علامت‌گذاری توکن به‌عنوان استفاده‌شده
@@ -175,6 +187,14 @@ class ApiPackageDownloadController extends Controller
 
         if (!$package) {
             return response()->json(['error' => 'پکیج یافت نشد.'], 404);
+        }
+
+        // 🚩 گیت اشتراک: دانلود/ساخت لینک فقط با اشتراکِ فعالِ پرداخت‌شده و منقضی‌نشدهٔ
+        // پوشش‌دهندهٔ پروژهٔ پکیج — همان شرط گیت لیست و نمایش تک‌پکیج.
+        if (!$this->subscriptionService->hasActiveSubscriptionForProject($customer, (int) $package->project_id)) {
+            return response()->json([
+                'error' => 'اشتراک فعالی وجود ندارد؛ دانلود پکیج فقط با اشتراک فعال امکان‌پذیر است.',
+            ], 403);
         }
 
         $license = $this->authService->getActiveLicense($customer, $slug);
