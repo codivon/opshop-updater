@@ -104,6 +104,7 @@ class HomePage extends Component
         'packages'     => ['پکیج‌ها (محصولات)', 'package'],
         'products'     => ['پروژه‌های آماده', 'rocket'],
         'templates'    => ['قالب‌های آماده', 'layout-template'],
+        'subscription_active' => ['اشتراک فعال (وضعیت/بررسی کد)', 'user-check'],
         'subscription' => ['اشتراک‌ها', 'crown'],
         'track'        => ['پیگیری خرید مهمان', 'search'],
         'contact'      => ['تماس با ما', 'message-circle'],
@@ -163,6 +164,11 @@ class HomePage extends Component
         $tmp = $this->form['home_sort_'.$key];
         $this->form['home_sort_'.$key]   = $this->form['home_sort_'.$other];
         $this->form['home_sort_'.$other] = $tmp;
+
+        // رفع باگ «فلش‌ها کار نمی‌کنند»: computed sectionRows در همین درخواست کش
+        // شده بود (requestCachedValue) و رندر بعدی ترتیب کهنه را نشان می‌داد؛
+        // کش computed باید پاک شود تا لیست با مقادیر جدید فرم دوباره ساخته شود.
+        unset($this->sectionRows);
     }
 
     public function render()
@@ -178,7 +184,7 @@ class HomePage extends Component
     {
         $max = fn (int $chars) => ['nullable', 'string', 'max:'.$chars];
 
-        return [
+        $rules = [
             // هیرو
             'form.home_hero_badge'    => $max(100),
             'form.home_hero_title'    => ['nullable', 'string', 'max:200'],

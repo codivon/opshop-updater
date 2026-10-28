@@ -172,6 +172,85 @@ class ShopHomeAndContactTest extends TestCase
         );
     }
 
+    public function test_panel_move_updates_rendered_row_order_immediately(): void
+    {
+        // رگرسیون باگ «ویجت‌ها جابه‌جا نمیشوند»: computed sectionRows در همان درخواستِ
+        // فلش کش می‌شد و رندر بعدی ترتیب کهنه را نشان می‌داد — پس از move، خودِ HTML
+        // رندرشدهٔ پنل باید بلافاصله ترتیب جدید را نشان دهد (قبل از هر ذخیره‌ای).
+        $panel = Livewire::test(SettingsHomePage::class)
+            ->assertSeeInOrder(['هیرو (معرفی بالا)', 'آمار اعتماد'], false)
+            ->call('moveSectionDown', 'hero');
+
+        $html = $panel->html();
+        $this->assertLessThan(
+            mb_strpos($html, 'هیرو (معرفی بالا)'),
+            mb_strpos($html, 'آمار اعتماد')
+        );
+
+        // و برگشت به جای اولش
+        $panel->call('moveSectionUp', 'hero');
+
+        $html = $panel->html();
+        $this->assertLessThan(
+            mb_strpos($html, 'آمار اعتماد'),
+            mb_strpos($html, 'هیرو (معرفی بالا)')
+        );
+    }
+
+    public function test_subscription_active_box_is_independent_widget(): void
+    {
+        // طرح اشتراک فعال تا بخش «طرح‌های اشتراک ویژه» هم رندر شود
+        \App\Models\SubscriptionPlan::create([
+            'name' => 'طرح آزمون', 'slug' => 'plan-test',
+            'price' => 100000, 'duration_months' => 1, 'is_active' => true,
+        ]);
+
+        // پیش‌فرض: جعبهٔ «اشتراک فعال دارید؟» و طرح‌های اشتراک هر دو هست‌اند
+        $this->get(route('shop.home'))->assertOk()
+            ->assertSee('اشتراک فعال دارید؟')
+            ->assertSee('طرح‌های اشتراک ویژه');
+
+        // خاموشی «اشتراک فعال» → جعبهٔ بررسی می‌رود؛ طرح‌ها سرجایشان
+        $this->setSetting('home_subscription_active_enabled', '0');
+        $this->get(route('shop.home'))->assertOk()
+            ->assertDontSee('اشتراک فعال دارید؟')
+            ->assertSee('طرح‌های اشتراک ویژه');
+
+        // خاموشی «اشتراک‌ها» → طرح‌ها می‌روند؛ جعبهٔ بررسی مستقل می‌ماند
+        $this->setSetting('home_subscription_active_enabled', '1');
+        $this->setSetting('home_subscription_enabled', '0');
+        $this->get(route('shop.home'))->assertOk()
+            ->assertSee('اشتراک فعال دارید؟')
+            ->assertDontSee('طرح‌های اشتراک ویژه');
+
+        $this->setSetting('home_subscription_enabled', '1');
+    }
+
+    public function test_subscription_active_box_can_be_reordered(): void
+    {
+        // طرح اشتراک فعال تا بخش «طرح‌های اشتراک ویژه» هم رندر شود
+        \App\Models\SubscriptionPlan::create([
+            'name' => 'طرح آزمون', 'slug' => 'plan-test',
+            'price' => 100000, 'duration_months' => 1, 'is_active' => true,
+        ]);
+
+        // پیش‌فرض (۹۵): جعبهٔ «اشتراک فعال دارید؟» بالای طرح‌های اشتراک (۱۰۰)
+        $html = $this->get(route('shop.home'))->getContent();
+        $this->assertLessThan(
+            mb_strpos($html, 'طرح‌های اشتراک ویژه'),
+            mb_strpos($html, 'اشتراک فعال دارید؟')
+        );
+
+        // انتقال آن به پایینِ طرح‌ها از پنل (کلید home_sort_*)
+        $this->setSetting('home_sort_subscription_active', '130');
+
+        $html = $this->get(route('shop.home'))->getContent();
+        $this->assertLessThan(
+            mb_strpos($html, 'اشتراک فعال دارید؟'),
+            mb_strpos($html, 'طرح‌های اشتراک ویژه')
+        );
+    }
+
     public function test_track_section_can_be_disabled(): void
     {
         $this->get(route('shop.home'))->assertOk()->assertSee('خرید قبلی دارید؟');

@@ -26,6 +26,7 @@ class HomePage
         'home_packages_enabled'      => '1',
         'home_products_enabled'      => '1',
         'home_templates_enabled'     => '1',
+        'home_subscription_active_enabled' => '1',
         'home_subscription_enabled'  => '1',
         'home_track_enabled'         => '1',
         'home_contact_enabled'       => '1',
@@ -41,6 +42,7 @@ class HomePage
         'home_sort_packages'     => '70',
         'home_sort_products'     => '80',
         'home_sort_templates'    => '90',
+        'home_sort_subscription_active' => '95',
         'home_sort_subscription' => '100',
         'home_sort_track'        => '110',
         'home_sort_contact'      => '120',
@@ -120,14 +122,14 @@ class HomePage
         'home_why_enabled', 'home_testimonials_enabled',
         'home_categories_enabled',
         'home_packages_enabled', 'home_products_enabled', 'home_templates_enabled',
-        'home_subscription_enabled', 'home_contact_enabled', 'contact_form_enabled',
+        'home_subscription_active_enabled', 'home_subscription_enabled', 'home_contact_enabled', 'contact_form_enabled',
         'home_track_enabled',
     ];
 
     /** بخش‌های صفحهٔ اصلی (کلید کوتاه) — به ترتیب پیش‌فرض؛ ترتیب واقعی از home_sort_* خوانده می‌شود */
     public const SECTION_KEYS = [
         'hero', 'stats', 'about', 'why', 'testimonials', 'categories',
-        'packages', 'products', 'templates', 'subscription', 'track', 'contact',
+        'packages', 'products', 'templates', 'subscription_active', 'subscription', 'track', 'contact',
     ];
 
     /** گروه جدول settings برای همهٔ کلیدهای این ماژول */
