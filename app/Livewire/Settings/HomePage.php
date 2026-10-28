@@ -5,6 +5,7 @@ namespace App\Livewire\Settings;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Setting;
 use App\Support\HomePage as HomeSettings;
+use App\Support\ShopMenu;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -14,6 +15,8 @@ use Livewire\Component;
  * همهٔ ویجت‌های صفحهٔ اصلی (هیرو، آمار اعتماد، معرفی، چرا ما، نظرات،
  * پکیج/پروژه/قالب، اشتراک، تماس با ما) و کد اینماد فوتر از همین صفحه
  * فعال/غیرفعال و شخصی‌سازی می‌شوند.
+ * Task 60: ترتیب بخش‌ها (home_sort_*) + تب «بخش‌ها» با فلش بالا/پایین.
+ * Task 61: تب «منوی هدر» — ترتیب و روشن/خاموشی لینک‌های ناوبری فروشگاه (گروه menu).
  *
  * الگو: مطابق Settings\Security — فرم $form + حلقهٔ ذخیره + پاک‌سازی کش هر کلید.
  */
@@ -25,20 +28,36 @@ class HomePage extends Component
 
     public array $form = [];
 
+    /** ماژول‌های تنظیماتی این پنل (هرکدام DEFAULTS + BOOL_KEYS + group() دارند) */
+    private function modules(): array
+    {
+        return [HomeSettings::class, ShopMenu::class];
+    }
+
+    /** همهٔ کلیدهای بولی هر دو ماژول */
+    private function boolKeys(): array
+    {
+        return array_merge(HomeSettings::BOOL_KEYS, ShopMenu::BOOL_KEYS);
+    }
+
     public function mount(): void
     {
-        // پیش‌فرض‌ها + مقادیر ذخیره‌شده
-        foreach (HomeSettings::DEFAULTS as $key => $default) {
-            $this->form[$key] = $default;
+        // پیش‌فرض‌ها + مقادیر ذخیره‌شده (دو ماژول: صفحهٔ اصلی + منوی هدر)
+        foreach ($this->modules() as $module) {
+            foreach ($module::DEFAULTS as $key => $default) {
+                $this->form[$key] = $default;
+            }
         }
 
         $stored = Setting::query()
-            ->where('group', 'home')
+            ->whereIn('group', ['home', 'menu'])
             ->pluck('value', 'key');
+
+        $boolKeys = $this->boolKeys();
 
         foreach ($stored as $key => $value) {
             if (array_key_exists($key, $this->form)) {
-                $this->form[$key] = in_array($key, HomeSettings::BOOL_KEYS, true)
+                $this->form[$key] = in_array($key, $boolKeys, true)
                     ? (bool) filter_var($value, FILTER_VALIDATE_BOOLEAN)
                     : (string) $value;
             }
@@ -49,24 +68,29 @@ class HomePage extends Component
     {
         $this->validate();
 
-        foreach (HomeSettings::DEFAULTS as $key => $default) {
-            if (! array_key_exists($key, $this->form)) {
-                continue;
+        $boolKeys = $this->boolKeys();
+
+        foreach ($this->modules() as $module) {
+            foreach ($module::DEFAULTS as $key => $default) {
+                if (! array_key_exists($key, $this->form)) {
+                    continue;
+                }
+
+                $value = $this->form[$key];
+
+                if (in_array($key, $boolKeys, true)) {
+                    $value = $value ? '1' : '0';
+                }
+
+                Setting::set($key, (string) $value, 'string', $module::group($key));
             }
 
-            $value = $this->form[$key];
-
-            if (in_array($key, HomeSettings::BOOL_KEYS, true)) {
-                $value = $value ? '1' : '0';
+            // پاک‌سازی کش تنظیمات (helper setting از کش ۶۰ثانیه‌ای می‌خواند)
+            foreach (array_keys($module::DEFAULTS) as $key) {
+                \Illuminate\Support\Facades\Cache::forget('setting:'.$key);
             }
-
-            Setting::set($key, (string) $value, 'string', HomeSettings::group($key));
         }
 
-        // پاک‌سازی کش تنظیمات (helper setting از کش ۶۰ثانیه‌ای می‌خواند)
-        foreach (array_keys(HomeSettings::DEFAULTS) as $key) {
-            \Illuminate\Support\Facades\Cache::forget('setting:'.$key);
-        }
         \Illuminate\Support\Facades\Cache::forget('settings');
 
         $this->toast('تنظیمات صفحهٔ اصلی ذخیره شد.');
@@ -171,6 +195,66 @@ class HomePage extends Component
         unset($this->sectionRows);
     }
 
+    /* ------------------------------------------------------------------ */
+    /*  منوی هدر فروشگاه (گروه menu) — Task 61                             */
+    /* ------------------------------------------------------------------ */
+
+    /** ردیف‌های منوی هدر به ترتیب فعلی فرم (menu_sort_*) برای تب «منوی هدر» */
+    public function getMenuRowsProperty(): array
+    {
+        $rows = [];
+
+        foreach (ShopMenu::keys() as $key) {
+            $rows[] = [
+                'key'   => $key,
+                'label' => ShopMenu::ITEMS[$key]['label'],
+                'icon'  => ShopMenu::ITEMS[$key]['icon'],
+                'sort'  => (int) ($this->form['menu_sort_'.$key] ?? 0),
+            ];
+        }
+
+        usort($rows, fn ($a, $b) => $a['sort'] <=> $b['sort']);
+
+        return $rows;
+    }
+
+    /** جابه‌جایی یک آیتم منو یک ردیف به بالا (فرم ذخیره‌نشده — با «ذخیره تنظیمات» اعمال می‌شود) */
+    public function moveMenuUp(string $key): void
+    {
+        $this->moveMenu($key, -1);
+    }
+
+    /** جابه‌جایی یک آیتم منو یک ردیف به پایین */
+    public function moveMenuDown(string $key): void
+    {
+        $this->moveMenu($key, +1);
+    }
+
+    private function moveMenu(string $key, int $direction): void
+    {
+        $keys  = array_column($this->menuRows, 'key');
+        $index = array_search($key, $keys, true);
+
+        if ($index === false) {
+            return;
+        }
+
+        $neighbor = $index + $direction;
+
+        if ($neighbor < 0 || $neighbor >= count($keys)) {
+            return;
+        }
+
+        $other = $keys[$neighbor];
+
+        $tmp = $this->form['menu_sort_'.$key];
+        $this->form['menu_sort_'.$key]   = $this->form['menu_sort_'.$other];
+        $this->form['menu_sort_'.$other] = $tmp;
+
+        // آموزهٔ Task 60: کش computed باید پاک شود وگرنه رندر ترتیب کهنه را نشان می‌دهد
+        unset($this->menuRows);
+    }
+
     public function render()
     {
         return view('livewire.settings.home');
@@ -257,6 +341,11 @@ class HomePage extends Component
         // ترتیب بخش‌ها — عدد مثبت؛ از فلش‌های پنل تغییر می‌کند
         foreach (HomeSettings::SECTION_KEYS as $key) {
             $rules['form.home_sort_'.$key] = ['required', 'integer', 'min:1', 'max:999'];
+        }
+
+        // ترتیب آیتم‌های منوی هدر — عدد مثبت؛ از فلش‌های پنل تغییر می‌کند
+        foreach (ShopMenu::keys() as $key) {
+            $rules['form.menu_sort_'.$key] = ['required', 'integer', 'min:1', 'max:999'];
         }
 
         return $rules;

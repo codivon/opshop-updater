@@ -79,71 +79,23 @@
 
             <span class="hidden h-6 w-px bg-zinc-200 sm:block dark:bg-zinc-800" aria-hidden="true"></span>
 
-            {{-- nav — FIX (سرریز افقی موبایل): برچسب متنی لینک‌ها زیر sm مخفی می‌شود (فقط آیکون) +
+            {{-- nav — آیتم‌ها از پنل «صفحهٔ اصلی فروشگاه» ← تب «منوی هدر» (ترتیب + روشن/خاموش) — Task 61.
+                 FIX (سرریز افقی موبایل): برچسب متنی لینک‌ها زیر sm مخفی می‌شود (فقط آیکون) +
                  خود nav در عرض‌های خیلی کوچک اسکرول افقی می‌گیرد تا هرگز صفحه را عریض نکند --}}
             <nav class="flex max-w-full items-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="ناوبری فروشگاه">
-                <a href="{{ route('shop.home') }}" wire:navigate
-                   @class([
-                       'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.home'),
-                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! request()->routeIs('shop.home'),
-                   ])
-                   @if(request()->routeIs('shop.home')) aria-current="page" @endif>
-                    <x-icon name="home" class="size-4.5" />
-                    <span class="hidden sm:block">خانه</span>
-                </a>
-                <a href="{{ route('shop.packages') }}" wire:navigate
-                   @class([
-                       'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.packages') || request()->routeIs('shop.package'),
-                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! (request()->routeIs('shop.packages') || request()->routeIs('shop.package')),
-                   ])
-                   @if(request()->routeIs('shop.packages') || request()->routeIs('shop.package')) aria-current="page" @endif>
-                    <x-icon name="package" class="size-4.5" />
-                    <span class="hidden sm:block">پکیج‌ها</span>
-                </a>
-                <a href="{{ route('shop.products') }}" wire:navigate
-                   @class([
-                       'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.products') || request()->routeIs('shop.product'),
-                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! (request()->routeIs('shop.products') || request()->routeIs('shop.product')),
-                   ])
-                   @if(request()->routeIs('shop.products') || request()->routeIs('shop.product')) aria-current="page" @endif>
-                    <x-icon name="rocket" class="size-4.5" />
-                    <span class="hidden sm:block">پروژه‌ها</span>
-                </a>
-                <a href="{{ route('shop.templates') }}" wire:navigate
-                   @class([
-                       'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.templates') || request()->routeIs('shop.template') || request()->routeIs('payment.result.template'),
-                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! (request()->routeIs('shop.templates') || request()->routeIs('shop.template') || request()->routeIs('payment.result.template')),
-                   ])
-                   @if(request()->routeIs('shop.templates') || request()->routeIs('shop.template')) aria-current="page" @endif>
-                    <x-icon name="layout-template" class="size-4.5" />
-                    <span class="hidden sm:block">قالب‌ها</span>
-                </a>
-                @if(\App\Support\Features::changelog())
-                    <a href="{{ route('shop.changelog') }}" wire:navigate
+                @foreach(\App\Support\ShopMenu::orderedItems() as $item)
+                    @php($menuActive = collect($item['routes'])->contains(fn ($pattern) => request()->routeIs($pattern)))
+                    <a href="{{ route($item['routes'][0]) }}" wire:navigate wire:key="shop-menu-{{ $item['key'] }}"
                        @class([
                            'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                           'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.changelog'),
-                           'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! request()->routeIs('shop.changelog'),
+                           'bg-brand-500/10 text-brand-600 dark:text-brand-400' => $menuActive,
+                           'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! $menuActive,
                        ])
-                       @if(request()->routeIs('shop.changelog')) aria-current="page" @endif>
-                        <x-icon name="history" class="size-4.5" />
-                        <span class="hidden sm:block">تغییرات</span>
+                       @if($menuActive) aria-current="page" @endif>
+                        <x-icon name="{{ $item['icon'] }}" class="size-4.5" />
+                        <span class="hidden sm:block">{{ $item['label'] }}</span>
                     </a>
-                @endif
-                <a href="{{ route('shop.subscriptions') }}" wire:navigate
-                   @class([
-                       'flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                       'bg-brand-500/10 text-brand-600 dark:text-brand-400' => request()->routeIs('shop.subscriptions') || request()->routeIs('subscription.*'),
-                       'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100' => ! (request()->routeIs('shop.subscriptions') || request()->routeIs('subscription.*')),
-                   ])
-                   @if(request()->routeIs('shop.subscriptions') || request()->routeIs('subscription.*')) aria-current="page" @endif>
-                    <x-icon name="crown" class="size-4.5" />
-                    <span class="hidden sm:block">طرح‌های اشتراک</span>
-                </a>
+                @endforeach
             </nav>
 
             <div class="flex-1"></div>
@@ -186,13 +138,8 @@
                 </a>
             @endif
 
-            {{-- admin login --}}
-            <a href="{{ route('login') }}" wire:navigate
-               class="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
-               title="ورود به پنل مدیریت">
-                <x-icon name="shield-check" class="size-4" />
-                <span class="hidden sm:block">ورود مدیر</span>
-            </a>
+            {{-- Task 61: لینک «ورود مدیر» از هدر فروشگاه حذف شد (کاهش سطح نمایش پنل مدیریت) —
+                 صفحهٔ ورود مدیران همچنان از مسیر مستقیم /login در دسترس است. --}}
         </div>
     </header>
 

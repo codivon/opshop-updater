@@ -20,6 +20,7 @@
     <form wire:submit="save" class="space-y-6">
         <x-tabs :tabs="[
             ['id' => 'sections', 'label' => 'بخش‌ها', 'icon' => 'layout-grid'],
+            ['id' => 'menu',     'label' => 'منوی هدر', 'icon' => 'menu'],
             ['id' => 'hero',     'label' => 'هیرو', 'icon' => 'sparkles'],
             ['id' => 'about',    'label' => 'معرفی', 'icon' => 'users'],
             ['id' => 'trust',    'label' => 'اعتماد', 'icon' => 'badge-check'],
@@ -62,6 +63,38 @@
                     </x-card>
                 </div>
             </x-slot:sections>
+
+            {{-- ==================== منوی هدر (ترتیب + روشن/خاموش) — Task 61 ==================== --}}
+            <x-slot:menu>
+                <div class="space-y-6">
+                    <x-card title="منوی هدر فروشگاه" subtitle="ترتیب لینک‌های ناوبری هدر را با فلش‌ها تغییر دهید و آیتم‌های لازم را خاموش/روشن کنید؛ تغییرات بعد از «ذخیره تنظیمات» روی هدر همهٔ صفحات فروشگاه اعمال می‌شود. خاموشی آیتم فقط لینک هدر را مخفی می‌کند؛ دسترسی مستقیم با آدرس سرجایش است.">
+                        <div class="space-y-2.5">
+                            @foreach($this->menuRows as $row)
+                                <div class="flex flex-wrap items-center gap-3 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60"
+                                     wire:key="menurow-{{ $row['key'] }}">
+                                    <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-zinc-500 shadow-xs dark:bg-zinc-900 dark:text-zinc-400">
+                                        <x-icon name="{{ $row['icon'] }}" class="size-4.5" />
+                                    </span>
+                                    <span class="min-w-0 flex-1 text-sm font-bold text-zinc-800 dark:text-zinc-100">{{ $row['label'] }}</span>
+                                    <span class="flex items-center gap-1">
+                                        <button type="button" wire:click="moveMenuUp('{{ $row['key'] }}')" wire:key="menuup-{{ $row['key'] }}"
+                                                class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-900 dark:ring-zinc-700/60 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                                title="انتقال به بالا" aria-label="انتقال {{ $row['label'] }} به بالا">
+                                            <x-icon name="chevron-up" class="size-4" />
+                                        </button>
+                                        <button type="button" wire:click="moveMenuDown('{{ $row['key'] }}')" wire:key="menudown-{{ $row['key'] }}"
+                                                class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-900 dark:ring-zinc-700/60 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                                title="انتقال به پایین" aria-label="انتقال {{ $row['label'] }} به پایین">
+                                            <x-icon name="chevron-down" class="size-4" />
+                                        </button>
+                                    </span>
+                                    <x-toggle wire:model="form.menu_{{ $row['key'] }}_enabled" id="menu_{{ $row['key'] }}_enabled" />
+                                </div>
+                            @endforeach
+                        </div>
+                    </x-card>
+                </div>
+            </x-slot:menu>
 
             {{-- ==================== هیرو ==================== --}}
             <x-slot:hero>
