@@ -30,7 +30,7 @@
             {{-- ==================== بخش‌ها (روشن/خاموش) ==================== --}}
             <x-slot:sections>
                 <div class="space-y-6">
-                    <x-card title="نمایش بخش‌ها" subtitle="هر ویجت صفحهٔ اصلی را جداگانه روشن/خاموش کنید؛ ترتیب بخش‌ها ثابت است: هیرو → آمار → معرفی → چرا ما → نظرات → محصولات → اشتراک → تماس.">
+                    <x-card title="نمایش بخش‌ها" subtitle="هر ویجت صفحهٔ اصلی را جداگانه روشن/خاموش کنید؛ ترتیب بخش‌ها ثابت است: هیرو → آمار → معرفی → چرا ما → نظرات → دسته‌بندی → محصولات → اشتراک → تماس.">
                         <div class="grid gap-3 sm:grid-cols-2">
                             @foreach([
                                 'home_hero_enabled'         => ['هیرو (معرفی بالا)', 'sparkles'],
@@ -38,6 +38,7 @@
                                 'home_about_enabled'        => ['معرفی (درباره ما)', 'users'],
                                 'home_why_enabled'          => ['چرا ما', 'badge-check'],
                                 'home_testimonials_enabled' => ['نظرات مشتریان', 'quote'],
+                                'home_categories_enabled'   => ['دسته‌بندی محصولات', 'folder-tree'],
                                 'home_packages_enabled'     => ['پکیج‌ها (محصولات)', 'package'],
                                 'home_products_enabled'     => ['پروژه‌های آماده', 'rocket'],
                                 'home_templates_enabled'    => ['قالب‌های آماده', 'layout-template'],

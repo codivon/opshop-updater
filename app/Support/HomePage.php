@@ -22,6 +22,7 @@ class HomePage
         'home_about_enabled'         => '1',
         'home_why_enabled'           => '1',
         'home_testimonials_enabled'  => '1',
+        'home_categories_enabled'    => '1',
         'home_packages_enabled'      => '1',
         'home_products_enabled'      => '1',
         'home_templates_enabled'     => '1',
@@ -102,6 +103,7 @@ class HomePage
     public const BOOL_KEYS = [
         'home_hero_enabled', 'home_stats_enabled', 'home_about_enabled',
         'home_why_enabled', 'home_testimonials_enabled',
+        'home_categories_enabled',
         'home_packages_enabled', 'home_products_enabled', 'home_templates_enabled',
         'home_subscription_enabled', 'home_contact_enabled', 'contact_form_enabled',
     ];

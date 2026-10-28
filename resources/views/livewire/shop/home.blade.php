@@ -163,7 +163,7 @@
         {{-- ================================================================ --}}
         {{-- ۵) محصولات — دسته‌بندی‌ها + پکیج‌ها + پروژه‌ها + قالب‌ها            --}}
         {{-- ================================================================ --}}
-        @php($showCategories = $ho['home_packages_enabled'] || $ho['home_products_enabled'])
+        @php($showCategories = $ho['home_categories_enabled'] && ($ho['home_packages_enabled'] || $ho['home_products_enabled']))
         @php($packageNodes = $showCategories ? $this->packageCategoryTree : collect())
         @php($productNodes = $showCategories ? $this->productCategoryTree : collect())
         @if($showCategories && ($packageNodes->count() || $productNodes->count()))

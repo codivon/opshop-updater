@@ -84,6 +84,42 @@ class ShopHomeAndContactTest extends TestCase
             ->assertDontSee('info@weblak.ir');
     }
 
+    public function test_categories_section_can_be_disabled_and_enabled(): void
+    {
+        \App\Models\Category::create(['name' => 'دستهٔ پکیج', 'slug' => 'cat-pkg', 'type' => 'package', 'is_active' => true]);
+        \App\Models\Category::create(['name' => 'دستهٔ پروژه', 'slug' => 'cat-prd', 'type' => 'product', 'is_active' => true]);
+
+        // پیش‌فرض: بخش دسته‌بندی محصولات روی صفحهٔ اصلی دیده می‌شود
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertSee('دسته‌بندی محصولات');
+
+        // خاموش‌کردن سوییچ مستقل دسته‌بندی (با سوییچ پکیج/پروژهٔ روشن) → کل بخش مخفی می‌شود
+        $this->setSetting('home_categories_enabled', '0');
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertDontSee('دسته‌بندی محصولات');
+
+        // روشن‌کردن مجدد → بخش برمی‌گردد
+        $this->setSetting('home_categories_enabled', '1');
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertSee('دسته‌بندی محصولات');
+
+        // رگرسیون: با خاموشی پکیج‌ها و پروژه‌ها، بخش دسته‌بندیِ روشن رندر نمی‌شود (ظرف خالی نمی‌ماند)
+        $this->setSetting('home_packages_enabled', '0');
+        $this->setSetting('home_products_enabled', '0');
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertDontSee('دسته‌بندی محصولات');
+
+        // سوییچ «دسته‌بندی محصولات» در پنل صفحهٔ اصلی موجود است
+        $this->actingAs($this->admin)
+            ->get(route('admin.settings.home'))
+            ->assertOk()
+            ->assertSee('دسته‌بندی محصولات');
+    }
+
     public function test_enamad_code_renders_in_footer_when_set(): void
     {
         $this->get(route('shop.home'))->assertOk()->assertDontSee('trustseal.enamad.ir');
