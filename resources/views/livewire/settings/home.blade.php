@@ -27,30 +27,38 @@
             ['id' => 'footer',   'label' => 'فوتر', 'icon' => 'panel-top'],
         ]">
 
-            {{-- ==================== بخش‌ها (روشن/خاموش) ==================== --}}
+            {{-- ==================== بخش‌ها (روشن/خاموش + ترتیب) ==================== --}}
             <x-slot:sections>
                 <div class="space-y-6">
-                    <x-card title="نمایش بخش‌ها" subtitle="هر ویجت صفحهٔ اصلی را جداگانه روشن/خاموش کنید؛ ترتیب بخش‌ها ثابت است: هیرو → آمار → معرفی → چرا ما → نظرات → دسته‌بندی → محصولات → اشتراک → تماس.">
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            @foreach([
-                                'home_hero_enabled'         => ['هیرو (معرفی بالا)', 'sparkles'],
-                                'home_stats_enabled'        => ['آمار اعتماد', 'bar-chart'],
-                                'home_about_enabled'        => ['معرفی (درباره ما)', 'users'],
-                                'home_why_enabled'          => ['چرا ما', 'badge-check'],
-                                'home_testimonials_enabled' => ['نظرات مشتریان', 'quote'],
-                                'home_categories_enabled'   => ['دسته‌بندی محصولات', 'folder-tree'],
-                                'home_packages_enabled'     => ['پکیج‌ها (محصولات)', 'package'],
-                                'home_products_enabled'     => ['پروژه‌های آماده', 'rocket'],
-                                'home_templates_enabled'    => ['قالب‌های آماده', 'layout-template'],
-                                'home_subscription_enabled' => ['اشتراک‌ها', 'crown'],
-                                'home_contact_enabled'      => ['تماس با ما', 'message-circle'],
-                                'contact_form_enabled'      => ['فرم تماس (داخل بخش تماس)', 'send'],
-                            ] as $key => $meta)
-                                <div class="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
-                                    <x-toggle wire:model="form.{{ $key }}" label="{{ $meta[0] }}" id="{{ $key }}" />
+                    <x-card title="نمایش و ترتیب بخش‌ها" subtitle="هر ویجت را با فلش‌ها بالا/پایین ببرید و با سوییچ روشن/خاموش کنید؛ ترتیب جدید بعد از «ذخیره تنظیمات» روی صفحهٔ اصلی اعمال می‌شود.">
+                        <div class="space-y-2.5">
+                            @foreach($this->sectionRows as $row)
+                                <div class="flex flex-wrap items-center gap-3 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60"
+                                     wire:key="secrow-{{ $row['key'] }}">
+                                    <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-zinc-500 shadow-xs dark:bg-zinc-900 dark:text-zinc-400">
+                                        <x-icon name="{{ $row['icon'] }}" class="size-4.5" />
+                                    </span>
+                                    <span class="min-w-0 flex-1 text-sm font-bold text-zinc-800 dark:text-zinc-100">{{ $row['label'] }}</span>
+                                    <span class="flex items-center gap-1">
+                                        <button type="button" wire:click="moveSectionUp('{{ $row['key'] }}')" wire:key="secup-{{ $row['key'] }}"
+                                                class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-900 dark:ring-zinc-700/60 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                                title="انتقال به بالا" aria-label="انتقال {{ $row['label'] }} به بالا">
+                                            <x-icon name="chevron-up" class="size-4" />
+                                        </button>
+                                        <button type="button" wire:click="moveSectionDown('{{ $row['key'] }}')" wire:key="secdown-{{ $row['key'] }}"
+                                                class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-900 dark:ring-zinc-700/60 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                                title="انتقال به پایین" aria-label="انتقال {{ $row['label'] }} به پایین">
+                                            <x-icon name="chevron-down" class="size-4" />
+                                        </button>
+                                    </span>
+                                    <x-toggle wire:model="form.home_{{ $row['key'] }}_enabled" id="home_{{ $row['key'] }}_enabled" />
                                 </div>
                             @endforeach
                         </div>
+                    </x-card>
+
+                    <x-card title="فرم تماس" subtitle="فرم تماس داخل بخش «تماس با ما» نمایش داده می‌شود و ترتیب مستقل ندارد.">
+                        <x-toggle wire:model="form.contact_form_enabled" label="نمایش فرم تماس" id="contact_form_enabled" />
                     </x-card>
                 </div>
             </x-slot:sections>

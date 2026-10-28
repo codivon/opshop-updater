@@ -93,6 +93,78 @@ class HomePage extends Component
         ];
     }
 
+    /** برچسب و آیکون هر بخش (کلید کوتاه => [برچسب، آیکون]) */
+    public const SECTION_META = [
+        'hero'         => ['هیرو (معرفی بالا)', 'sparkles'],
+        'stats'        => ['آمار اعتماد', 'bar-chart'],
+        'about'        => ['معرفی (درباره ما)', 'users'],
+        'why'          => ['چرا ما', 'badge-check'],
+        'testimonials' => ['نظرات مشتریان', 'quote'],
+        'categories'   => ['دسته‌بندی محصولات', 'folder-tree'],
+        'packages'     => ['پکیج‌ها (محصولات)', 'package'],
+        'products'     => ['پروژه‌های آماده', 'rocket'],
+        'templates'    => ['قالب‌های آماده', 'layout-template'],
+        'subscription' => ['اشتراک‌ها', 'crown'],
+        'track'        => ['پیگیری خرید مهمان', 'search'],
+        'contact'      => ['تماس با ما', 'message-circle'],
+    ];
+
+    /** ردیف‌های بخش‌ها به ترتیب فعلی فرم (home_sort_*) برای تب «بخش‌ها» */
+    public function getSectionRowsProperty(): array
+    {
+        $rows = [];
+
+        foreach (HomeSettings::SECTION_KEYS as $key) {
+            [$label, $icon] = self::SECTION_META[$key];
+
+            $rows[] = [
+                'key'   => $key,
+                'label' => $label,
+                'icon'  => $icon,
+                'sort'  => (int) ($this->form['home_sort_'.$key] ?? 0),
+            ];
+        }
+
+        usort($rows, fn ($a, $b) => $a['sort'] <=> $b['sort']);
+
+        return $rows;
+    }
+
+    /** جابه‌جایی یک بخش یک ردیف به بالا (فرم ذخیره‌نشده — با «ذخیره تنظیمات» اعمال می‌شود) */
+    public function moveSectionUp(string $key): void
+    {
+        $this->moveSection($key, -1);
+    }
+
+    /** جابه‌جایی یک بخش یک ردیف به پایین */
+    public function moveSectionDown(string $key): void
+    {
+        $this->moveSection($key, +1);
+    }
+
+    private function moveSection(string $key, int $direction): void
+    {
+        // مقدار جدید را نسبت به ترتیب «فرم» محاسبه می‌کنیم (نه دیتابیس)
+        $keys  = array_column($this->sectionRows, 'key');
+        $index = array_search($key, $keys, true);
+
+        if ($index === false) {
+            return;
+        }
+
+        $neighbor = $index + $direction;
+
+        if ($neighbor < 0 || $neighbor >= count($keys)) {
+            return; // بالاترین/پایین‌ترین ردیف — حرکتی نیست
+        }
+
+        $other = $keys[$neighbor];
+
+        $tmp = $this->form['home_sort_'.$key];
+        $this->form['home_sort_'.$key]   = $this->form['home_sort_'.$other];
+        $this->form['home_sort_'.$other] = $tmp;
+    }
+
     public function render()
     {
         return view('livewire.settings.home');
@@ -175,6 +247,13 @@ class HomePage extends Component
             // فوتر — اینماد
             'form.footer_enamad_code' => ['nullable', 'string', 'max:5000'],
         ];
+
+        // ترتیب بخش‌ها — عدد مثبت؛ از فلش‌های پنل تغییر می‌کند
+        foreach (HomeSettings::SECTION_KEYS as $key) {
+            $rules['form.home_sort_'.$key] = ['required', 'integer', 'min:1', 'max:999'];
+        }
+
+        return $rules;
     }
 
     protected function messages(): array

@@ -120,6 +120,69 @@ class ShopHomeAndContactTest extends TestCase
             ->assertSee('دسته‌بندی محصولات');
     }
 
+    public function test_home_sections_can_be_reordered_from_settings(): void
+    {
+        // ترتیب پیش‌فرض: هیرو قبل از تماس با ما
+        $default = $this->get(route('shop.home'))->assertOk()->getContent();
+        $this->assertLessThan(
+            mb_strpos($default, 'هر ایده‌ای در سر دارید'),
+            mb_strpos($default, 'از اول تا بزرگ شدن استارتاپ')
+        );
+
+        // تماس با ما بالاتر از هیرو (کلیدهای home_sort_*)
+        $this->setSetting('home_sort_contact', '10');
+        $this->setSetting('home_sort_hero', '120');
+
+        $html = $this->get(route('shop.home'))->assertOk()->getContent();
+        $this->assertLessThan(
+            mb_strpos($html, 'از اول تا بزرگ شدن استارتاپ'),
+            mb_strpos($html, 'هر ایده‌ای در سر دارید')
+        );
+    }
+
+    public function test_panel_can_reorder_sections(): void
+    {
+        $this->actingAs($this->admin)
+            ->get(route('admin.settings.home'))
+            ->assertOk()
+            ->assertSee('نمایش و ترتیب بخش‌ها');
+
+        Livewire::test(SettingsHomePage::class)
+            // مرزها: بالاترین ردیف بالا نمی‌رود و پایین‌ترین پایین نمی‌رود
+            ->assertSet('form.home_sort_hero', '10')
+            ->call('moveSectionUp', 'hero')
+            ->assertSet('form.home_sort_hero', '10')
+            ->call('moveSectionDown', 'contact')
+            ->assertSet('form.home_sort_contact', '120')
+            // جابه‌جایی واقعی: هیرو یک ردیف پایین (تعویض با آمار اعتماد)
+            ->call('moveSectionDown', 'hero')
+            ->assertSet('form.home_sort_hero', '20')
+            ->assertSet('form.home_sort_stats', '10')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('settings', ['key' => 'home_sort_hero',  'value' => '20', 'group' => 'home']);
+        $this->assertDatabaseHas('settings', ['key' => 'home_sort_stats', 'value' => '10', 'group' => 'home']);
+
+        // روی صفحهٔ اصلی: آمار اعتماد («سال تجربه») بالاتر از هیرو رندر می‌شود
+        $html = $this->get(route('shop.home'))->assertOk()->getContent();
+        $this->assertLessThan(
+            mb_strpos($html, 'از اول تا بزرگ شدن استارتاپ'),
+            mb_strpos($html, 'سال تجربه')
+        );
+    }
+
+    public function test_track_section_can_be_disabled(): void
+    {
+        $this->get(route('shop.home'))->assertOk()->assertSee('خرید قبلی دارید؟');
+
+        $this->setSetting('home_track_enabled', '0');
+        $this->get(route('shop.home'))->assertOk()->assertDontSee('خرید قبلی دارید؟');
+
+        $this->setSetting('home_track_enabled', '1');
+        $this->get(route('shop.home'))->assertOk()->assertSee('خرید قبلی دارید؟');
+    }
+
     public function test_enamad_code_renders_in_footer_when_set(): void
     {
         $this->get(route('shop.home'))->assertOk()->assertDontSee('trustseal.enamad.ir');

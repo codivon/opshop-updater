@@ -269,6 +269,9 @@ class Home extends Component
             'whyItems'     => $home::whyItems(),
             'trustStats'   => $home::stats(),
             'testimonials' => $home::testimonials(),
+
+            // ترتیب رندر بخش‌ها از کلیدهای home_sort_* (پنل ← تب بخش‌ها) — Task 59
+            'sections' => $home::orderedSections(),
         ];
     }
 

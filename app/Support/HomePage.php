@@ -27,8 +27,23 @@ class HomePage
         'home_products_enabled'      => '1',
         'home_templates_enabled'     => '1',
         'home_subscription_enabled'  => '1',
+        'home_track_enabled'         => '1',
         'home_contact_enabled'       => '1',
         'contact_form_enabled'       => '1',
+
+        /* -------------------- ترتیب بخش‌ها (پنل قابل جابه‌جایی) ------------ */
+        'home_sort_hero'         => '10',
+        'home_sort_stats'        => '20',
+        'home_sort_about'        => '30',
+        'home_sort_why'          => '40',
+        'home_sort_testimonials' => '50',
+        'home_sort_categories'   => '60',
+        'home_sort_packages'     => '70',
+        'home_sort_products'     => '80',
+        'home_sort_templates'    => '90',
+        'home_sort_subscription' => '100',
+        'home_sort_track'        => '110',
+        'home_sort_contact'      => '120',
 
         /* -------------------- هیرو (معرفی بالا) -------------------- */
         'home_hero_badge'    => 'آماده همکاری و پروژه جدید',
@@ -106,6 +121,13 @@ class HomePage
         'home_categories_enabled',
         'home_packages_enabled', 'home_products_enabled', 'home_templates_enabled',
         'home_subscription_enabled', 'home_contact_enabled', 'contact_form_enabled',
+        'home_track_enabled',
+    ];
+
+    /** بخش‌های صفحهٔ اصلی (کلید کوتاه) — به ترتیب پیش‌فرض؛ ترتیب واقعی از home_sort_* خوانده می‌شود */
+    public const SECTION_KEYS = [
+        'hero', 'stats', 'about', 'why', 'testimonials', 'categories',
+        'packages', 'products', 'templates', 'subscription', 'track', 'contact',
     ];
 
     /** گروه جدول settings برای همهٔ کلیدهای این ماژول */
@@ -128,6 +150,20 @@ class HomePage
     public static function on(string $key): bool
     {
         return filter_var((string) setting($key, self::DEFAULTS[$key] ?? '0'), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /** کلیدهای بخش‌ها به ترتیب ذخیره‌شدهٔ پنل (home_sort_*؛ هرچه کوچک‌تر، بالاتر) */
+    public static function orderedSections(): array
+    {
+        $sections = [];
+
+        foreach (self::SECTION_KEYS as $key) {
+            $sections[$key] = (int) setting('home_sort_'.$key, self::DEFAULTS['home_sort_'.$key] ?? '0');
+        }
+
+        asort($sections); // PHP 8+ پایدار است — ترتیب برابر = ترتیب پیش‌فرض
+
+        return array_keys($sections);
     }
 
     /** کد HTML اینماد فوتر (خالی = نمایش داده نمی‌شود) */
