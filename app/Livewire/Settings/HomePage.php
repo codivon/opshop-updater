@@ -17,6 +17,7 @@ use Livewire\Component;
  * فعال/غیرفعال و شخصی‌سازی می‌شوند.
  * Task 60: ترتیب بخش‌ها (home_sort_*) + تب «بخش‌ها» با فلش بالا/پایین.
  * Task 61: تب «منوی هدر» — ترتیب و روشن/خاموشی لینک‌های ناوبری فروشگاه (گروه menu).
+ * Task 62: دکمهٔ سوم هیرو (سایت برند weblak.ir) + لینک «نمونه‌کارها» در بخش معرفی.
  *
  * الگو: مطابق Settings\Security — فرم $form + حلقهٔ ذخیره + پاک‌سازی کش هر کلید.
  */
@@ -277,6 +278,8 @@ class HomePage extends Component
             'form.home_hero_cta_link' => $max(300),
             'form.home_hero_cta2_text' => $max(60),
             'form.home_hero_cta2_link' => $max(300),
+            'form.home_hero_cta3_text' => $max(60),
+            'form.home_hero_cta3_link' => $max(300),
 
             // آمار
             'form.home_stat1_value' => $max(30),
@@ -291,6 +294,8 @@ class HomePage extends Component
             // معرفی
             'form.home_about_title' => $max(120),
             'form.home_about_body'  => ['nullable', 'string', 'max:5000'],
+            'form.home_about_more_text' => $max(60),
+            'form.home_about_more_link' => $max(300),
 
             // چرا ما
             'form.home_why_title' => $max(120),

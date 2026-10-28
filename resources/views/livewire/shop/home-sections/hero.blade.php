@@ -1,4 +1,4 @@
-{{-- بخش «hero» صفحهٔ اصلی — محتوا/سوییچ/ترتیب از پنل (Task 59) --}}
+{{-- بخش «hero» صفحهٔ اصلی — محتوا/سوییچ/ترتیب از پنل (Task 59) — دکمهٔ سوم: سایت برند (Task 62) --}}
     @if($ho['home_hero_enabled'])
         <section class="shop-hero relative overflow-hidden">
             <div class="pointer-events-none absolute inset-0" aria-hidden="true">
@@ -36,6 +36,15 @@
                             <a href="{{ $hs['home_hero_cta2_link'] ?: '#contact' }}" class="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/25 backdrop-blur transition-colors hover:bg-white/20">
                                 <x-icon name="message-circle" class="size-4" />
                                 {{ $hs['home_hero_cta2_text'] }}
+                            </a>
+                        @endif
+                        {{-- دکمهٔ سوم: بیشتر درباره من / نمونه‌کارها → سایت برند (تب جدید) — Task 62 --}}
+                        @if($hs['home_hero_cta3_text'] !== '')
+                            @php($cta3 = $hs['home_hero_cta3_link'] ?: 'https://weblak.ir')
+                            <a href="{{ $cta3 }}" @if(str_starts_with($cta3, 'http')) target="_blank" rel="noopener" @endif class="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/25 backdrop-blur transition-colors hover:bg-white/20">
+                                <x-icon name="globe" class="size-4" />
+                                {{ $hs['home_hero_cta3_text'] }}
+                                <x-icon name="external-link" class="size-3.5 opacity-60" />
                             </a>
                         @endif
                     </div>

@@ -128,6 +128,14 @@
                                 <x-field label="لینک دکمهٔ دوم" for="home_hero_cta2_link">
                                     <x-input id="home_hero_cta2_link" wire:model="form.home_hero_cta2_link" dir="ltr" placeholder="#contact" icon="link" />
                                 </x-field>
+                                <x-field label="متن دکمهٔ سوم" for="home_hero_cta3_text"
+                                         hint="لینک سایت برند (درباره من / نمونه‌کارها) — خالی = نمایش داده نمی‌شود">
+                                    <x-input id="home_hero_cta3_text" wire:model="form.home_hero_cta3_text" placeholder="بیشتر درباره من و نمونه‌کارها" />
+                                </x-field>
+                                <x-field label="لینک دکمهٔ سوم" for="home_hero_cta3_link"
+                                         hint="در تب جدید باز می‌شود — مثلاً سایت اصلی برند">
+                                    <x-input id="home_hero_cta3_link" wire:model="form.home_hero_cta3_link" dir="ltr" placeholder="https://weblak.ir" icon="link" />
+                                </x-field>
                             </div>
                         </div>
                     </x-card>
@@ -147,6 +155,17 @@
                                      hint="برای پاراگراف جدید، Enter بزنید">
                                 <x-textarea id="home_about_body" wire:model="form.home_about_body" rows="7" />
                             </x-field>
+
+                            <div class="grid gap-5 sm:grid-cols-2">
+                                <x-field label="متن لینک نمونه‌کارها" for="home_about_more_text"
+                                         hint="کنار دکمهٔ «صحبت درباره ایده شما» — خالی = مخفی">
+                                    <x-input id="home_about_more_text" wire:model="form.home_about_more_text" placeholder="مشاهده نمونه‌کارها در وب‌لاک" />
+                                </x-field>
+                                <x-field label="لینک نمونه‌کارها" for="home_about_more_link"
+                                         hint="سایت اصلی برند — در تب جدید باز می‌شود">
+                                    <x-input id="home_about_more_link" wire:model="form.home_about_more_link" dir="ltr" placeholder="https://weblak.ir" icon="link" />
+                                </x-field>
+                            </div>
                         </div>
                     </x-card>
                 </div>

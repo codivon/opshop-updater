@@ -321,6 +321,60 @@ class ShopHomeAndContactTest extends TestCase
     }
 
     /* -------------------------------------------------------------- */
+    /*  لینک سایت برند (weblak.ir) — Task 62                            */
+    /* -------------------------------------------------------------- */
+
+    public function test_hero_third_button_and_about_portfolio_link_render_by_default(): void
+    {
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertSee('بیشتر درباره من و نمونه‌کارها')    // دکمهٔ سوم هیرو
+            ->assertSee('href="https://weblak.ir"', false)  // لینک پیش‌فرض برند
+            ->assertSee('target="_blank"', false)           // لینک بیرونی در تب جدید
+            ->assertSee('مشاهده نمونه‌کارها در وب‌لاک');     // لینک بخش معرفی
+    }
+
+    public function test_brand_links_are_editable_and_hideable(): void
+    {
+        // متن دکمهٔ سوم خالی → فقط همان دکمه مخفی می‌شود؛ دکمه‌های دیگر سرجایشان‌اند
+        $this->setSetting('home_hero_cta3_text', '');
+
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertDontSee('بیشتر درباره من و نمونه‌کارها')
+            ->assertSee('مشاهده محصولات'); // دکمهٔ اول
+
+        // متن و لینک سفارشی برای دکمهٔ سوم و لینک معرفی
+        $this->setSetting('home_hero_cta3_text', 'نمونه‌کارهای من');
+        $this->setSetting('home_about_more_link', 'https://weblak.ir/portfolio');
+
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertSee('نمونه‌کارهای من')
+            ->assertSee('href="https://weblak.ir/portfolio"', false);
+    }
+
+    public function test_panel_edits_brand_links_and_persists(): void
+    {
+        Livewire::test(SettingsHomePage::class)
+            ->assertSet('form.home_hero_cta3_link', 'https://weblak.ir')
+            ->set('form.home_about_more_text', 'پورتفولیوی من')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertDispatched('toast');
+
+        $this->assertDatabaseHas('settings', [
+            'key'   => 'home_about_more_text',
+            'value' => 'پورتفولیوی من',
+            'group' => 'home',
+        ]);
+
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertSee('پورتفولیوی من');
+    }
+
+    /* -------------------------------------------------------------- */
     /*  فرم تماس با ما                                                  */
     /* -------------------------------------------------------------- */
 
