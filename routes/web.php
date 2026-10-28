@@ -153,6 +153,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', \App\Http\Middleware
     // پروفایل مدیر (ویرایش نام/ایمیل + تغییر رمز عبور)
     Route::get('profile', \App\Livewire\Settings\Profile::class)->name('profile');
 
+    // محتوای فروشگاه — صفحهٔ اصلی (ویجت‌ها) + پیام‌های تماس (Task 56)
+    Route::get('settings/home', \App\Livewire\Settings\HomePage::class)->name('settings.home');
+    Route::get('messages', \App\Livewire\Messages\Index::class)->name('messages.index');
+
     // محصولات
     Route::get('projects', \App\Livewire\Projects\Index::class)->name('projects.index');
     Route::get('updates', \App\Livewire\Updates\Index::class)->name('updates.index');

@@ -26,6 +26,7 @@ class Features
         'sec_captcha_admin_register' => '1',
         'sec_captcha_customer_login' => '1',
         'sec_captcha_comments'       => '1',
+        'sec_captcha_contact'        => '1',
         // تلهٔ زمان: پاسخ‌دادن زیر این ثانیه‌ها = ربات
         'sec_captcha_min_seconds'    => '2',
 
@@ -40,6 +41,10 @@ class Features
         'sec_lockout_customer_decay' => '15',
         'sec_lockout_comment_max'    => '5',
         'sec_lockout_comment_decay'  => '10',
+
+        // فرم تماس (صفحهٔ اصلی فروشگاه)
+        'sec_lockout_contact_max'    => '5',
+        'sec_lockout_contact_decay'  => '10',
 
         // هدرهای امنیتی
         'sec_headers_enabled'        => '1',
@@ -95,7 +100,7 @@ class Features
     /** کلیدهای بولی (در پنل به‌صورت toggle ذخیرهٔ 1/0 می‌شوند) */
     public const BOOL_KEYS = [
         'sec_captcha_enabled', 'sec_captcha_admin_login', 'sec_captcha_admin_register',
-        'sec_captcha_customer_login', 'sec_captcha_comments', 'sec_honeypot_enabled',
+        'sec_captcha_customer_login', 'sec_captcha_comments', 'sec_captcha_contact', 'sec_honeypot_enabled',
         'sec_lockout_enabled', 'sec_headers_enabled', 'sec_headers_hsts',
         'sec_2fa_enabled', 'sec_roles_enabled',
         'feat_announcement_enabled', 'feat_announcement_dismissible',

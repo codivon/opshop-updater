@@ -244,8 +244,36 @@ class Home extends Component
         ];
     }
 
+    /**
+     * تنظیمات ویجت‌های صفحهٔ اصلی (گروه home) — Task 56.
+     * همهٔ بخش‌ها (هیرو، معرفی، آمار، چرا ما، نظرات، محصولات، تماس) از پنل
+     * /admin/settings/home قابل ویرایش/خاموش‌کردن هستند.
+     */
+    private function homeSettingsPayload(): array
+    {
+        $home = \App\Support\HomePage::class;
+
+        return [
+            // متن‌ها (کلید => مقدار trim‌شده با پیش‌فرض)
+            'hs' => collect($home::DEFAULTS)
+                ->keys()
+                ->mapWithKeys(fn ($key) => [$key => $home::str($key)])
+                ->all(),
+
+            // کلیدهای روشن/خاموش (کلید => bool)
+            'ho' => array_combine(
+                $home::BOOL_KEYS,
+                array_map(fn ($key) => $home::on($key), $home::BOOL_KEYS)
+            ),
+
+            'whyItems'     => $home::whyItems(),
+            'trustStats'   => $home::stats(),
+            'testimonials' => $home::testimonials(),
+        ];
+    }
+
     public function render()
     {
-        return view('livewire.shop.home');
+        return view('livewire.shop.home', $this->homeSettingsPayload());
     }
 }

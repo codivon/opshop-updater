@@ -233,6 +233,17 @@
     {{-- ============ Footer ============ --}}
     {{-- فوتر چسبیده به محتوای بالای خود (جریان عادی سند) — نه چسبیده به پایین ویوپورت --}}
     <footer class="border-t border-zinc-200/70 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+
+        {{-- نشان‌های اعتماد (اینماد) — کد از پنل «صفحهٔ اصلی فروشگاه» (Task 56) --}}
+        @php($enamadCode = \App\Support\HomePage::enamadCode())
+        @if($enamadCode !== '')
+            <div class="mx-auto w-full max-w-7xl border-b border-zinc-200/70 px-4 py-4 sm:px-6 dark:border-zinc-800" aria-label="نشان‌های اعتماد">
+                <div class="flex flex-wrap items-center justify-center gap-5 text-center">
+                    {!! $enamadCode !!}
+                </div>
+            </div>
+        @endif
+
         <div class="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-3 px-4 py-6 text-center sm:flex-row sm:text-start sm:px-6">
             <div class="flex items-center gap-2.5">
                 <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 text-white">

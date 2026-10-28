@@ -28,6 +28,7 @@
                 ['route' => 'admin.templates.index', 'title' => 'قالب‌ها', 'icon' => 'layout-template', 'match' => ['admin.templates*']],
                 ['route' => 'admin.categories.index', 'title' => 'دسته‌بندی‌ها', 'icon' => 'tag', 'match' => ['admin.categories*']],
                 ['route' => 'admin.comments.index', 'title' => 'دیدگاه‌ها', 'icon' => 'message-square', 'match' => ['admin.comments*'], 'badge' => \App\Models\Comment::pendingCount()],
+                ['route' => 'admin.messages.index', 'title' => 'پیام‌های تماس', 'icon' => 'inbox', 'match' => ['admin.messages*'], 'badge' => \App\Models\ContactMessage::newCount()],
             ],
         ],
         [
@@ -49,6 +50,7 @@
                 ['route' => 'admin.logs.index', 'title' => 'لاگ‌ها', 'icon' => 'terminal', 'match' => ['admin.logs*']],
                 ['route' => 'admin.tools.backup', 'title' => 'پشتیبان‌گیری', 'icon' => 'archive', 'match' => ['admin.tools*']],
                 ['route' => 'admin.settings.index', 'title' => 'تنظیمات', 'icon' => 'settings', 'match' => ['admin.settings.index', 'admin.settings.gateways']],
+                ['route' => 'admin.settings.home', 'title' => 'صفحهٔ اصلی فروشگاه', 'icon' => 'panel-top', 'match' => ['admin.settings.home']],
                 ['route' => 'admin.settings.security', 'title' => 'امنیت و امکانات', 'icon' => 'shield', 'match' => ['admin.settings.security']],
                 ['route' => 'admin.users.index', 'title' => 'کاربران', 'icon' => 'shield-check', 'match' => ['admin.users*']],
                 ['route' => 'admin.profile', 'title' => 'پروفایل مدیر', 'icon' => 'user-check', 'match' => ['admin.profile']],
