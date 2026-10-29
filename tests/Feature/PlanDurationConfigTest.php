@@ -6,11 +6,13 @@ use App\Livewire\Plans\Form as PlansForm;
 use App\Livewire\Plans\Index as PlansIndex;
 use App\Livewire\Shop\Plans as ShopPlans;
 use App\Livewire\Shop\SubscriptionsIndex;
+use App\Models\Customer;
 use App\Models\PackageLicense;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanDuration;
 use App\Services\SubscriptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\Concerns\MakesShopData;
 use Tests\TestCase;
@@ -369,6 +371,34 @@ class PlanDurationConfigTest extends TestCase
         $component->assertSee('این طرح قابلیت‌ها و پکیج‌های رایگان دارد');
     }
 
+    /**
+     * Task 66 — طرحی که هیچ قابلیت/پکیجی (در هیچ مدتی) ندارد:
+     * نه نوار «این طرح قابلیت‌ها و پکیج‌های رایگان دارد» و نه دکمهٔ جزئیات هیچ مدتی.
+     */
+    public function test_shop_plan_without_any_features_or_packages_has_no_details_button(): void
+    {
+        // چندمدتیِ کاملاً خالی — بدون قابلیت سطح طرح و بدون پکیج (ارث‌بری هم چیزی ندارد)
+        $emptyPlan = SubscriptionPlan::create([
+            'name' => 'چندمدتی خالی', 'slug' => 'multi-empty-' . uniqid(),
+            'duration_months' => 1, 'price' => 0,
+            'is_active' => true, 'features' => [],
+        ]);
+        $emptyPlan->durations()->create(['duration_months' => 1, 'price' => 0, 'is_active' => true, 'sort_order' => 1]);
+        $emptyPlan->durations()->create(['duration_months' => 3, 'price' => 0, 'is_active' => true, 'sort_order' => 2]);
+
+        // تک‌مدتیِ خالی
+        SubscriptionPlan::create([
+            'name' => 'تک‌مدتی خالی', 'slug' => 'single-empty-' . uniqid(),
+            'duration_months' => 1, 'price' => 50000,
+            'is_active' => true, 'features' => [],
+        ]);
+
+        Livewire::test(SubscriptionsIndex::class)
+            ->assertDontSee('این طرح قابلیت‌ها و پکیج‌های رایگان دارد')
+            ->assertDontSee('قابلیت‌ها و پکیج‌ها')
+            ->assertDontSee('برای مشاهده کلیک کنید');
+    }
+
     /** Task 65 — کپی طرح از جدول پنل: همهٔ مدت‌ها + قابلیت‌ها + پکیج‌های هر مدت */
     public function test_admin_panel_copies_plan_with_durations_and_packages(): void
     {
@@ -432,5 +462,122 @@ class PlanDurationConfigTest extends TestCase
         // هر دو کپی با شناسه‌های متمایز (سوییچ تصادفی خودکار در تداخل)
         $this->assertSame(2, SubscriptionPlan::where('slug', 'like', $plan->slug . '-copy%')->count());
         $this->assertSame(3, SubscriptionPlan::query()->distinct('slug')->count('slug'));
+    }
+
+    /* ================================================================
+     *  Task 66 — بررسی API: پکیج‌های رایگان طرح اشتراک کاربر باید بر
+     *  اساس «مدتِ خریداری‌شده» (پیکربندی مؤثر همان مدت) گزارش/اعمال شود
+     *  — نه صرفاً پکیج‌های سطح طرح.
+     * ================================================================ */
+
+    /**
+     * سناریوی پایه: طرح دو‌مدتی؛ پکیج سطح طرح (۱ ماه رایگان) + پکیج اختصاصی
+     * مدت ۳ ماهه (۲ ماه رایگان)؛ خرید و تأیید با مدت ۳ ماهه.
+     *
+     * @return array{0: Customer, 1: SubscriptionPlan, 2: Package, 3: Package}
+     */
+    private function makePurchasedDurationScenario(): array
+    {
+        $plan = $this->makeMultiDurationPlan();
+
+        $planPackage = $this->makePackage(['name' => 'پکیج سطح طرح']);
+        $plan->packages()->attach($planPackage->id, ['free_months' => 1]);
+
+        $vipPackage = $this->makePackage(['name' => 'پکیج ویژه ۳ ماهه']);
+        $duration3  = $plan->durations()->where('duration_months', 3)->first();
+        $duration3->packages()->attach($vipPackage->id, ['free_months' => 2]);
+
+        $customer = $this->makeCustomer();
+
+        $result = $this->service->purchase($customer, $plan, null, null, null, 3);
+        $this->service->approve($result['order']);
+
+        return [$customer, $plan, $planPackage, $vipPackage];
+    }
+
+    private function apiHeaders(Customer $customer): array
+    {
+        return [
+            'Authorization' => 'Bearer ' . $customer->update_code,
+            'X-Project-Url' => $customer->website_url,
+            'Accept'        => 'application/json',
+        ];
+    }
+
+    public function test_my_subscriptions_api_reports_free_packages_of_purchased_duration(): void
+    {
+        [$customer, $plan, $planPackage, $vipPackage] = $this->makePurchasedDurationScenario();
+
+        $res = $this->getJson('/api/v1/my-subscriptions', $this->apiHeaders($customer))
+            ->assertOk();
+
+        $res->assertJsonPath('data.subscriptions.0.plan', $plan->name);
+        // مدتِ انتخابیِ خریداری‌شده از snapshot سفارش
+        $res->assertJsonPath('data.subscriptions.0.duration_label', '۳ ماه');
+
+        // فقط پکیجِ اختصاصی مدتِ خریداری‌شده با مدت رایگان خودش — نه پکیج سطح طرح
+        $free = $res->json('data.free_packages');
+        $this->assertSame([$vipPackage->slug], array_column($free, 'slug'));
+        $this->assertSame(2, (int) $free[0]['free_months']);
+        $this->assertSame('۲ ماه رایگان', $free[0]['free_label']);
+        $this->assertSame($plan->name, $free[0]['subscription_plan']);
+        $this->assertNotNull($free[0]['license_key']);
+    }
+
+    public function test_api_package_purchase_uses_purchased_duration_free_months(): void
+    {
+        [$customer, $plan, $planPackage, $vipPackage] = $this->makePurchasedDurationScenario();
+
+        // مسیر پوشش اشتراک، آخرین نسخهٔ فعال پکیج را لازم دارد
+        $this->makePackageVersion($vipPackage);
+
+        // پکیجِ اختصاصی مدت ۳ ماهه → رایگان با اشتراک فعال (لایسنس همان ۲ ماهِ همان مدت)
+        $this->postJson('/api/v1/packages/' . $vipPackage->slug . '/purchase', [
+            'callback_url' => 'https://example.com/callback',
+        ], $this->apiHeaders($customer))
+            ->assertOk()
+            ->assertJsonPath('is_free', true)
+            ->assertJsonPath('via_subscription', true)
+            ->assertJsonPath('plan', $plan->name);
+
+        $license = PackageLicense::where('customer_id', $customer->id)
+            ->where('package_id', $vipPackage->id)
+            ->sole();
+        $this->assertSame(2, (int) $license->duration_months);
+        $this->assertTrue($license->expires_at->gt(now()->addMonths(1)));
+
+        // پکیجِ سطح طرح در مدتِ دارای پیکربندی اختصاصی پوشش داده نمی‌شود → مسیر خرید عادی
+        $this->postJson('/api/v1/packages/' . $planPackage->slug . '/purchase', [
+            'callback_url' => 'https://example.com/callback',
+        ], $this->apiHeaders($customer))
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'انتخاب طرح قیمت‌گذاری الزامی است.');
+    }
+
+    public function test_api_package_show_reports_free_months_of_purchased_duration(): void
+    {
+        [$customer,,, $vipPackage] = $this->makePurchasedDurationScenario();
+
+        $this->getJson('/api/v1/packages/' . $vipPackage->slug, $this->apiHeaders($customer))
+            ->assertOk()
+            ->assertJsonPath('data.subscription.is_free_with_subscription', true)
+            ->assertJsonPath('data.subscription.free_months', 2)
+            ->assertJsonPath('data.subscription.free_label', '۲ ماه رایگان')
+            ->assertJsonPath('data.is_purchased', true);
+    }
+
+    public function test_api_package_download_works_with_plan_subscription_coverage(): void
+    {
+        [$customer,,, $vipPackage] = $this->makePurchasedDurationScenario();
+
+        // گیت دانلود فقط اشتراکِ پروژه‌ای را قبول داشت — اشتراکِ طرح‌محورِ
+        // پوشش‌دهندهٔ پکیج (مدتِ خریداری‌شده) هم باید دانلود را باز کند (Task 66)
+        $version = $this->makePackageVersion($vipPackage);
+        Storage::fake('local');
+        Storage::disk('local')->put($version->file_path, 'FAKE-ZIP-CONTENT');
+
+        $this->get('/api/v1/packages/' . $vipPackage->slug . '/download', $this->apiHeaders($customer))
+            ->assertOk()
+            ->assertHeader('X-Package-Version', '1.0.0');
     }
 }

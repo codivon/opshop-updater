@@ -10,6 +10,7 @@ use App\Models\PackageLicense;
 use App\Models\PackagePricingPlan;
 use App\Models\PackagePurchase;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Services\LicenseService;
 use App\Services\PackageApiAuthService;
 use App\Services\PaymentService;
@@ -125,8 +126,11 @@ class ApiPackageController extends Controller
                 return response()->json(['error' => 'پکیج یافت نشد.'], 404);
             }
 
-            // بررسی دسترسی مشتری به پروژه‌ی این پکیج
-            $hasAccess = $customer->subscriptions()
+            // بررسی دسترسی مشتری به پروژهٔ این پکیج — یا پوششِ پکیج با اشتراکِ
+            // فعالِ طرح‌محور (پیکربندی مؤثرِ مدتِ خریداری‌شده — Task 66)
+            $coveringSubscription = $this->subscriptionService->activeSubscriptionCovering($customer, $package);
+
+            $hasAccess = $coveringSubscription !== null || $customer->subscriptions()
                 ->where('project_id', $package->project_id)
                 ->where('status', 'active')
                 ->where('payment_status', 'paid')
@@ -143,7 +147,6 @@ class ApiPackageController extends Controller
             $license = $this->authService->getActiveLicense($customer, $slug);
 
             // این پکیج با اشتراک فعالِ طرح‌محور مشتری رایگان است؟
-            $coveringSubscription = $this->subscriptionService->activeSubscriptionCovering($customer, $package);
             $subscriptionInfo = $coveringSubscription
                 ? $this->subscriptionInfoFor($coveringSubscription, $package, $license)
                 : null;
@@ -214,8 +217,9 @@ class ApiPackageController extends Controller
             $subscription = $this->subscriptionService->activeSubscriptionCovering($customer, $package);
 
             if ($subscription) {
-                $plan    = $subscription->plan;
-                $covered = $plan?->packages->firstWhere('id', $package->id);
+                $plan = $subscription->plan;
+                // مدت رایگان از «پیکربندی مؤثرِ مدتِ خریداری‌شده» — نه صرفاً پکیج‌های سطح طرح (Task 66)
+                $covered    = $subscription->effectivePackages()->firstWhere('id', $package->id);
                 $freeMonths = (int) ($covered?->pivot->free_months ?? 1);
 
                 $latestVersion = $package->latestVersion()->first();
@@ -605,12 +609,13 @@ class ApiPackageController extends Controller
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
-            ->with('plan.packages')
+            ->with(['plan.packages', 'order'])
             ->get();
 
         $coverage = [];
         foreach ($subs as $sub) {
-            foreach ($sub->plan?->packages ?? [] as $pkg) {
+            // پیکربندی مؤثرِ مدتِ خریداری‌شده — نه صرفاً پکیج‌های سطح طرح (Task 66)
+            foreach ($sub->effectivePackages() as $pkg) {
                 if (!array_key_exists($pkg->id, $coverage)) {
                     $coverage[$pkg->id] = [
                         'subscription' => $sub,
@@ -628,8 +633,10 @@ class ApiPackageController extends Controller
      * =================================================================== */
     private function subscriptionInfoFor(Subscription $subscription, Package $package, ?PackageLicense $license): array
     {
-        $plan     = $subscription->plan;
-        $covered  = $plan?->packages->firstWhere('id', $package->id);
+        $plan = $subscription->plan;
+        // مدت رایگان از «پیکربندی مؤثرِ مدتِ خریداری‌شده» — نه صرفاً پکیج‌های سطح طرح (Task 66)
+        $covered    = $subscription->effectivePackages()->firstWhere('id', $package->id);
+        $freeMonths = (int) ($covered?->pivot->free_months ?? 1);
 
         return [
             'is_free_with_subscription' => true,
@@ -639,7 +646,8 @@ class ApiPackageController extends Controller
             'days_remaining'            => $subscription->expires_at !== null
                 ? (int) max(0, now()->diffInDays($subscription->expires_at))
                 : null,
-            'free_months'               => (int) ($covered?->pivot->free_months ?? 1),
+            'free_months'               => $freeMonths,
+            'free_label'                => SubscriptionPlan::freeMonthsLabel($freeMonths),
             // لایسنس صادرشده برای این پکیج (اگر لایسنس فعال وجود دارد)
             'license_key'               => $license?->license_key,
         ];

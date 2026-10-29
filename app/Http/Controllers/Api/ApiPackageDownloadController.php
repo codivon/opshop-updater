@@ -69,9 +69,11 @@ class ApiPackageDownloadController extends Controller
                 return response()->json(['error' => 'فایل پکیج یافت نشد.'], 404);
             }
 
-            // 🚩 گیت اشتراک: حتی با توکن معتبر، بدون اشتراکِ فعالِ پرداخت‌شده و
-            // منقضی‌نشدهٔ پوشش‌دهندهٔ پروژهٔ این پکیج، دانلود مجاز نیست.
-            if (!$this->subscriptionService->hasActiveSubscriptionForProject($customer, (int) $version->package->project_id)) {
+            // 🚩 گیت اشتراک: حتی با توکن معتبر، دانلود فقط با اشتراکِ فعالِ پرداخت‌شده و
+            // منقضی‌نشدهٔ پوشش‌دهندهٔ پروژهٔ این پکیج یا اشتراکِ فعالِ طرح‌محوری که
+            // این پکیج را در پیکربندی مؤثرِ مدتِ خریداری‌شده‌اش رایگان می‌کند (Task 66).
+            if (!$this->subscriptionService->hasActiveSubscriptionForProject($customer, (int) $version->package->project_id)
+                && !$this->subscriptionService->activeSubscriptionCovering($customer, $version->package)) {
                 return response()->json([
                     'error' => 'اشتراک فعالی وجود ندارد؛ دانلود پکیج فقط با اشتراک فعال امکان‌پذیر است.',
                 ], 403);
@@ -190,8 +192,10 @@ class ApiPackageDownloadController extends Controller
         }
 
         // 🚩 گیت اشتراک: دانلود/ساخت لینک فقط با اشتراکِ فعالِ پرداخت‌شده و منقضی‌نشدهٔ
-        // پوشش‌دهندهٔ پروژهٔ پکیج — همان شرط گیت لیست و نمایش تک‌پکیج.
-        if (!$this->subscriptionService->hasActiveSubscriptionForProject($customer, (int) $package->project_id)) {
+        // پوشش‌دهندهٔ پروژهٔ پکیج — یا اشتراکِ فعالِ طرح‌محوری که این پکیج را در
+        // پیکربندی مؤثرِ مدتِ خریداری‌شده‌اش رایگان می‌کند (Task 66).
+        if (!$this->subscriptionService->hasActiveSubscriptionForProject($customer, (int) $package->project_id)
+            && !$this->subscriptionService->activeSubscriptionCovering($customer, $package)) {
             return response()->json([
                 'error' => 'اشتراک فعالی وجود ندارد؛ دانلود پکیج فقط با اشتراک فعال امکان‌پذیر است.',
             ], 403);

@@ -223,7 +223,7 @@ class ApiSubscriptionController extends Controller
 
             $subscriptions = $customer->subscriptions()
                 ->whereNotNull('subscription_plan_id')
-                ->with('plan:id,name,slug,duration_months')
+                ->with(['plan:id,name,slug,duration_months', 'order'])
                 ->orderByDesc('id')
                 ->limit(20)
                 ->get()
@@ -237,6 +237,8 @@ class ApiSubscriptionController extends Controller
                         'expires_at'      => $sub->expires_at?->toDateTimeString(),
                         'is_unlimited'    => $sub->expires_at === null,
                         'days_remaining'  => $sub->expires_at ? max(0, now()->diffInDays($sub->expires_at)) : null,
+                        // مدتِ انتخابیِ خریداری‌شده (از snapshot سفارش — Task 66)
+                        'duration_label'  => $sub->order?->meta['chosen_duration']['label'] ?? null,
                     ];
                 });
 
@@ -273,6 +275,13 @@ class ApiSubscriptionController extends Controller
 
     /**
      * پکیج‌های رایگانِ طرح‌های اشتراکِ فعال مشتری.
+     *
+     * منبع پیکربندی (Task 66): «پیکربندی مؤثرِ مدتِ خریداری‌شدهٔ» هر اشتراک
+     * (Subscription::effectivePackages) — همان اولویتی که approve() لایسنس‌ها را صادر
+     * کرده: snapshotِ مدتِ انتخابی → پکیج‌های سطح طرح → snapshotِ طرحِ حذف‌شده.
+     * پیش از این، همیشه پکیج‌های سطح طرح برگردانده می‌شد و اگر مدیر برای مدتِ خریداری‌شده
+     * پیکربندی اختصاصی تعریف کرده بود، پکیج‌ها/مدت رایگانِ اشتباه نمایش داده می‌شد.
+     *
      * لایسنس‌های فعال مشتری یک‌بار کوئری می‌شوند و بر اساس package_id نگاشت می‌گردند.
      */
     private function freePackagesFor(Customer $customer): array
@@ -283,7 +292,7 @@ class ApiSubscriptionController extends Controller
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
-            ->with('plan.packages')
+            ->with(['plan.packages', 'order'])
             ->get();
 
         if ($activeSubs->isEmpty()) {
@@ -303,7 +312,7 @@ class ApiSubscriptionController extends Controller
         $freePackages = [];
         $seen = [];
         foreach ($activeSubs as $sub) {
-            foreach ($sub->plan?->packages ?? [] as $pkg) {
+            foreach ($sub->effectivePackages() as $pkg) {
                 if (in_array($pkg->id, $seen)) {
                     continue; // هر پکیج یک‌بار (اولین اشتراک فعال ملاک است)
                 }

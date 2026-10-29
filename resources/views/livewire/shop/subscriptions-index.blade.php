@@ -76,7 +76,7 @@
                         : 0)
                     <div class="card relative flex flex-col overflow-hidden transition-all hover:shadow-card-lg {{ $buyingSlug === $plan->slug ? 'ring-2 ring-brand-500' : '' }}"
                          wire:key="plan-{{ $plan->id }}"
-                         @if($hasDurs || $hasAnyDetails) x-data="{ open: false, cur: 0, durs: JSON.parse(atob('{{ base64_encode((string) json_encode($cardDetails)) }}')), faNum(n) { return String(n).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) } }" @endif>
+                         @if($hasAnyDetails) x-data="{ open: false, cur: 0, durs: JSON.parse(atob('{{ base64_encode((string) json_encode($cardDetails)) }}')), faNum(n) { return String(n).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) } }" @endif>
 
                         {{-- ribbon --}}
                         @if($hasDurs && $allFree)
@@ -165,13 +165,17 @@
                                                         <span class="text-[10px] text-zinc-400">تومان</span>
                                                     @endif
                                                 </div>
-                                                {{-- جزئیات همین مدت (قابلیت‌ها + پکیج‌های رایگان) — مودال آنی سمت مرورگر --}}
+                                                {{-- جزئیات همین مدت (قابلیت‌ها + پکیج‌های رایگان) — مودال آنی سمت مرورگر؛
+                                                     مدتِ بدون قابلیت/پکیج دکمه ندارد (Task 66) --}}
+                                                @php($tileDetail = $cardDetails[$loop->index] ?? null)
+                                                @if($tileDetail && (count($tileDetail['features']) > 0 || count($tileDetail['packages']) > 0))
                                                 <button type="button" @click="cur = {{ $loop->index }}; open = true"
                                                         class="mt-2 flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg bg-zinc-50 px-2 py-1.5 text-[10px] font-bold text-zinc-500 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-900/60 dark:text-zinc-400 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
                                                         aria-haspopup="dialog" title="دیدن قابلیت‌ها و پکیج‌های رایگان این مدت">
                                                     <x-icon name="eye" class="size-3.5" />
                                                     قابلیت‌ها و پکیج‌ها
                                                 </button>
+                                                @endif
                                             </div>
                                         @endforeach
                                     </div>
@@ -228,7 +232,7 @@
                                 @if($hasDurs)
                                     <p class="-mt-2 flex items-center justify-center gap-1 text-center text-[10px] leading-4 text-zinc-400">
                                         <x-icon name="info" class="size-3 shrink-0" />
-                                        پیکربندی هر مدت می‌تواند متفاوت باشد — از دکمهٔ هر مدت هم می‌توانید ببینید
+                                        پیکربندی هر مدت می‌تواند متفاوت باشد — در مودال همهٔ مدت‌ها را ببینید
                                     </p>
                                 @endif
                             @endif
@@ -349,11 +353,12 @@
                             </form>
                         @endif
 
-                        {{-- ============ مودال «جزئیات مدت» (Task 64 + 65) ============
+                        {{-- ============ مودال «جزئیات مدت» (Task 64 + 65 + 66) ============
                              کاملاً سمت مرورگر با Alpine — بدون رفت‌وبرگشت سرور، بازشدن آنی.
                              برای طرح‌های تک‌مدتی هم رندر می‌شود (cardDetailsFor یک ردیف می‌سازد).
-                             داده‌ها از cardDetailsFor() (ارث‌بری رعایت شده) در x-data --}}
-                        @if($hasDurs || $hasAnyDetails)
+                             داده‌ها از cardDetailsFor() (ارث‌بری رعایت شده) در x-data؛
+                             Task 66: تب‌های همهٔ مدت‌ها داخل مودال (کلیک روی هر ماه = دیدن پیکربندی همان مدت) --}}
+                        @if($hasAnyDetails)
                         <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
                              role="dialog" aria-modal="true" aria-label="جزئیات مدت اعتبار"
                              @keydown.escape.window="open = false">
@@ -411,6 +416,29 @@
                                         </button>
                                     </div>
                                 </div>
+
+                                {{-- تب‌های همهٔ مدت‌ها — کلیک روی هر ماه = پیکربندی همان مدت (Task 66) --}}
+                                @if(count($cardDetails) > 1)
+                                    <div class="flex shrink-0 gap-1.5 overflow-x-auto border-b border-zinc-100 bg-zinc-50/70 px-4 py-2.5 dark:border-zinc-800 dark:bg-zinc-900/50"
+                                         role="tablist" aria-label="انتخاب مدت اعتبار برای مشاهدهٔ پیکربندی">
+                                        <template x-for="(d, ti) in durs" :key="'dtab-' + ti">
+                                            <button type="button" role="tab"
+                                                    :aria-selected="cur === ti ? 'true' : 'false'"
+                                                    @click="cur = ti"
+                                                    :class="cur === ti
+                                                        ? 'bg-gradient-to-l from-brand-500 to-brand-600 text-white shadow-md shadow-brand-500/25'
+                                                        : 'bg-white text-zinc-500 ring-1 ring-zinc-200 hover:bg-brand-50 hover:text-brand-600 hover:ring-brand-200 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-700 dark:hover:bg-brand-500/10 dark:hover:text-brand-300 dark:hover:ring-brand-500/30'"
+                                                    class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-black transition-all">
+                                                <x-icon name="calendar-clock" class="size-3.5 opacity-70" />
+                                                <span x-text="d.label"></span>
+                                                {{-- نقطه = این مدت پکیج رایگان دارد --}}
+                                                <template x-if="d.packages.length > 0">
+                                                    <span class="size-1.5 shrink-0 rounded-full" :class="cur === ti ? 'bg-white' : 'bg-emerald-400'" title="این مدت پکیج رایگان دارد"></span>
+                                                </template>
+                                            </button>
+                                        </template>
+                                    </div>
+                                @endif
 
                                 {{-- بدنه --}}
                                 <div class="min-h-0 flex-1 overflow-y-auto">

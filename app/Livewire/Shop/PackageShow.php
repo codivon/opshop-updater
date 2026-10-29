@@ -236,7 +236,7 @@ class PackageShow extends Component
         return $customer ? $this->findActivePlanSubscription($customer) : null;
     }
 
-    /** آیا این پکیج با طرحِ اشتراک فعالِ session برای مشتری رایگان است؟ */
+    /** آیا این پکیج با پیکربندی مؤثرِ یکی از اشتراک‌های فعالِ طرح‌محورِ session رایگان است؟ */
     #[Computed]
     public function isCoveredBySubscription(): bool
     {
@@ -245,13 +245,7 @@ class PackageShow extends Component
             return false;
         }
 
-        $plan = $this->myActiveSubscription?->plan;
-
-        if (!$plan) {
-            return false;
-        }
-
-        return $plan->packages->contains(fn ($pkg) => $pkg->id === $this->package->id);
+        return $this->findCoveringSubscription() !== null;
     }
 
     /* ---------------------------------------------------------------- */
@@ -289,13 +283,12 @@ class PackageShow extends Component
             $this->updateCode = $customer->update_code;
         }
 
-        // ---- شاخه اشتراک فعال: این پکیج با طرحِ همین مشتری رایگان است ----
+        // ---- شاخه اشتراک فعال: این پکیج با پیکربندی مؤثرِ یکی از اشتراک‌های فعال رایگان است ----
         // (قبل از الزام انتخاب طرح — قواعد planId نباید مسیر رایگان اشتراک را ببندند)
-        $subscription = $this->findActivePlanSubscription($customer);
+        $subscription = $this->findCoveringSubscription($customer);
         if (
-            $subscription?->plan
+            $subscription
             && !$this->package->is_free
-            && $subscription->plan->packages->contains(fn ($pkg) => $pkg->id === $this->package->id)
         ) {
             $this->fulfillWithSubscription($customer, $subscription);
             return;
@@ -475,7 +468,9 @@ class PackageShow extends Component
         }
 
         $plan = $subscription->plan;
-        $freeMonths = (int) ($plan->packages->firstWhere('id', $this->package->id)?->pivot->free_months ?? 1);
+        // مدت رایگان از «پیکربندی مؤثرِ مدتِ خریداری‌شده» — نه صرفاً پکیج‌های سطح طرح (Task 66)
+        $covered    = $subscription->effectivePackages()->firstWhere('id', $this->package->id);
+        $freeMonths = (int) ($covered?->pivot->free_months ?? 1);
 
         // ---- خرید رایگان (بدون درگاه) ----
         $purchase = PackagePurchase::create([
@@ -512,7 +507,7 @@ class PackageShow extends Component
                 'starts_at'       => $startsAt,
                 'expires_at'      => $expiresAt,
                 'duration_months' => $freeMonths,
-                'notes'           => 'دسترسی رایگان از طریق اشتراک «' . $plan->name . '».',
+                'notes'           => 'دسترسی رایگان از طریق اشتراک «' . ($plan?->name ?? 'طرح اشتراک') . '».',
             ]);
 
             if ($existing) {
@@ -540,6 +535,28 @@ class PackageShow extends Component
             ->with('plan.packages')
             ->orderByDesc('id')
             ->first();
+    }
+
+    /**
+     * اولین اشتراکِ فعالِ طرح‌محوری که «پیکربندی مؤثرِ مدتِ خریداری‌شده‌اش»
+     * این پکیج را رایگان می‌کند — نه صرفاً پکیج‌های سطح طرح (Task 66).
+     */
+    protected function findCoveringSubscription(?Customer $customer = null): ?Subscription
+    {
+        $customer ??= $this->currentCustomer();
+
+        if (!$customer) {
+            return null;
+        }
+
+        return $customer->subscriptions()
+            ->whereNotNull('subscription_plan_id')
+            ->where('status', 'active')
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->with(['plan.packages', 'order'])
+            ->orderByDesc('id')
+            ->get()
+            ->first(fn (Subscription $sub) => $sub->effectivePackages()->contains('id', $this->package->id));
     }
 
     public function render()

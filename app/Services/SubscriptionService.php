@@ -397,20 +397,30 @@ class SubscriptionService
      * اشتراک فعالِ طرح‌محوری که این پکیج را رایگان می‌کند (یا null).
      *
      * منطق: اشتراک‌های طرح‌محورِ (subscription_plan_id پر) فعالِ مشتری — بدون انقضا
-     * یا با انقضای آینده — که پکیج موردنظر در فهرست پکیج‌های همراهِ طرحشان باشد.
+     * یا با انقضای آینده — که پکیج موردنظر در «پیکربندی مؤثرِ مدتِ خریداری‌شدهٔ» آن‌ها
+     * باشد (Task 66): snapshotِ مدتِ انتخابی خرید → پکیج‌های سطح طرح → snapshot طرح.
      * (مشخصه pivot «free_months» مدت دسترسی رایگان است؛ ۰ = نامحدود)
      */
     public function activeSubscriptionCovering(Customer $customer, Package $package): ?Subscription
     {
-        return $customer->subscriptions()
+        $subs = $customer->subscriptions()
             ->whereNotNull('subscription_plan_id')
             ->where('status', 'active')
             ->where(function ($q) {
                 $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
             })
-            ->whereHas('plan.packages', fn ($q) => $q->where('packages.id', $package->id))
-            ->with('plan.packages')
-            ->first();
+            ->with(['plan.packages', 'order'])
+            ->orderByDesc('id')
+            ->get();
+
+        foreach ($subs as $sub) {
+            // پیکربندی مؤثرِ مدتِ خریداری‌شده — نه صرفاً پکیج‌های سطح طرح (Task 66)
+            if ($sub->effectivePackages()->contains('id', $package->id)) {
+                return $sub;
+            }
+        }
+
+        return null;
     }
 
     /**
