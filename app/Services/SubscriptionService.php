@@ -92,20 +92,27 @@ class SubscriptionService
         $totalDiscount = $discount + $couponDiscount;
 
         // snapshot طرح در meta (برای زمانی که طرح بعداً حذف/ویرایش شود)
+        // پکیج‌ها/قابلیت‌ها بر اساس مدتِ انتخابی حل می‌شوند (Task 63):
+        // اگر مدت انتخابی پیکربندی اختصاصی داشته باشد از همان، وگرنه از خود طرح.
+        $snapshotPackages = $plan->packagesForDuration($durationOption)
+            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'slug' => $p->slug, 'free_months' => (int) ($p->pivot->free_months ?? 1)])
+            ->values()
+            ->all();
+
+        $snapshotFeatures = $durationOption
+            ? $durationOption->resolvedFeatures($plan->features ?? [])
+            : ($plan->features ?? []);
+
         $snapshot = [
             'plan' => [
                 'name'            => $plan->name,
                 'slug'            => $plan->slug,
                 'duration_months' => $chosenMonths,
-                'features'        => $plan->features ?? [],
+                'features'        => $snapshotFeatures,
                 'price'           => $amount,
                 'final_price'     => $final,
                 'is_one_time'     => (bool) $plan->is_one_time,
-                'packages'        => $plan->packages()
-                    ->get(['packages.id', 'packages.name', 'packages.slug'])
-                    ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'slug' => $p->slug, 'free_months' => (int) $p->pivot->free_months])
-                    ->values()
-                    ->all(),
+                'packages'        => $snapshotPackages,
             ],
         ];
 
@@ -117,6 +124,9 @@ class SubscriptionService
                 'price'           => $amount,
                 'discount_price'  => $discount,
                 'final_price'     => $baseFinal,
+                // پیکربندی مؤثر همین مدت در لحظهٔ خرید — منبع صدور لایسنس‌ها (Task 63)
+                'features'        => $snapshotFeatures,
+                'packages'        => $snapshotPackages,
             ];
         }
 
@@ -275,10 +285,25 @@ class SubscriptionService
             ]);
 
             // ۲) لایسنس رایگان پکیج‌های همراه طرح
+            // اولویت (Task 63): پیکربندی مؤثرِ مدتِ انتخابیِ مشتری در لحظهٔ خرید
+            // (meta.chosen_duration.packages) → پکیج‌های فعلی طرح → snapshot قدیمی طرح
             $granted = [];
-            $packages = $plan
-                ? $plan->packages()->get(['packages.id', 'packages.name', 'packages.slug'])
-                : collect();
+            $packages = collect();
+            $durationSnap = $order->meta['chosen_duration']['packages'] ?? [];
+
+            if (!empty($durationSnap)) {
+                $packages = Package::whereIn('id', array_column($durationSnap, 'id'))
+                    ->get()
+                    ->map(function ($p) use ($durationSnap) {
+                        $snap = collect($durationSnap)->firstWhere('id', $p->id);
+                        $p->pivot = (object) ['free_months' => (int) ($snap['free_months'] ?? 1)];
+
+                        return $p;
+                    });
+            } elseif ($plan) {
+                $packages = $plan->packages()->get(['packages.id', 'packages.name', 'packages.slug']);
+            }
+
             // اگر طرح حذف شده باشد، از snapshot سفارش استفاده می‌کنیم
             if ($packages->isEmpty() && !empty($order->meta['plan']['packages'])) {
                 $packages = Package::whereIn('id', array_column($order->meta['plan']['packages'], 'id'))

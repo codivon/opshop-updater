@@ -379,6 +379,14 @@ class ApiSubscriptionController extends Controller
                 'final_price'     => $d->final_price,
                 'is_free'         => $d->final_price <= 0,
                 'sort_order'      => (int) $d->sort_order,
+                // پیکربندی مؤثر این مدت — اختصاصی مدت یا فال‌بک به خود طرح (Task 63)
+                'features'        => $d->resolvedFeatures($plan->features ?? []),
+                'packages'        => $d->resolvedPackages($plan->packages)->map(fn ($p) => [
+                    'slug'        => $p->slug,
+                    'name'        => $p->name,
+                    'free_months' => (int) ($p->pivot->free_months ?? 1),
+                    'free_label'  => SubscriptionPlan::freeMonthsLabel((int) ($p->pivot->free_months ?? 1)),
+                ])->values()->all(),
             ])->values()->all(),
             'features'        => $plan->features ?? [],
             'packages'        => $plan->packages->map(fn ($p) => [

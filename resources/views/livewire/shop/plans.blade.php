@@ -90,6 +90,9 @@
                     @php($cardHasDiscount = $durationOption ? $durationOption->has_discount : $plan->has_discount)
                     @php($cardDiscountPercent = $durationOption ? $durationOption->discount_percent : $plan->discount_percent)
                     @php($cardDurationLabel = $durationOption?->duration_label ?? $plan->duration_label)
+                    {{-- قابلیت‌ها/پکیج‌های مؤثر بر اساس مدت انتخابی (ارث‌بری از طرح در صورت نبود پیکربندی اختصاصی) — Task 63 --}}
+                    @php($cardFeatures = $durationOption ? $durationOption->resolvedFeatures($plan->features ?? []) : ($plan->features ?? []))
+                    @php($cardPackages = $durationOption?->resolvedPackages($plan->packages) ?? $plan->packages)
                     <article wire:key="plan-{{ $plan->id }}" @class([
                         'card relative flex flex-col overflow-hidden transition-all hover:shadow-card-lg',
                         'ring-2 ring-brand-500/60' => $isBestValue,
@@ -167,12 +170,12 @@
                                 @endif
                             </div>
 
-                            {{-- ---- قابلیت‌های طرح ---- --}}
-                            @if($plan->features)
+                            {{-- ---- قابلیت‌های طرح (مؤثر برای مدت انتخابی) ---- --}}
+                            @if($cardFeatures)
                                 <div>
                                     <p class="mb-2.5 text-xs font-bold text-zinc-500 dark:text-zinc-400">قابلیت‌های طرح</p>
                                     <ul class="space-y-2">
-                                        @foreach($plan->features as $feature)
+                                        @foreach($cardFeatures as $feature)
                                             <li class="flex items-start gap-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
                                                 <x-icon name="check" class="mt-1.5 size-4 shrink-0 text-emerald-500" />
                                                 <span>{{ $feature }}</span>
@@ -190,11 +193,11 @@
                                     <x-icon name="package" class="size-3.5" />
                                     پکیج‌های این طرح
                                 </p>
-                                <span class="text-xs tabular-nums text-zinc-400">{{ fa_num($plan->packages->count()) }} پکیج</span>
+                                <span class="text-xs tabular-nums text-zinc-400">{{ fa_num($cardPackages->count()) }} پکیج</span>
                             </div>
 
                             @php($expanded = in_array($plan->id, $this->expandedPlans, true))
-                            @php($visiblePackages = $expanded || $plan->packages->count() <= 4 ? $plan->packages : $plan->packages->take(4))
+                            @php($visiblePackages = $expanded || $cardPackages->count() <= 4 ? $cardPackages : $cardPackages->take(4))
                             <ul class="space-y-1.5">
                                 @foreach($visiblePackages as $package)
                                     <li wire:key="pkg-{{ $plan->id }}-{{ $package->id }}">
@@ -209,29 +212,26 @@
                                                 </span>
                                             </span>
 
-                                            {{-- مدت دسترسی مؤثر: pivot یا مدت پیش‌فرض طرح (۰ = نامحدود) --}}
-                                            @php($pivotMonths = $package->pivot->duration_months)
-                                            @php($effectiveMonths = $pivotMonths ?? $plan->duration_months)
-                                            @if($effectiveMonths === 0)
+                                            {{-- مدت دسترسی رایگان این پکیج در مدت انتخابی (pivot؛ ۰ = نامحدود) --}}
+                                            @php($freeMonths = (int) ($package->pivot->free_months ?? 1))
+                                            @if($freeMonths === 0)
                                                 <x-badge variant="info" icon="clock">نامحدود</x-badge>
-                                            @elseif($pivotMonths !== null)
-                                                <x-badge variant="neutral" icon="clock">{{ fa_num($effectiveMonths) }} ماه</x-badge>
                                             @else
-                                                <x-badge variant="neutral">مدت پیش‌فرض: {{ fa_num($plan->duration_label) }}</x-badge>
+                                                <x-badge variant="neutral" icon="clock">{{ \App\Models\SubscriptionPlan::freeMonthsLabel($freeMonths) }}</x-badge>
                                             @endif
                                         </a>
                                     </li>
                                 @endforeach
 
-                                @if(!$expanded && $plan->packages->count() > 4)
+                                @if(!$expanded && $cardPackages->count() > 4)
                                     <li wire:key="more-{{ $plan->id }}">
                                         <button type="button" wire:click="toggleExpand({{ $plan->id }})"
                                                 class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 px-3 py-2.5 text-xs font-bold text-zinc-500 transition-colors hover:border-brand-400 hover:text-brand-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-brand-500/50 dark:hover:text-brand-400">
                                             <x-icon name="chevron-down" class="size-3.5" />
-                                            +{{ fa_num($plan->packages->count() - 4) }} پکیج دیگر — نمایش همه
+                                            +{{ fa_num($cardPackages->count() - 4) }} پکیج دیگر — نمایش همه
                                         </button>
                                     </li>
-                                @elseif($expanded && $plan->packages->count() > 4)
+                                @elseif($expanded && $cardPackages->count() > 4)
                                     <li wire:key="less-{{ $plan->id }}">
                                         <button type="button" wire:click="toggleExpand({{ $plan->id }})"
                                                 class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-300 px-3 py-2.5 text-xs font-bold text-zinc-500 transition-colors hover:border-brand-400 hover:text-brand-600 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-brand-500/50 dark:hover:text-brand-400">
@@ -279,6 +279,7 @@
         @if($checkoutPlan)
             @php($gatewayOptions = $this->gateways->mapWithKeys(fn ($g) => [$g->key => $g->name . ' (' . $g->key . ')'])->all())
             @php($checkoutDuration = $this->selectedDurationFor($checkoutPlan))
+            @php($checkoutPackages = $checkoutDuration?->resolvedPackages($checkoutPlan->packages) ?? $checkoutPlan->packages)
             @php($checkoutFinal = $checkoutDuration?->final_price ?? $checkoutPlan->final_price)
             @php($checkoutPrice = $checkoutDuration?->price ?? $checkoutPlan->price)
             @php($checkoutHasDiscount = $checkoutDuration ? $checkoutDuration->has_discount : $checkoutPlan->has_discount)
@@ -297,7 +298,7 @@
                             @endif
                         </div>
                         <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                            دسترسی به {{ fa_num($checkoutPlan->packages->count()) }} پکیج با لایسنس اختصاصی
+                            دسترسی به {{ fa_num($checkoutPackages->count()) }} پکیج با لایسنس اختصاصی
                         </p>
                     </div>
                     <div class="text-end">

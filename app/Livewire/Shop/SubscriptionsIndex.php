@@ -6,6 +6,7 @@ use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Models\DiscountCode;
 use App\Models\Gateway;
+use App\Models\Package;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanDuration;
@@ -51,7 +52,12 @@ class SubscriptionsIndex extends Component
     {
         return SubscriptionPlan::query()
             ->active()
-            ->with(['packages:id,name,slug,category', 'durations'])
+            ->with([
+                'packages:id,name,slug,category',
+                'durations',
+                // پیکربندی اختصاصی هر مدت — پکیج‌های فعال (Task 63)
+                'durations.packages' => fn ($q) => $q->where('status', Package::STATUS_ACTIVE),
+            ])
             ->orderBy('sort_order')
             ->orderByDesc('id')
             ->get();

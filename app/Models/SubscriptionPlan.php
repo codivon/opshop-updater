@@ -137,6 +137,21 @@ class SubscriptionPlan extends Model
         };
     }
 
+    /**
+     * پکیج‌های همراه مؤثر برای یک مدت اعتبار (همراه pivot free_months) —
+     * اگر مدت پیکربندی اختصاصی داشته باشد از همان، وگرنه از پکیج‌های خود طرح — Task 63
+     *
+     * @return \Illuminate\Support\Collection<int, \App\Models\Package>
+     */
+    public function packagesForDuration(?SubscriptionPlanDuration $duration)
+    {
+        if ($duration && $duration->hasOwnPackages()) {
+            return $duration->packages()->get();
+        }
+
+        return $this->packages()->get(['packages.id', 'packages.name', 'packages.slug']);
+    }
+
     /* ---------------------------------------------------------------- */
     /*  Helpers                                                          */
     /* ---------------------------------------------------------------- */

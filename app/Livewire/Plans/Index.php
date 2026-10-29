@@ -50,13 +50,22 @@ class Index extends Component
     /** پکیج‌های همراه: [['package_id' => '', 'free_months' => '1'], …] */
     public array $formPackages = [];
 
-    /** مدت‌های اعتبار (حداقل یک ردیف الزامی): [['duration_months' => '1', 'price' => '0', 'discount_price' => '', 'is_active' => true], …] */
+    /** مدت‌های اعتبار (حداقل یک ردیف الزامی): [['duration_months' => '1', 'price' => '0', 'discount_price' => '', 'is_active' => true, 'features_text' => '', 'packages' => [], 'packageToAdd' => ''], …] */
     public array $formDurations = [];
 
-    /** یک ردیف خالی برای ریپیتر مدت‌های اعتبار */
+    /** یک ردیف خالی برای ریپیتر مدت‌های اعتبار — هر مدت می‌تواند قابلیت‌ها/پکیج‌های اختصاصی خودش را داشته باشد (Task 63) */
     protected function emptyDurationRow(): array
     {
-        return ['duration_months' => '', 'price' => '', 'discount_price' => '', 'is_active' => true];
+        return [
+            'duration_months' => '',
+            'price'           => '',
+            'discount_price'  => '',
+            'is_active'       => true,
+            // پیکربندی اختصاصی این مدت — خالی = ارث‌بری از طرح (Task 63)
+            'features_text'   => '',
+            'packages'        => [], // [['package_id' => '', 'free_months' => '1'], …]
+            'packageToAdd'    => '',
+        ];
     }
 
     public function updatedSearch(): void
@@ -130,6 +139,34 @@ class Index extends Component
         $this->formPackages = array_values($this->formPackages);
     }
 
+    /** افزودن پکیج به یک مدت اعتبار (پیکربندی اختصاصی آن مدت — Task 63) */
+    public function addDurationPackage(int $durationIndex): void
+    {
+        if (!isset($this->formDurations[$durationIndex])) {
+            return;
+        }
+
+        $id = (int) ($this->formDurations[$durationIndex]['packageToAdd'] ?? 0);
+
+        if ($id > 0 && !collect($this->formDurations[$durationIndex]['packages'] ?? [])
+            ->contains(fn ($row) => (int) ($row['package_id'] ?? 0) === $id)) {
+            $this->formDurations[$durationIndex]['packages'][] = ['package_id' => (string) $id, 'free_months' => '1'];
+        }
+
+        $this->formDurations[$durationIndex]['packageToAdd'] = '';
+    }
+
+    /** حذف یک پکیج از پیکربندی یک مدت اعتبار */
+    public function removeDurationPackage(int $durationIndex, int $packageIndex): void
+    {
+        if (!isset($this->formDurations[$durationIndex]['packages'][$packageIndex])) {
+            return;
+        }
+
+        unset($this->formDurations[$durationIndex]['packages'][$packageIndex]);
+        $this->formDurations[$durationIndex]['packages'] = array_values($this->formDurations[$durationIndex]['packages']);
+    }
+
     /* ---------------------------------------------------------------- */
     /*  Durations editor (مدت‌های اعتبار چندگزینه‌ای)                      */
     /* ---------------------------------------------------------------- */
@@ -191,7 +228,7 @@ class Index extends Component
 
     public function openEdit(int $id): void
     {
-        $plan = SubscriptionPlan::with(['packages', 'durations'])->findOrFail($id);
+        $plan = SubscriptionPlan::with(['packages', 'durations', 'durations.packages'])->findOrFail($id);
 
         $this->reset(['deleteId']);
         $this->editingId = $plan->id;
@@ -214,6 +251,13 @@ class Index extends Component
                 'price'           => (string) $d->price,
                 'discount_price'  => $d->discount_price === null ? '' : (string) $d->discount_price,
                 'is_active'       => (bool) $d->is_active,
+                // پیکربندی اختصاصی مدت — Task 63
+                'features_text'   => implode("\n", $d->features ?? []),
+                'packages'        => $d->packages
+                    ->map(fn ($p) => ['package_id' => (string) $p->id, 'free_months' => (string) $p->pivot->free_months])
+                    ->values()
+                    ->all(),
+                'packageToAdd'    => '',
             ])
             ->values()
             ->all();
@@ -225,6 +269,9 @@ class Index extends Component
                 'price'           => (string) $plan->price,
                 'discount_price'  => $plan->discount_price !== null ? (string) $plan->discount_price : '',
                 'is_active'       => true,
+                'features_text'   => '',
+                'packages'        => [],
+                'packageToAdd'    => '',
             ]];
         }
 
@@ -257,6 +304,12 @@ class Index extends Component
             'formDurations.*.price'               => ['required', 'integer', 'min:0'],
             'formDurations.*.discount_price'      => ['nullable', 'integer', 'min:0', 'lt:formDurations.*.price'],
             'formDurations.*.is_active'           => ['boolean'],
+
+            // پیکربندی اختصاصی هر مدت (Task 63): قابلیت‌ها + پکیج‌ها با مدت دسترسی رایگان
+            'formDurations.*.features_text'                 => ['nullable', 'string', 'max:4000'],
+            'formDurations.*.packages'                      => ['array'],
+            'formDurations.*.packages.*.package_id'         => ['nullable', 'integer', 'exists:packages,id'],
+            'formDurations.*.packages.*.free_months'        => ['required_with:formDurations.*.packages.*.package_id', 'integer', 'min:0', 'max:120'],
         ], [
             'form.name.required'          => 'نام طرح الزامی است.',
             'form.name.max'               => 'نام طرح حداکثر ۱۰۰ کاراکتر است.',
@@ -281,6 +334,15 @@ class Index extends Component
             'formDurations.*.discount_price.integer'   => 'تخفیف باید عدد صحیح باشد.',
             'formDurations.*.discount_price.min'       => 'تخفیف نمی‌تواند منفی باشد.',
             'formDurations.*.discount_price.lt'        => 'تخفیف هر مدت باید کمتر از قیمت همان مدت باشد.',
+
+            // پیکربندی اختصاصی هر مدت — Task 63
+            'formDurations.*.features_text.max'                    => 'قابلیت‌های هر مدت حداکثر ۴٬۰۰۰ کاراکتر است.',
+            'formDurations.*.packages.array'                       => 'ساختار پکیج‌های مدت نامعتبر است.',
+            'formDurations.*.packages.*.package_id.exists'         => 'پکیج انتخابی این مدت معتبر نیست.',
+            'formDurations.*.packages.*.free_months.required_with' => 'مدت دسترسی رایگان پکیج‌های این مدت را مشخص کنید.',
+            'formDurations.*.packages.*.free_months.integer'       => 'مدت دسترسی رایگان باید عدد صحیح باشد.',
+            'formDurations.*.packages.*.free_months.min'           => 'مدت دسترسی رایگان حداقل ۰ است (۰ = نامحدود).',
+            'formDurations.*.packages.*.free_months.max'           => 'مدت دسترسی رایگان حداکثر ۱۲۰ ماه است.',
         ]);
 
         $features = array_values(array_filter(
@@ -290,14 +352,33 @@ class Index extends Component
 
         // همگام‌سازی مدت‌های اعتبار (چندگزینه‌ای) — بازسازی کامل از ردیف‌های فرم؛
         // ترتیبِ ردیف‌ها در فرم = ترتیب نمایش گزینه‌ها (sort_order از جایگاه ردیف)
+        // هر ردیف می‌تواند قابلیت‌ها (هر خط یک قابلیت) و پکیج‌های اختصاصی خودش را داشته باشد — Task 63
         $durationRows = collect($this->formDurations)
-            ->map(fn ($row, $i) => [
-                'duration_months' => (int) $row['duration_months'],
-                'price'           => (int) ($row['price'] ?: 0),
-                'discount_price'  => blank($row['discount_price'] ?? null) ? null : (int) $row['discount_price'],
-                'is_active'       => (bool) ($row['is_active'] ?? true),
-                'sort_order'      => $i + 1,
-            ])
+            ->map(function ($row, $i) {
+                // قابلیت‌های اختصاصی مدت: هر خط یک قابلیت — خالی = ارث‌بری از طرح
+                $features = collect(preg_split('/\r\n|\r|\n/', (string) ($row['features_text'] ?? '')))
+                    ->map(fn ($f) => trim((string) $f))
+                    ->filter(fn ($f) => $f !== '')
+                    ->values()
+                    ->all();
+
+                // پکیج‌های اختصاصی مدت (بدون تکرار) — خالی = ارث‌بری از پکیج‌های طرح
+                $packages = collect($row['packages'] ?? [])
+                    ->filter(fn ($p) => !empty($p['package_id']))
+                    ->keyBy(fn ($p) => (int) $p['package_id'])
+                    ->map(fn ($p) => ['free_months' => (int) ($p['free_months'] ?: 1)])
+                    ->all();
+
+                return [
+                    'duration_months' => (int) $row['duration_months'],
+                    'price'           => (int) ($row['price'] ?: 0),
+                    'discount_price'  => blank($row['discount_price'] ?? null) ? null : (int) $row['discount_price'],
+                    'is_active'       => (bool) ($row['is_active'] ?? true),
+                    'sort_order'      => $i + 1,
+                    'features'        => $features ?: null,
+                    '__packages'      => $packages, // جدا از ستون‌های مدل — بعد از create سینک می‌شود
+                ];
+            })
             ->values()
             ->all();
 
@@ -335,7 +416,15 @@ class Index extends Component
 
         $plan->durations()->delete();
         foreach ($durationRows as $row) {
-            $plan->durations()->create($row);
+            $packages = $row['__packages'];
+            unset($row['__packages']);
+
+            $duration = $plan->durations()->create($row);
+
+            // سینک پکیج‌های اختصاصی این مدت (pivot جدید — خالی = ارث‌بری از طرح)
+            if ($packages !== []) {
+                $duration->packages()->sync($packages);
+            }
         }
 
         $this->showModal = false;

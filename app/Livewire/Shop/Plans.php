@@ -62,6 +62,8 @@ class Plans extends Component
                     ->with('latestVersion:id,package_id,version')
                     ->where('status', Package::STATUS_ACTIVE),
                 'durations',
+                // پیکربندی اختصاصی هر مدت — پکیج‌های فعال (Task 63)
+                'durations.packages' => fn ($q) => $q->where('status', Package::STATUS_ACTIVE),
             ])
             ->where('is_active', true)
             ->orderBy('sort_order')

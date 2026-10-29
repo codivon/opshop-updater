@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * مدت اعتبار طرح اشتراک — هر طرح می‌تواند چند مدت داشته باشد
@@ -21,6 +22,7 @@ class SubscriptionPlanDuration extends Model
         'discount_price',
         'is_active',
         'sort_order',
+        'features',
     ];
 
     protected $casts = [
@@ -29,6 +31,7 @@ class SubscriptionPlanDuration extends Model
         'discount_price'  => 'integer',
         'is_active'       => 'boolean',
         'sort_order'      => 'integer',
+        'features'        => 'array',
     ];
 
     /** در سریالایز JSON/آرایه (از جمله API) همیشه لِیبل و مبلغ نهایی همراه است */
@@ -37,6 +40,14 @@ class SubscriptionPlanDuration extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(SubscriptionPlan::class, 'subscription_plan_id');
+    }
+
+    /** پکیج‌های همراه اختصاصی این مدت (نبود ردیف = ارث‌بری از پکیج‌های طرح) */
+    public function packages(): BelongsToMany
+    {
+        return $this->belongsToMany(Package::class, 'subscription_plan_duration_package', 'subscription_plan_duration_id', 'package_id')
+            ->withPivot('free_months')
+            ->withTimestamps();
     }
 
     /* ---------------------------------------------------------------- */
@@ -77,5 +88,58 @@ class SubscriptionPlanDuration extends Model
         }
 
         return (int) min(99, round(((int) $this->price - $this->final_price) * 100 / (int) $this->price));
+    }
+
+    /* ---------------------------------------------------------------- */
+    /*  پیکربندی مستقل هر مدت (قابلیت‌ها / پکیج‌ها) — Task 63              */
+    /* ---------------------------------------------------------------- */
+
+    /** آیا این مدت قابلیت‌های اختصاصی خودش را دارد؟ */
+    public function hasOwnFeatures(): bool
+    {
+        return is_array($this->features) && $this->features !== [];
+    }
+
+    /** آیا این مدت پکیج‌های اختصاصی خودش را دارد؟ */
+    public function hasOwnPackages(): bool
+    {
+        if ($this->relationLoaded('packages')) {
+            return $this->packages->isNotEmpty();
+        }
+
+        return $this->packages()->exists();
+    }
+
+    /**
+     * قابلیت‌های مؤثر این مدت — اختصاصی مدت یا فال‌بک به قابلیت‌های طرح
+     * (فال‌بک اختیاری برای جلوگیری از کوئری اضافه وقتی features طرح در دسترس است)
+     */
+    public function resolvedFeatures(?array $planFeatures = null): array
+    {
+        if ($this->hasOwnFeatures()) {
+            return array_values($this->features);
+        }
+
+        if ($planFeatures !== null) {
+            return array_values($planFeatures);
+        }
+
+        return array_values($this->plan?->features ?? []);
+    }
+
+    /**
+     * پکیج‌های مؤثر این مدت (همراه pivot free_months) —
+     * اختصاصی مدت یا فال‌بک به پکیج‌های خود طرح (فال‌بک اختیاری برای جلوگیری از کوئری اضافه)
+     *
+     * @param  \Illuminate\Support\Collection<int, \App\Models\Package>|null $fallback پکیج‌های طرح (در دسترس بودن)
+     * @return \Illuminate\Support\Collection<int, \App\Models\Package>
+     */
+    public function resolvedPackages($fallback = null)
+    {
+        if ($this->hasOwnPackages()) {
+            return $this->relationLoaded('packages') ? $this->packages : $this->packages()->get();
+        }
+
+        return $fallback ?? $this->plan?->packages ?? collect();
     }
 }

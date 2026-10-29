@@ -288,6 +288,70 @@
                                     <p class="w-full text-xs font-bold text-rose-500">{{ $message }}</p>
                                 @enderror
                             @endforeach
+
+                            {{-- پیکربندی اختصاصی این مدت: قابلیت‌ها + پکیج‌ها (Task 63) --}}
+                            <details class="w-full" wire:key="plan-duration-config-{{ $i }}">
+                                <summary class="flex cursor-pointer select-none items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold text-zinc-500 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:text-zinc-400 dark:hover:bg-brand-500/10 dark:hover:text-brand-400">
+                                    <x-icon name="settings" class="size-3.5" />
+                                    قابلیت‌ها و پکیج‌های این مدت
+                                    @if(trim($row['features_text'] ?? '') !== '' || count($row['packages'] ?? []) > 0)
+                                        <span class="rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-black text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">سفارشی</span>
+                                    @else
+                                        <span class="text-[10px] font-medium text-zinc-400">(خالی = ارث‌بری از طرح)</span>
+                                    @endif
+                                </summary>
+                                <div class="mt-2 grid gap-3 rounded-xl bg-white p-3 ring-1 ring-zinc-200/70 lg:grid-cols-2 dark:bg-zinc-900/40 dark:ring-zinc-700/50">
+                                    {{-- قابلیت‌های اختصاصی این مدت --}}
+                                    <div>
+                                        <label for="plan-dur-{{ $i }}-features" class="mb-1 block text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                                            قابلیت‌های این مدت — هر خط یک قابلیت
+                                        </label>
+                                        <textarea id="plan-dur-{{ $i }}-features" wire:model="formDurations.{{ $i }}.features_text" rows="4"
+                                                  placeholder="خالی = همان قابلیت‌های طرح" class="input w-full"></textarea>
+                                    </div>
+                                    {{-- پکیج‌های اختصاصی این مدت --}}
+                                    <div>
+                                        <p class="mb-1 text-xs font-bold text-zinc-600 dark:text-zinc-300">پکیج‌های این مدت + مدت دسترسی رایگان</p>
+                                        <div class="space-y-1.5">
+                                            @foreach($row['packages'] ?? [] as $j => $prow)
+                                                <div class="flex items-center gap-1.5" wire:key="plan-durpkg-{{ $i }}-{{ $j }}">
+                                                    <select wire:model="formDurations.{{ $i }}.packages.{{ $j }}.package_id" class="input min-w-32 flex-1" aria-label="پکیج این مدت">
+                                                        <option value="">انتخاب پکیج…</option>
+                                                        @foreach($this->packages as $package)
+                                                            <option value="{{ $package->id }}">{{ $package->name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <input type="number" wire:model="formDurations.{{ $i }}.packages.{{ $j }}.free_months" min="0" max="120"
+                                                           class="input w-20" title="مدت دسترسی رایگان (ماه)" aria-label="ماه رایگان این پکیج" />
+                                                    <span class="whitespace-nowrap text-[10px] text-zinc-400">ماه</span>
+                                                    <button type="button" wire:click="removeDurationPackage({{ $i }}, {{ $j }})"
+                                                            class="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                                                            title="حذف پکیج از این مدت" aria-label="حذف پکیج از این مدت">
+                                                        <x-icon name="x" class="size-3.5" />
+                                                    </button>
+                                                </div>
+                                                @error('formDurations.' . $i . '.packages.' . $j . '.free_months')
+                                                    <p class="text-xs font-bold text-rose-500">{{ $message }}</p>
+                                                @enderror
+                                            @endforeach
+                                            <div class="flex items-center gap-1.5">
+                                                <select wire:model="formDurations.{{ $i }}.packageToAdd" class="input min-w-32 flex-1" aria-label="افزودن پکیج به این مدت">
+                                                    <option value="">افزودن پکیج…</option>
+                                                    @foreach($this->packages as $package)
+                                                        <option value="{{ $package->id }}">{{ $package->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <button type="button" wire:click="addDurationPackage({{ $i }})"
+                                                        class="rounded-lg p-2 text-brand-600 transition-colors hover:bg-brand-50 dark:hover:bg-brand-500/10"
+                                                        title="افزودن پکیج به این مدت" aria-label="افزودن پکیج به این مدت">
+                                                    <x-icon name="plus" class="size-4" />
+                                                </button>
+                                            </div>
+                                            <p class="text-[10px] text-zinc-400">خالی = همان پکیج‌های همراه طرح با مدت‌های خودشان</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
                         </div>
                     @endforeach
                     @if(count($formDurations) === 0)

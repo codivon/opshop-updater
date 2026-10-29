@@ -64,6 +64,9 @@
                     @php($myOrder = $this->myOrders->get($plan->id))
                     @php($durOpt = $this->displayDurationFor($plan))
                     @php($durOpts = $plan->durationOptions())
+                    {{-- قابلیت‌ها/پکیج‌های مؤثر بر اساس مدت نمایشی (ارث‌بری از طرح در صورت نبود پیکربندی اختصاصی) — Task 63 --}}
+                    @php($cardFeatures = $durOpt ? $durOpt->resolvedFeatures($plan->features ?? []) : ($plan->features ?? []))
+                    @php($cardPackages = $durOpt?->resolvedPackages($plan->packages) ?? $plan->packages)
                     @php($hasDurs = $durOpts->isNotEmpty())
                     @php($maxDisc = $hasDurs ? (int) $durOpts->max('discount_percent') : 0)
                     @php($allFree = $hasDurs && $durOpts->every(fn ($d) => $d->final_price <= 0))
@@ -139,6 +142,9 @@
                                                  title="هنگام خرید می‌توانید این مدت را انتخاب کنید">
                                                 <div class="flex items-center justify-between gap-1">
                                                     <span class="text-xs font-black text-zinc-700 dark:text-zinc-200">{{ $d->duration_label }}</span>
+                                                    @if($d->hasOwnFeatures() || $d->hasOwnPackages())
+                                                        <span class="shrink-0 rounded-md bg-brand-100 px-1.5 py-0.5 text-[10px] font-black text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" title="این مدت پیکربندی اختصاصی قابلیت‌ها/پکیج‌ها دارد">ویژه</span>
+                                                    @endif
                                                     @if($d->discount_percent > 0)
                                                         <span class="shrink-0 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-black text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">{{ fa_num($d->discount_percent) }}٪</span>
                                                     @endif
@@ -176,10 +182,10 @@
                                 </div>
                             @endif
 
-                            {{-- features --}}
-                            @if($plan->features && count($plan->features))
+                            {{-- features (مؤثر برای مدت نمایشی) --}}
+                            @if($cardFeatures && count($cardFeatures))
                                 <ul class="space-y-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-                                    @foreach($plan->features as $feature)
+                                    @foreach($cardFeatures as $feature)
                                         <li class="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-300">
                                             <x-icon name="check-circle" class="mt-0.5 size-4 shrink-0 text-emerald-500" />
                                             {{ $feature }}
@@ -188,15 +194,15 @@
                                 </ul>
                             @endif
 
-                            {{-- included packages --}}
-                            @if($plan->packages->count())
+                            {{-- included packages (مؤثر برای مدت نمایشی) --}}
+                            @if($cardPackages->count())
                                 <div class="rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
                                     <p class="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-200">
                                         <x-icon name="package" class="size-4 text-brand-600 dark:text-brand-400" />
                                         پکیج‌های رایگان این طرح
                                     </p>
                                     <ul class="mt-2.5 space-y-2">
-                                        @foreach($plan->packages as $pkg)
+                                        @foreach($cardPackages as $pkg)
                                             <li class="flex items-center justify-between gap-2 text-xs">
                                                 <span class="flex min-w-0 items-center gap-1.5 text-zinc-600 dark:text-zinc-300">
                                                     <x-icon name="download" class="size-3.5 shrink-0 text-zinc-400" />
