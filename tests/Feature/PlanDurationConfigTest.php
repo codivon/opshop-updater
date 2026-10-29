@@ -148,7 +148,7 @@ class PlanDurationConfigTest extends TestCase
 
         Livewire::test(PlansIndex::class)
             ->call('openEdit', $plan->id)
-            ->set('formDurations.1.features_text', "پشتیبانی ۳ ماهه VIP\nآپدیت رایگان")
+            ->set('formDurations.1.features', ['پشتیبانی ۳ ماهه VIP', 'آپدیت رایگان'])
             ->set('formDurations.1.packages', [['package_id' => (string) $pkgB->id, 'free_months' => '3']])
             ->call('save')
             ->assertHasNoErrors();
@@ -176,7 +176,7 @@ class PlanDurationConfigTest extends TestCase
         // باز کردن مودال ویرایش → مقادیر ذخیره‌شده برمی‌گردند
         Livewire::test(PlansIndex::class)
             ->call('openEdit', $plan->id)
-            ->assertSet('formDurations.1.features_text', "پشتیبانی ۳ ماهه VIP\nآپدیت رایگان")
+            ->assertSet('formDurations.1.features', ['پشتیبانی ۳ ماهه VIP', 'آپدیت رایگان'])
             ->assertSet('formDurations.1.packages.0.package_id', (string) $pkgB->id)
             ->assertSet('formDurations.1.packages.0.free_months', '3');
     }
@@ -198,6 +198,38 @@ class PlanDurationConfigTest extends TestCase
             ->assertCount('formDurations.0.packages', 1)
             ->call('removeDurationPackage', 0, 0)
             ->assertCount('formDurations.0.packages', 0);
+    }
+
+    public function test_admin_panel_add_remove_and_save_duration_feature_rows(): void
+    {
+        $plan = $this->makeMultiDurationPlan();
+
+        Livewire::test(PlansIndex::class)
+            ->call('openEdit', $plan->id)
+            // افزودن دو ردیف قابلیت به مدت ۳ ماهه (index 1) مثل قابلیت‌های طرح
+            ->call('addDurationFeature', 1)
+            ->call('addDurationFeature', 1)
+            ->set('formDurations.1.features.0', 'پشتیبانی ۳ ماهه VIP')
+            ->set('formDurations.1.features.1', '  آپدیت رایگان  ')
+            // حذف یک ردیف + افزودن ردیف تازه → reindex درست
+            ->call('removeDurationFeature', 1, 0)
+            ->call('addDurationFeature', 1)
+            ->set('formDurations.1.features.1', 'مشاوره اختصاصی')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        // ردیف اول حذف شده بود → فقط «آپدیت رایگان» (بدون فاصلهٔ اضافی) و «مشاوره اختصاصی» ذخیره می‌شود
+        $duration3After = $plan->durations()->where('duration_months', 3)->first();
+        $this->assertSame(['آپدیت رایگان', 'مشاوره اختصاصی'], $duration3After->features);
+
+        // مدت ۱ ماهه دست‌نخورده → خالی = ارث‌بری
+        $duration1After = $plan->durations()->where('duration_months', 1)->first();
+        $this->assertNull($duration1After->features);
+
+        // باز کردن مودال → ردیف‌های قابلیت ذخیره‌شده برمی‌گردند
+        Livewire::test(PlansIndex::class)
+            ->call('openEdit', $plan->id)
+            ->assertSet('formDurations.1.features', ['آپدیت رایگان', 'مشاوره اختصاصی']);
     }
 
     public function test_shop_card_shows_duration_config_of_selected_duration(): void

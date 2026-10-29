@@ -289,25 +289,51 @@
                                 @enderror
                             @endforeach
 
-                            {{-- پیکربندی اختصاصی این مدت: قابلیت‌ها + پکیج‌ها (Task 63) --}}
-                            <details class="w-full" wire:key="plan-duration-config-{{ $i }}">
-                                <summary class="flex cursor-pointer select-none items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold text-zinc-500 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:text-zinc-400 dark:hover:bg-brand-500/10 dark:hover:text-brand-400">
+                            {{-- پیکربندی اختصاصی این مدت: قابلیت‌ها + پکیج‌ها (Task 63) —
+                                 باز/بسته با state کامپوننت (نه <details>) تا بعد از افزودن/حذف ردیف‌ها باز بماند --}}
+                            <div class="w-full" wire:key="plan-duration-config-{{ $i }}">
+                                <button type="button" wire:click="toggleDurationConfig({{ $i }})"
+                                        class="flex w-full cursor-pointer select-none items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold text-zinc-500 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:text-zinc-400 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                        aria-expanded="{{ ($openDurationConfigs[$i] ?? false) ? 'true' : 'false' }}">
                                     <x-icon name="settings" class="size-3.5" />
                                     قابلیت‌ها و پکیج‌های این مدت
-                                    @if(trim($row['features_text'] ?? '') !== '' || count($row['packages'] ?? []) > 0)
+                                    @if(collect($row['features'] ?? [])->filter(fn ($f) => trim((string) $f) !== '')->isNotEmpty() || count($row['packages'] ?? []) > 0)
                                         <span class="rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-black text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">سفارشی</span>
                                     @else
                                         <span class="text-[10px] font-medium text-zinc-400">(خالی = ارث‌بری از طرح)</span>
                                     @endif
-                                </summary>
+                                    <x-icon name="{{ ($openDurationConfigs[$i] ?? false) ? 'chevron-up' : 'chevron-down' }}" class="ms-auto size-3.5" />
+                                </button>
+                                @if($openDurationConfigs[$i] ?? false)
                                 <div class="mt-2 grid gap-3 rounded-xl bg-white p-3 ring-1 ring-zinc-200/70 lg:grid-cols-2 dark:bg-zinc-900/40 dark:ring-zinc-700/50">
-                                    {{-- قابلیت‌های اختصاصی این مدت --}}
+                                    {{-- قابلیت‌های اختصاصی این مدت — ریپیتر افزودن/حذف مثل قابلیت‌های طرح --}}
                                     <div>
-                                        <label for="plan-dur-{{ $i }}-features" class="mb-1 block text-xs font-bold text-zinc-600 dark:text-zinc-300">
-                                            قابلیت‌های این مدت — هر خط یک قابلیت
-                                        </label>
-                                        <textarea id="plan-dur-{{ $i }}-features" wire:model="formDurations.{{ $i }}.features_text" rows="4"
-                                                  placeholder="خالی = همان قابلیت‌های طرح" class="input w-full"></textarea>
+                                        <div class="mb-1 flex items-center justify-between gap-2">
+                                            <p class="text-xs font-bold text-zinc-600 dark:text-zinc-300">قابلیت‌های این مدت</p>
+                                            <button type="button" wire:click="addDurationFeature({{ $i }})"
+                                                    class="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-brand-600 transition-colors hover:bg-brand-50 dark:hover:bg-brand-500/10"
+                                                    title="افزودن قابلیت به این مدت" aria-label="افزودن قابلیت به این مدت">
+                                                <x-icon name="plus" class="size-3.5" />
+                                                افزودن
+                                            </button>
+                                        </div>
+                                        <div class="space-y-1.5">
+                                            @foreach($row['features'] ?? [] as $j => $feature)
+                                                <div class="flex items-center gap-1.5" wire:key="plan-durfeat-{{ $i }}-{{ $j }}">
+                                                    <x-icon name="check-circle" class="size-3.5 shrink-0 text-brand-500" />
+                                                    <input type="text" wire:model="formDurations.{{ $i }}.features.{{ $j }}"
+                                                           placeholder="مثلاً پشتیبانی اختصاصی ۳ ماهه" class="input flex-1" aria-label="قابلیت این مدت" />
+                                                    <button type="button" wire:click="removeDurationFeature({{ $i }}, {{ $j }})"
+                                                            class="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                                                            title="حذف قابلیت" aria-label="حذف قابلیت از این مدت">
+                                                        <x-icon name="trash" class="size-3.5" />
+                                                    </button>
+                                                </div>
+                                            @endforeach
+                                            @if(count($row['features'] ?? []) === 0)
+                                                <p class="text-[11px] text-zinc-400">قابلیتی ثبت نشده — «افزودن» را بزنید (خالی = همان قابلیت‌های طرح).</p>
+                                            @endif
+                                        </div>
                                     </div>
                                     {{-- پکیج‌های اختصاصی این مدت --}}
                                     <div>
@@ -351,7 +377,8 @@
                                         </div>
                                     </div>
                                 </div>
-                            </details>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                     @if(count($formDurations) === 0)
