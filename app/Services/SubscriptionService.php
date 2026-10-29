@@ -169,6 +169,27 @@ class SubscriptionService
             // مصرف شمارنده کد تخفیف (مسیر رایگان از markAsPaid عبور نمی‌کند)
             $order->discountCode?->recordUsage();
 
+            // ⚡ تأیید خودکار (تنظیم پنل): اگر فعال باشد، خرید رایگان همان لحظه
+            // فعال می‌شود — اشتراک + لایسنس پکیج‌های همراه + پیامک فعال‌سازی.
+            if (self::autoApproveEnabled()) {
+                try {
+                    $this->approve($order->refresh());
+
+                    return [
+                        'order'          => $order,
+                        'is_free'        => true,
+                        'auto_approved'  => true,
+                        'message'        => 'اشتراک رایگان شما فعال شد.',
+                    ];
+                } catch (\Throwable $e) {
+                    // خطای تأیید خودکار نباید خرید را بشکند → مسیر عادی (انتظار تأیید مدیر)
+                    Log::warning('Subscription auto-approve failed (free path)', [
+                        'order_id' => $order->id,
+                        'error'    => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // 📱 پیامک: تأیید ثبت درخواست به مشتری + اطلاع‌رسانی فوری به مدیر
             try {
                 $vars = [
@@ -211,9 +232,10 @@ class SubscriptionService
 
     /**
      * تأیید پرداخت سفارش اشتراک (بازگشت از درگاه).
-     * توجه: صدور لایسنس/فعال‌سازی در متد approve() و پس از تأیید مدیر انجام می‌شود.
+     * اگر «تأیید خودکار» در پنل فعال باشد، بلافاصله پس از تأیید پرداخت،
+     * اشتراک فعال و لایسنس پکیج‌های همراه صادر می‌شود (بدون تأیید مدیر).
      *
-     * @return array{paid: bool, order?: SubscriptionOrder, message?: string}
+     * @return array{paid: bool, order?: SubscriptionOrder, message?: string, auto_approved?: bool}
      */
     public function verifyPayment(string $transactionId): array
     {
@@ -224,10 +246,61 @@ class SubscriptionService
         }
 
         if ($order->isPaid()) {
-            return ['paid' => true, 'order' => $order, 'message' => 'این تراکنش قبلاً تأیید شده است.'];
+            $result = ['paid' => true, 'order' => $order, 'message' => 'این تراکنش قبلاً تأیید شده است.'];
+
+            // سفارشِ پرداخت‌شده ولی هنوز منتظر مدیر (مثلاً تنظیم بعداً روشن شده) هم پوشش داده می‌شود
+            $this->autoApproveIfPending($order, $result);
+
+            return $result;
         }
 
-        return $this->paymentService->verifySubscriptionPayment($transactionId);
+        $result = $this->paymentService->verifySubscriptionPayment($transactionId);
+
+        if (($result['paid'] ?? false) && ($result['order'] ?? null) instanceof SubscriptionOrder) {
+            $this->autoApproveIfPending($result['order'], $result);
+        }
+
+        return $result;
+    }
+
+    /* ===================================================================
+     *  تأیید خودکار (تنظیم پنل → تنظیمات → اشتراک)
+     * =================================================================== */
+
+    /** آیا «تأیید خودکار خریدهای اشتراک» در تنظیمات پنل فعال است؟ */
+    public static function autoApproveEnabled(): bool
+    {
+        return filter_var((string) setting('subscriptions_auto_approve', '0'), FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * پس از تأیید پرداخت: اگر تأیید خودکار فعال و سفارش هنوز منتظر مدیر باشد،
+     * بلافاصله تأیید و فعال می‌شود؛ خطا جریان اصلی را نمی‌شکند (مسیر دستی مدیر باقی می‌ماند).
+     *
+     * @param array{paid: bool, order?: SubscriptionOrder, message?: string} $result
+     */
+    private function autoApproveIfPending(SubscriptionOrder $order, array &$result): void
+    {
+        if (!self::autoApproveEnabled()) {
+            return;
+        }
+
+        if ($order->admin_status !== SubscriptionOrder::ADMIN_STATUS_PENDING) {
+            return; // قبلاً تأیید/رد شده — کاری نداریم
+        }
+
+        try {
+            $this->approve($order->refresh());
+
+            $result['order']         = $order;
+            $result['auto_approved'] = true;
+            $result['message']       = 'پرداخت تأیید و اشتراک شما فعال شد.';
+        } catch (\Throwable $e) {
+            Log::warning('Subscription auto-approve failed (paid path)', [
+                'order_id' => $order->id,
+                'error'    => $e->getMessage(),
+            ]);
+        }
     }
 
     /* ===================================================================

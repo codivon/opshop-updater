@@ -119,6 +119,25 @@
             </div>
         </x-card>
 
+        {{-- subscription settings --}}
+        <x-card id="subscriptions" title="تنظیمات اشتراک" subtitle="رفتار تأیید خریدهای طرح‌های اشتراک (فروشگاه و API).">
+            <div class="space-y-4">
+                <div class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                    <x-toggle wire:model="form.subscriptions_auto_approve" label="تأیید خودکار خریدهای اشتراک" id="subscriptions_auto_approve" />
+                    <p class="mt-2 text-xs leading-6 text-zinc-500 dark:text-zinc-400">
+                        اگر روشن باشد، به‌محض خرید موفق — پرداختِ تأییدشدهٔ درگاه یا خرید رایگان — اشتراک بلافاصله فعال می‌شود،
+                        لایسنس پکیج‌های همراه همان لحظه صادر و پیامک فعال‌سازی ارسال می‌شود؛ بدون نیاز به تأیید شما.
+                        اگر خاموش باشد، هر خرید پس از پرداخت در <a href="{{ route('admin.subscriptions.orders') }}" class="font-bold underline underline-offset-2">سفارش‌های اشتراک</a> می‌ماند تا شما آن را تأیید یا رد کنید.
+                    </p>
+                </div>
+
+                <div class="flex items-start gap-2 rounded-xl bg-amber-50 p-4 text-xs leading-6 text-amber-800 ring-1 ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20">
+                    <x-icon name="zap" class="size-4.5 shrink-0" />
+                    <p>این تنظیم روی همهٔ طرح‌ها اعمال می‌شود. سفارش‌هایی که قبلاً خریداری شده و در انتظار تأیید مانده‌اند، با روشن‌کردن این گزینه فعال نمی‌شوند — آن‌ها را از <b>سفارش‌های اشتراک</b> به‌صورت دستی تأیید کنید.</p>
+                </div>
+            </div>
+        </x-card>
+
         {{-- sms settings --}}
         <x-card id="sms" title="تنظیمات پیامک" subtitle="سیستم پیامک برای خرید، اشتراک، تمدید و انقضا — با ۵ درایور ایرانی.">
             <div class="space-y-5">

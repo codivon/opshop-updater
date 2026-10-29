@@ -201,6 +201,13 @@
 
             <div class="flex-1"></div>
 
+            {{-- بازدید سایت (فروشگاه) — در تب جدید --}}
+            <a href="{{ route('shop.home') }}" target="_blank" rel="noopener"
+               class="rounded-xl p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+               aria-label="بازدید سایت" title="بازدید سایت">
+                <x-icon name="external-link" class="size-5" />
+            </a>
+
             {{-- dark mode --}}
             <button type="button" @click="window.toggleDarkMode()"
                     class="rounded-xl p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-amber-300"

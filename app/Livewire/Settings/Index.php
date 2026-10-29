@@ -40,6 +40,10 @@ class Index extends Component
         // ---- پرداخت ----
         'payment_shaparak_proxy' => '',
 
+        // ---- اشتراک ----
+        // تأیید خودکار خریدهای اشتراک: پس از پرداخت موفق/خرید رایگان، بدون نیاز به تأیید مدیر
+        'subscriptions_auto_approve' => false,
+
         // ---- پیامک ----
         'sms_enabled' => false,
         'sms_driver' => 'kavenegar',
@@ -67,6 +71,12 @@ class Index extends Component
     public bool $confirmCache = false;
     public bool $confirmOptimize = false;
 
+    /** کلیدهای بولی فرم (ذخیره ۰/۱ و خواندن bool) */
+    protected const BOOL_KEYS = [
+        'mail_enabled', 'mail_use_settings', 'sms_enabled', 'sms_notify_admin',
+        'subscriptions_auto_approve',
+    ];
+
     /** گروه ذخیره هر کلید (مطابق ساختار جدول settings) */
     protected const GROUPS = [
         'site_name' => 'general',
@@ -84,6 +94,9 @@ class Index extends Component
 
         // ---- پرداخت ----
         'payment_shaparak_proxy' => 'payments',
+
+        // ---- اشتراک ----
+        'subscriptions_auto_approve' => 'subscriptions',
 
         // ---- پیامک ----
         'sms_enabled' => 'sms',
@@ -107,12 +120,12 @@ class Index extends Component
     public function mount(): void
     {
         $stored = Setting::query()
-            ->whereIn('group', ['general', 'email', 'sms', 'payments'])
+            ->whereIn('group', ['general', 'email', 'sms', 'payments', 'subscriptions'])
             ->pluck('value', 'key');
 
         foreach (array_keys($this->form) as $key) {
             if ($stored->has($key)) {
-                $this->form[$key] = in_array($key, ['mail_enabled', 'mail_use_settings', 'sms_enabled', 'sms_notify_admin'], true)
+                $this->form[$key] = in_array($key, self::BOOL_KEYS, true)
                     ? (bool) filter_var($stored->get($key), FILTER_VALIDATE_BOOLEAN)
                     : (string) $stored->get($key);
             }
@@ -131,7 +144,7 @@ class Index extends Component
         foreach (self::GROUPS as $key => $group) {
             $value = $this->form[$key];
 
-            if (in_array($key, ['mail_enabled', 'mail_use_settings', 'sms_enabled', 'sms_notify_admin'], true)) {
+            if (in_array($key, self::BOOL_KEYS, true)) {
                 $value = $value ? '1' : '0';
             }
 
@@ -304,6 +317,7 @@ class Index extends Component
             'form.mail_username' => ['nullable', 'string', 'max:255'],
             'form.mail_password' => ['nullable', 'string', 'max:255'],
             'form.payment_shaparak_proxy' => ['nullable', 'string', 'max:255'],
+            'form.subscriptions_auto_approve' => ['nullable', 'boolean'],
 
             'form.sms_driver' => ['nullable', 'string', 'in:kavenegar,melipayamak,ippanel,farazsms,idehpardazan'],
             'form.sms_admin_mobile' => ['nullable', 'string', 'max:20'],
