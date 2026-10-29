@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Plans\Form as PlansForm;
+use App\Livewire\Plans\Index as PlansIndex;
 use App\Livewire\Shop\Plans as ShopPlans;
 use App\Livewire\Shop\SubscriptionsIndex;
 use App\Models\PackageLicense;
@@ -313,8 +314,11 @@ class PlanDurationConfigTest extends TestCase
             ->assertDontSee('پکیج ارثی فروشگاه');
     }
 
-    /** صفحهٔ واقعی فروشگاه (/subscriptions) — کارت با مدت نمایشی (اولین گزینه به‌صورت پیش‌فرض) */
-    public function test_shop_subscriptions_page_shows_per_duration_config(): void
+    /**
+     * Task 65 — کارت فروشگاه: به‌جای لیست‌های بلند، نوار فشردهٔ «دارای قابلیت‌ها و پکیج‌های رایگان»؛
+     * نام قابلیت‌ها/پکیج‌ها دیگر در بدنهٔ کارت نیست (داخل آیلند base64 مودال است).
+     */
+    public function test_shop_subscriptions_page_shows_compact_details_banner(): void
     {
         $plan = $this->makeMultiDurationPlan();
 
@@ -326,18 +330,107 @@ class PlanDurationConfigTest extends TestCase
         $duration3->update(['features' => ['قابلیت اختصاصی سه‌ماهه']]);
         $duration3->packages()->attach($vipPackage->id, ['free_months' => 3]);
 
-        // پیش‌فرض: مدت نمایشی = اولین گزینه (۱ ماهه، بدون پیکربندی) → قابلیت‌ها/پکیج‌های طرح
-        Livewire::test(SubscriptionsIndex::class)
-            ->assertSee('پکیج ارثی صفحه فروشگاه')
-            ->assertSee('۱ ماه رایگان')
-            ->assertSee('پشتیبانی پایه')
-            ->assertDontSee('پکیج ویژه سه‌ماهه')
-            // انتخاب مدت ۳ ماهه در فرم خرید → پیکربندی همان مدت روی کارت
-            ->call('selectDuration', $plan->id, 3)
-            ->assertSee('پکیج ویژه سه‌ماهه')
-            ->assertSee('۳ ماه رایگان')
-            ->assertSee('قابلیت اختصاصی سه‌ماهه')
+        $content = Livewire::test(SubscriptionsIndex::class)
+            ->assertSee('این طرح قابلیت‌ها و پکیج‌های رایگان دارد')
+            ->assertSee('برای مشاهده کلیک کنید')
+            // نام‌ها دیگر در DOM نیستند — فقط شمارنده‌ها
             ->assertDontSee('پکیج ارثی صفحه فروشگاه')
-            ->assertDontSee('پشتیبانی پایه');
+            ->assertDontSee('پکیج ویژه سه‌ماهه')
+            ->assertDontSee('پشتیبانی پایه')
+            ->html();
+
+        // آیلند مودال برای طرح چندمدتی و تک‌مدتی (Task 65) تزریق می‌شود
+        $this->assertMatchesRegularExpression('/durs: JSON\.parse\(atob\(/', $content);
+    }
+
+    /** Task 65 — طرح تک‌مدتی (بدون ردیف مدت) هم مودال جزئیات دارد: cardDetailsFor یک ردیف می‌سازد */
+    public function test_shop_single_duration_plan_gets_details_entry(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'name' => 'تک‌مدتی ویژه', 'slug' => 'single-' . uniqid(),
+            'duration_months' => 2, 'price' => 100000, 'discount_price' => 20000,
+            'is_active' => true, 'features' => ['پشتیبانی دوماهه'],
+        ]);
+        $pkg = $this->makePackage(['name' => 'پکیج تک‌مدتی']);
+        $plan->packages()->attach($pkg->id, ['free_months' => 2]);
+
+        $component = Livewire::test(SubscriptionsIndex::class);
+
+        $details = $component->instance()->cardDetailsFor($plan);
+
+        $this->assertCount(1, $details);
+        $this->assertSame(['پشتیبانی دوماهه'], $details[0]['features']);
+        $this->assertSame('پکیج تک‌مدتی', $details[0]['packages'][0]['name']);
+        $this->assertSame('۲ ماه رایگان', $details[0]['packages'][0]['free']);
+        $this->assertFalse($details[0]['custom']);
+        $this->assertSame(20, $details[0]['percent']);
+
+        // نوار فشرده + مودال برای تک‌مدتی هم در DOM رندر می‌شود
+        $component->assertSee('این طرح قابلیت‌ها و پکیج‌های رایگان دارد');
+    }
+
+    /** Task 65 — کپی طرح از جدول پنل: همهٔ مدت‌ها + قابلیت‌ها + پکیج‌های هر مدت */
+    public function test_admin_panel_copies_plan_with_durations_and_packages(): void
+    {
+        $plan = $this->makeMultiDurationPlan();
+        $plan->update(['description' => 'توضیحات طرح اصلی', 'price' => 490000, 'discount_price' => 50000]);
+
+        $planPackage = $this->makePackage(['name' => 'پکیج سطح طرح']);
+        $plan->packages()->attach($planPackage->id, ['free_months' => 1]);
+
+        $vipPackage = $this->makePackage(['name' => 'پکیج ویژه']);
+        $duration3  = $plan->durations()->where('duration_months', 3)->first();
+        $duration3->update(['features' => ['قابلیت ویژه سه‌ماهه'], 'price' => 1200000]);
+        $duration3->packages()->attach($vipPackage->id, ['free_months' => 3]);
+
+        Livewire::test(PlansIndex::class)
+            ->call('copy', $plan->id)
+            ->assertHasNoErrors();
+
+        $this->assertSame(2, SubscriptionPlan::count());
+        $copy = SubscriptionPlan::query()->whereKeyNot($plan->id)->sole();
+
+        // نام/شناسه/وضعیت — کپی غیرفعال ساخته می‌شود تا بی‌اجازه منتشر نشود
+        $this->assertSame($plan->name . ' (کپی)', $copy->name);
+        $this->assertNotSame($plan->slug, $copy->slug);
+        $this->assertFalse($copy->is_active);
+        $this->assertSame('توضیحات طرح اصلی', $copy->description);
+        $this->assertSame(490000, $copy->price);
+        $this->assertSame(50000, $copy->discount_price);
+        $this->assertSame(['پشتیبانی پایه'], $copy->features);
+
+        // پکیج سطح طرح با همان مدت رایگان
+        $this->assertDatabaseHas('subscription_plan_package', [
+            'subscription_plan_id' => $copy->id,
+            'package_id'           => $planPackage->id,
+            'free_months'          => 1,
+        ]);
+
+        // مدت‌ها با قیمت/قابلیت‌هایشان
+        $this->assertSame(2, $copy->durations()->count());
+        $copyDuration3 = $copy->durations()->where('duration_months', 3)->first();
+        $this->assertSame(1200000, (int) $copyDuration3->price);
+        $this->assertSame(['قابلیت ویژه سه‌ماهه'], $copyDuration3->features);
+
+        // پکیج اختصاصی مدت ۳ ماهه کپی‌شده
+        $this->assertDatabaseHas('subscription_plan_duration_package', [
+            'subscription_plan_duration_id' => $copyDuration3->id,
+            'package_id'                    => $vipPackage->id,
+            'free_months'                   => 3,
+        ]);
+
+        // مدت ۱ ماهه بدون پیکربندی اختصاصی
+        $copyDuration1 = $copy->durations()->where('duration_months', 1)->first();
+        $this->assertNull($copyDuration1->features);
+        $this->assertDatabaseMissing('subscription_plan_duration_package', [
+            'subscription_plan_duration_id' => $copyDuration1->id,
+        ]);
+
+        // کپی دوم → شناسهٔ یکتا (تداخل slug حل می‌شود)
+        Livewire::test(PlansIndex::class)->call('copy', $plan->id);
+        $this->assertSame(3, SubscriptionPlan::count());
+        // هر دو کپی با شناسه‌های متمایز (سوییچ تصادفی خودکار در تداخل)
+        $this->assertSame(2, SubscriptionPlan::where('slug', 'like', $plan->slug . '-copy%')->count());
+        $this->assertSame(3, SubscriptionPlan::query()->distinct('slug')->count('slug'));
     }
 }

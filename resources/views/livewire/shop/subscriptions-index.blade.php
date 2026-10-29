@@ -64,17 +64,19 @@
                     @php($myOrder = $this->myOrders->get($plan->id))
                     @php($durOpt = $this->displayDurationFor($plan))
                     @php($durOpts = $plan->durationOptions())
-                    {{-- قابلیت‌ها/پکیج‌های مؤثر بر اساس مدت نمایشی (ارث‌بری از طرح در صورت نبود پیکربندی اختصاصی) — Task 63 --}}
-                    @php($cardFeatures = $durOpt ? $durOpt->resolvedFeatures($plan->features ?? []) : ($plan->features ?? []))
-                    @php($cardPackages = $durOpt?->resolvedPackages($plan->packages) ?? $plan->packages)
                     @php($hasDurs = $durOpts->isNotEmpty())
                     @php($maxDisc = $hasDurs ? (int) $durOpts->max('discount_percent') : 0)
                     @php($allFree = $hasDurs && $durOpts->every(fn ($d) => $d->final_price <= 0))
-                    {{-- جزئیات مؤثر هر مدت (قابلیت‌ها + پکیج‌ها) برای مودال — Task 64 --}}
-                    @php($durDetails = $hasDurs ? $this->durationDetailsFor($plan) : [])
+                    {{-- جزئیات مؤثر هر مدت (قابلیت‌ها + پکیج‌ها) برای مودال — طرح تک‌مدتی هم یک ردیف دارد (Task 65) --}}
+                    @php($cardDetails = $this->cardDetailsFor($plan))
+                    @php($hasAnyDetails = collect($cardDetails)->contains(fn ($d) => count($d['features']) > 0 || count($d['packages']) > 0))
+                    {{-- ایندکس مدتِ نمایشی در آرایهٔ جزئیات — کلیک روی نوار فشرده همین مدت را باز می‌کند --}}
+                    @php($curIndex = $hasDurs
+                        ? max(0, (int) $durOpts->search(fn ($d) => (int) $d->duration_months === (int) ($durOpt?->duration_months ?? -1)))
+                        : 0)
                     <div class="card relative flex flex-col overflow-hidden transition-all hover:shadow-card-lg {{ $buyingSlug === $plan->slug ? 'ring-2 ring-brand-500' : '' }}"
                          wire:key="plan-{{ $plan->id }}"
-                         @if($hasDurs) x-data="{ open: false, cur: 0, durs: JSON.parse(atob('{{ base64_encode((string) json_encode($durDetails)) }}')), faNum(n) { return String(n).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) } }" @endif>
+                         @if($hasDurs || $hasAnyDetails) x-data="{ open: false, cur: 0, durs: JSON.parse(atob('{{ base64_encode((string) json_encode($cardDetails)) }}')), faNum(n) { return String(n).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) } }" @endif>
 
                         {{-- ribbon --}}
                         @if($hasDurs && $allFree)
@@ -192,39 +194,43 @@
                                 </div>
                             @endif
 
-                            {{-- features (مؤثر برای مدت نمایشی) --}}
-                            @if($cardFeatures && count($cardFeatures))
-                                <ul class="space-y-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-                                    @foreach($cardFeatures as $feature)
-                                        <li class="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-                                            <x-icon name="check-circle" class="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                                            {{ $feature }}
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @endif
-
-                            {{-- included packages (مؤثر برای مدت نمایشی) --}}
-                            @if($cardPackages->count())
-                                <div class="rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
-                                    <p class="flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-200">
-                                        <x-icon name="package" class="size-4 text-brand-600 dark:text-brand-400" />
-                                        پکیج‌های رایگان این طرح
+                            {{-- نوار فشردهٔ «قابلیت‌ها و پکیج‌های رایگان» (Task 65) — به‌جای لیست‌های بلند؛
+                                 کلیک = مودال جزئیاتِ مدتِ نمایشی (آنی، سمت مرورگر) --}}
+                            @if($hasAnyDetails)
+                                @php($curDetail = $cardDetails[$curIndex] ?? ($cardDetails[0] ?? null))
+                                <button type="button" @click="cur = {{ $curIndex }}; open = true"
+                                        class="group relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-l from-brand-50 to-white p-3 text-start ring-1 ring-brand-100 transition-all hover:shadow-md hover:ring-brand-300 dark:from-brand-500/10 dark:to-zinc-800/40 dark:ring-brand-500/20 dark:hover:ring-brand-400/40"
+                                        aria-haspopup="dialog">
+                                    <span class="pointer-events-none absolute -end-6 -top-8 size-20 rounded-full bg-brand-100/60 blur-xl transition-opacity group-hover:opacity-100 dark:bg-brand-500/10" aria-hidden="true"></span>
+                                    <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-md shadow-brand-500/25">
+                                        <x-icon name="gift" class="size-5" />
+                                    </span>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block text-sm font-black text-zinc-800 dark:text-zinc-100">این طرح قابلیت‌ها و پکیج‌های رایگان دارد</span>
+                                        <span class="mt-1 flex flex-wrap items-center gap-1.5">
+                                            @if($curDetail && count($curDetail['features']))
+                                                <span class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-1.5 py-0.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                                                    <x-icon name="list-checks" class="size-3" />
+                                                    {{ fa_num(count($curDetail['features'])) }} قابلیت
+                                                </span>
+                                            @endif
+                                            @if($curDetail && count($curDetail['packages']))
+                                                <span class="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-1.5 py-0.5 text-[10px] font-black text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
+                                                    <x-icon name="package" class="size-3" />
+                                                    {{ fa_num(count($curDetail['packages'])) }} پکیج رایگان
+                                                </span>
+                                            @endif
+                                            <span class="text-[10px] font-bold text-zinc-400 group-hover:text-brand-600 dark:group-hover:text-brand-400">برای مشاهده کلیک کنید</span>
+                                        </span>
+                                    </span>
+                                    <x-icon name="chevron-left" class="size-4 shrink-0 text-brand-400 transition-transform group-hover:-translate-x-0.5" />
+                                </button>
+                                @if($hasDurs)
+                                    <p class="-mt-2 flex items-center justify-center gap-1 text-center text-[10px] leading-4 text-zinc-400">
+                                        <x-icon name="info" class="size-3 shrink-0" />
+                                        پیکربندی هر مدت می‌تواند متفاوت باشد — از دکمهٔ هر مدت هم می‌توانید ببینید
                                     </p>
-                                    <ul class="mt-2.5 space-y-2">
-                                        @foreach($cardPackages as $pkg)
-                                            <li class="flex items-center justify-between gap-2 text-xs">
-                                                <span class="flex min-w-0 items-center gap-1.5 text-zinc-600 dark:text-zinc-300">
-                                                    <x-icon name="download" class="size-3.5 shrink-0 text-zinc-400" />
-                                                    <span class="truncate">{{ $pkg->name }}</span>
-                                                </span>
-                                                <span class="shrink-0 rounded-lg bg-emerald-100 px-2 py-0.5 font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                                                    {{ \App\Models\SubscriptionPlan::freeMonthsLabel((int) $pkg->pivot->free_months) }}
-                                                </span>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
+                                @endif
                             @endif
 
                             {{-- already purchased state --}}
@@ -343,10 +349,11 @@
                             </form>
                         @endif
 
-                        {{-- ============ مودال «جزئیات مدت» (Task 64) ============
+                        {{-- ============ مودال «جزئیات مدت» (Task 64 + 65) ============
                              کاملاً سمت مرورگر با Alpine — بدون رفت‌وبرگشت سرور، بازشدن آنی.
-                             داده‌ها از durationDetailsFor() (ارث‌بری رعایت شده) در x-data --}}
-                        @if($hasDurs)
+                             برای طرح‌های تک‌مدتی هم رندر می‌شود (cardDetailsFor یک ردیف می‌سازد).
+                             داده‌ها از cardDetailsFor() (ارث‌بری رعایت شده) در x-data --}}
+                        @if($hasDurs || $hasAnyDetails)
                         <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
                              role="dialog" aria-modal="true" aria-label="جزئیات مدت اعتبار"
                              @keydown.escape.window="open = false">
@@ -451,11 +458,18 @@
                                                 <p class="mt-3 text-xs text-zinc-400" x-show="!durs[cur].packages.length">پکیج رایگانی برای این مدت تعریف نشده است.</p>
                                             </section>
 
-                                            {{-- یادآوری --}}
+                                            {{-- یادآوری — برای طرح چندمدتی/تک‌مدتی متفاوت --}}
+                                            @if($hasDurs)
                                             <p class="flex items-center justify-center gap-1.5 bg-zinc-50/60 px-5 py-3 text-center text-[10px] leading-5 text-zinc-400 dark:bg-zinc-800/40">
                                                 <x-icon name="info" class="size-3.5 shrink-0" />
                                                 پیکربندی هر مدت می‌تواند متفاوت باشد؛ هنگام خرید، دقیقاً پیکربندی همین مدت اعمال می‌شود.
                                             </p>
+                                            @else
+                                            <p class="flex items-center justify-center gap-1.5 bg-zinc-50/60 px-5 py-3 text-center text-[10px] leading-5 text-zinc-400 dark:bg-zinc-800/40">
+                                                <x-icon name="info" class="size-3.5 shrink-0" />
+                                                پس از خرید و تأیید مدیر، این قابلیت‌ها و پکیج‌های رایگان برای شما فعال می‌شود.
+                                            </p>
+                                            @endif
                                         </div>
                                     </template>
                                 </div>

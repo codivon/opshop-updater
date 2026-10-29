@@ -95,6 +95,79 @@ class Index extends Component
         $this->toast($plan->is_active ? 'طرح فعال شد.' : 'طرح غیرفعال شد.');
     }
 
+    /**
+     * کپی کامل یک طرح (Task 65) — نام/قابلیت‌ها/پکیج‌های سطح طرح +
+     * همهٔ مدت‌های اعتبار با پیکربندی اختصاصی هر مدت (قابلیت‌ها و پکیج‌ها).
+     *
+     * کپی به‌صورت «غیرفعال» ساخته می‌شود تا بی‌اجازه در فروشگاه منتشر نشود؛
+     * مدیر بعد از ویرایش نام/قیمت خودش آن را فعال می‌کند.
+     */
+    public function copy(int $id): void
+    {
+        $plan = SubscriptionPlan::with(['packages', 'durations', 'durations.packages'])->find($id);
+
+        if (!$plan) {
+            $this->toast('طرح موردنظر یافت نشد؛ ممکن است حذف شده باشد.', 'warning');
+
+            return;
+        }
+
+        // نام و شناسهٔ یکتا برای کپی
+        $name = $plan->name . ' (کپی)';
+        $base = trim($plan->slug) !== '' ? $plan->slug . '-copy' : (\Illuminate\Support\Str::slug($name) ?: 'plan-copy');
+        $slug = $base;
+
+        while (SubscriptionPlan::where('slug', $slug)->exists()) {
+            $slug = $base . '-' . strtolower(\Illuminate\Support\Str::random(4));
+        }
+
+        $copy = SubscriptionPlan::create([
+            'name'            => $name,
+            'slug'            => $slug,
+            'description'     => $plan->description,
+            'duration_months' => $plan->duration_months,
+            'price'           => $plan->price,
+            'discount_price'  => $plan->discount_price,
+            'is_one_time'     => $plan->is_one_time,
+            'is_active'       => false, // پس از ویرایش، مدیر فعال می‌کند
+            'sort_order'      => $plan->sort_order,
+            'features'        => $plan->features,
+        ]);
+
+        // پکیج‌های همراه سطح طرح (با مدت دسترسی رایگان هر کدام)
+        $planPackages = $plan->packages
+            ->mapWithKeys(fn ($p) => [$p->id => ['free_months' => (int) $p->pivot->free_months]])
+            ->all();
+
+        if ($planPackages !== []) {
+            $copy->packages()->sync($planPackages);
+        }
+
+        // همهٔ مدت‌های اعتبار + پیکربندی اختصاصی هر مدت (قابلیت‌ها و پکیج‌ها)
+        foreach ($plan->durations as $duration) {
+            $durationCopy = $copy->durations()->create([
+                'duration_months' => $duration->duration_months,
+                'price'           => $duration->price,
+                'discount_price'  => $duration->discount_price,
+                'is_active'       => $duration->is_active,
+                'sort_order'      => $duration->sort_order,
+                'features'        => $duration->features,
+            ]);
+
+            $durationPackages = $duration->packages
+                ->mapWithKeys(fn ($p) => [$p->id => ['free_months' => (int) $p->pivot->free_months]])
+                ->all();
+
+            if ($durationPackages !== []) {
+                $durationCopy->packages()->sync($durationPackages);
+            }
+        }
+
+        unset($this->records);
+
+        $this->toast("کپی طرح «{$plan->name}» ساخته شد — کپی غیرفعال است؛ پس از ویرایش فعالش کنید.");
+    }
+
     /* ---------------------------------------------------------------- */
     /*  Bulk selection (WithBulkActions)                                 */
     /* ---------------------------------------------------------------- */

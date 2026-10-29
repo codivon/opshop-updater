@@ -152,6 +152,39 @@ class SubscriptionsIndex extends Component
             ->all();
     }
 
+    /**
+     * جزئیات نمایشی کارت برای مودال «قابلیت‌ها و پکیج‌ها» — برای همهٔ طرح‌ها (Task 65):
+     *  - طرح چندمدتی → پیکربندی مؤثر هر مدت (durationDetailsFor)
+     *  - طرح تک‌مدتی قدیمی (بدون ردیف مدت) → یک ردیف از قابلیت‌ها/پکیج‌های خود طرح
+     *
+     * با حذف لیست‌های بلند از بدنهٔ کارت، حالا تنها راه دیدن جزئیات همین مودال است —
+     * پس برای طرح‌های تک‌مدتی هم یک ردیف ساخته می‌شود تا مودال کار کند.
+     */
+    public function cardDetailsFor(SubscriptionPlan $plan): array
+    {
+        if ($plan->hasDurations()) {
+            return $this->durationDetailsFor($plan);
+        }
+
+        return [[
+            'label'    => $plan->duration_label,
+            'price'    => $plan->final_price <= 0 ? 'رایگان' : money($plan->final_price, false) . ' تومان',
+            'original' => ($plan->discount_price > 0 && $plan->price > $plan->final_price)
+                ? money($plan->price, false) . ' تومان' : '',
+            'percent'  => ($plan->discount_price > 0 && $plan->price > 0)
+                ? (int) round(($plan->discount_price / max(1, $plan->price)) * 100) : 0,
+            'custom'   => false,
+            'features' => array_values($plan->features ?? []),
+            'packages' => $plan->packages
+                ->map(fn ($p) => [
+                    'name' => $p->name,
+                    'free' => \App\Models\SubscriptionPlan::freeMonthsLabel((int) $p->pivot->free_months),
+                ])
+                ->values()
+                ->all(),
+        ]];
+    }
+
     #[Computed]
     public function gateways()
     {

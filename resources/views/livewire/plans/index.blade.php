@@ -177,6 +177,13 @@
                                                 title="ویرایش">
                                             <x-icon name="pencil" class="size-4.5" />
                                         </button>
+                                        {{-- کپی کامل طرح: همهٔ مدت‌ها + قابلیت‌ها + پکیج‌های هر مدت (Task 65) --}}
+                                        <button type="button" wire:click="copy({{ $plan->id }})"
+                                                wire:loading.attr="disabled" wire:target="copy({{ $plan->id }})"
+                                                class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-500/10 dark:hover:text-sky-400"
+                                                title="کپی طرح (با همهٔ مدت‌ها، قابلیت‌ها و پکیج‌ها)">
+                                            <x-icon name="copy" class="size-4.5" />
+                                        </button>
                                         <button type="button" wire:click="toggleActive({{ $plan->id }})"
                                                 class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-500/10 dark:hover:text-amber-400"
                                                 title="{{ $plan->is_active ? 'غیرفعال کردن' : 'فعال کردن' }}">
