@@ -110,6 +110,48 @@ class SubscriptionsIndex extends Component
         $this->selectedDurations[$planId] = $months;
     }
 
+    /* ---------------------------------------------------------------- */
+    /*  جزئیات هر مدت (مودال نمایشی کارت — Task 64)                       */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * پیکربندی مؤثر هر مدت اعتبار یک طرح (قابلیت‌ها + پکیج‌های همراه) برای
+     * مودال «جزئیات مدت» در کارت فروشگاه.
+     *
+     * خروجی به‌صورت آرایهٔ سادهٔ JSON-پذیر است تا با @js به Alpine داده شود و
+     * باز/بسته شدن مودال کاملاً سمت مرورگر باشد (بدون رفت‌وبرگشت سرور — سریع).
+     * ارث‌بری رعایت می‌شود: مدت بدون پیکربندی اختصاصی = قابلیت‌ها/پکیج‌های خود طرح.
+     *
+     * @return array<int, array{label:string, price:string, original:string, percent:int, custom:bool, features:array<int,string>, packages:array<int, array{name:string, free:string}}>
+     */
+    public function durationDetailsFor(SubscriptionPlan $plan): array
+    {
+        if (!$plan->hasDurations()) {
+            return [];
+        }
+
+        return $plan->durationOptions()
+            ->map(fn (SubscriptionPlanDuration $d) => [
+                'label'    => $d->duration_label,
+                'price'    => $d->final_price <= 0 ? 'رایگان' : money($d->final_price, false) . ' تومان',
+                'original' => ($d->has_discount && $d->final_price > 0) ? money($d->price, false) . ' تومان' : '',
+                'percent'  => (int) $d->discount_percent,
+                'custom'   => $d->hasOwnFeatures() || $d->hasOwnPackages(),
+                // قابلیت‌های مؤثر (اختصاصی مدت یا ارث‌بری از طرح)
+                'features' => array_values($d->resolvedFeatures($plan->features ?? [])),
+                // پکیج‌های همراه مؤثر (اختصاصی مدت یا ارث‌بری از طرح) با برچسب ماه رایگان
+                'packages' => $d->resolvedPackages($plan->packages)
+                    ->map(fn ($p) => [
+                        'name' => $p->name,
+                        'free' => \App\Models\SubscriptionPlan::freeMonthsLabel((int) $p->pivot->free_months),
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
     #[Computed]
     public function gateways()
     {

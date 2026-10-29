@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\Plans\Index as PlansIndex;
+use App\Livewire\Plans\Form as PlansForm;
 use App\Livewire\Shop\Plans as ShopPlans;
 use App\Livewire\Shop\SubscriptionsIndex;
 use App\Models\PackageLicense;
@@ -21,6 +21,9 @@ use Tests\TestCase;
  * مدت اعتبار پکیج‌ها را ۳ ماهه (یا هر چیز دیگر) تعریف کرد.
  *  - مدت بدون پیکربندی اختصاصی → ارث‌بری از قابلیت‌ها/پکیج‌های خود طرح
  *  - خرید با مدت انتخابی → snapshot پیکربندی مؤثر همان مدت → تأیید مدیر از snapshot
+ *
+ * Task 64: فرم پنل به کامپوننت مجزای Plans\Form منتقل شده (رفع کندی مودال) —
+ * تست‌های پنل از طریق رویداد plan-form-open (همان مسیر واقعی دکمهٔ جدول) باز می‌شوند.
  */
 class PlanDurationConfigTest extends TestCase
 {
@@ -146,8 +149,9 @@ class PlanDurationConfigTest extends TestCase
         $duration1 = $plan->durations()->where('duration_months', 1)->first();
         $duration3 = $plan->durations()->where('duration_months', 3)->first();
 
-        Livewire::test(PlansIndex::class)
-            ->call('openEdit', $plan->id)
+        Livewire::test(PlansForm::class)
+            ->dispatch('plan-form-open', id: $plan->id)
+            ->assertSet('showModal', true)
             ->set('formDurations.1.features', ['پشتیبانی ۳ ماهه VIP', 'آپدیت رایگان'])
             ->set('formDurations.1.packages', [['package_id' => (string) $pkgB->id, 'free_months' => '3']])
             ->call('save')
@@ -174,7 +178,7 @@ class PlanDurationConfigTest extends TestCase
         ]);
 
         // باز کردن مودال ویرایش → مقادیر ذخیره‌شده برمی‌گردند
-        Livewire::test(PlansIndex::class)
+        Livewire::test(PlansForm::class)
             ->call('openEdit', $plan->id)
             ->assertSet('formDurations.1.features', ['پشتیبانی ۳ ماهه VIP', 'آپدیت رایگان'])
             ->assertSet('formDurations.1.packages.0.package_id', (string) $pkgB->id)
@@ -186,7 +190,7 @@ class PlanDurationConfigTest extends TestCase
         $plan = $this->makeMultiDurationPlan();
         $pkgA = $this->makePackage(['name' => 'پکیج الف']);
 
-        Livewire::test(PlansIndex::class)
+        Livewire::test(PlansForm::class)
             ->call('openEdit', $plan->id)
             ->set('formDurations.0.packageToAdd', (string) $pkgA->id)
             ->call('addDurationPackage', 0)
@@ -204,7 +208,7 @@ class PlanDurationConfigTest extends TestCase
     {
         $plan = $this->makeMultiDurationPlan();
 
-        Livewire::test(PlansIndex::class)
+        Livewire::test(PlansForm::class)
             ->call('openEdit', $plan->id)
             // افزودن دو ردیف قابلیت به مدت ۳ ماهه (index 1) مثل قابلیت‌های طرح
             ->call('addDurationFeature', 1)
@@ -227,9 +231,61 @@ class PlanDurationConfigTest extends TestCase
         $this->assertNull($duration1After->features);
 
         // باز کردن مودال → ردیف‌های قابلیت ذخیره‌شده برمی‌گردند
-        Livewire::test(PlansIndex::class)
+        Livewire::test(PlansForm::class)
             ->call('openEdit', $plan->id)
             ->assertSet('formDurations.1.features', ['آپدیت رایگان', 'مشاوره اختصاصی']);
+    }
+
+    /** مودال «جزئیات مدت» فروشگاه (Task 64) — دادهٔ هر مدت با ارث‌بری درست حل می‌شود */
+    public function test_shop_duration_details_modal_data_resolves_per_duration(): void
+    {
+        $plan = $this->makeMultiDurationPlan();
+
+        $planPackage = $this->makePackage(['name' => 'پکیج ارثی مودال']);
+        $plan->packages()->attach($planPackage->id, ['free_months' => 1]);
+
+        $vipPackage = $this->makePackage(['name' => 'پکیج ویژه مودال']);
+        $duration3  = $plan->durations()->where('duration_months', 3)->first();
+        $duration3->update(['features' => ['قابلیت ویژه مودال']]);
+        $duration3->packages()->attach($vipPackage->id, ['free_months' => 3]);
+
+        $details = Livewire::test(SubscriptionsIndex::class)
+            ->instance()
+            ->durationDetailsFor($plan);
+
+        $this->assertCount(2, $details);
+
+        // مدت ۱ ماهه — بدون پیکربندی → ارث‌بری از طرح + نشان غیرسفارشی
+        $this->assertFalse($details[0]['custom']);
+        $this->assertSame(['پشتیبانی پایه'], $details[0]['features']);
+        $this->assertSame('پکیج ارثی مودال', $details[0]['packages'][0]['name']);
+        $this->assertSame('۱ ماه رایگان', $details[0]['packages'][0]['free']);
+
+        // مدت ۳ ماهه — پیکربندی اختصاصی → قابلیت‌ها/پکیج‌های خودش
+        $this->assertTrue($details[1]['custom']);
+        $this->assertSame(['قابلیت ویژه مودال'], $details[1]['features']);
+        $this->assertSame('پکیج ویژه مودال', $details[1]['packages'][0]['name']);
+        $this->assertSame('۳ ماه رایگان', $details[1]['packages'][0]['free']);
+
+        // طرح تک‌مدتی (بدون ردیف مدت) → جزئیاتی ندارد (مودال نمایش داده نمی‌شود)
+        $single = SubscriptionPlan::create([
+            'name' => 'تک‌مدتی', 'slug' => 'single-' . uniqid(),
+            'duration_months' => 2, 'price' => 10000, 'is_active' => true,
+        ]);
+        $this->assertSame([], Livewire::test(SubscriptionsIndex::class)->instance()->durationDetailsFor($single));
+    }
+
+    /** جزئیات مودال در HTML صفحه فروشگاه به‌صورت base64 تزریق می‌شود (بدون متن لاتین/فارسی خام در DOM) */
+    public function test_shop_page_embeds_duration_details_data_island(): void
+    {
+        $plan = $this->makeMultiDurationPlan();
+
+        $content = Livewire::test(SubscriptionsIndex::class)->html();
+
+        // آیلند دادهٔ مودال باید موجود باشد
+        $this->assertMatchesRegularExpression('/durs: JSON\.parse\(atob\(/', $content);
+        // متن پیکربندی نباید خام در DOM باشد (مودال سمت مرورگر از آیلند می‌خواند)
+        $this->assertStringNotContainsString('پشتیبانی پایه\u0022', $content);
     }
 
     public function test_shop_card_shows_duration_config_of_selected_duration(): void

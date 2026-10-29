@@ -70,8 +70,11 @@
                     @php($hasDurs = $durOpts->isNotEmpty())
                     @php($maxDisc = $hasDurs ? (int) $durOpts->max('discount_percent') : 0)
                     @php($allFree = $hasDurs && $durOpts->every(fn ($d) => $d->final_price <= 0))
+                    {{-- جزئیات مؤثر هر مدت (قابلیت‌ها + پکیج‌ها) برای مودال — Task 64 --}}
+                    @php($durDetails = $hasDurs ? $this->durationDetailsFor($plan) : [])
                     <div class="card relative flex flex-col overflow-hidden transition-all hover:shadow-card-lg {{ $buyingSlug === $plan->slug ? 'ring-2 ring-brand-500' : '' }}"
-                         wire:key="plan-{{ $plan->id }}">
+                         wire:key="plan-{{ $plan->id }}"
+                         @if($hasDurs) x-data="{ open: false, cur: 0, durs: JSON.parse(atob('{{ base64_encode((string) json_encode($durDetails)) }}')), faNum(n) { return String(n).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]) } }" @endif>
 
                         {{-- ribbon --}}
                         @if($hasDurs && $allFree)
@@ -160,6 +163,13 @@
                                                         <span class="text-[10px] text-zinc-400">تومان</span>
                                                     @endif
                                                 </div>
+                                                {{-- جزئیات همین مدت (قابلیت‌ها + پکیج‌های رایگان) — مودال آنی سمت مرورگر --}}
+                                                <button type="button" @click="cur = {{ $loop->index }}; open = true"
+                                                        class="mt-2 flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg bg-zinc-50 px-2 py-1.5 text-[10px] font-bold text-zinc-500 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-900/60 dark:text-zinc-400 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
+                                                        aria-haspopup="dialog" title="دیدن قابلیت‌ها و پکیج‌های رایگان این مدت">
+                                                    <x-icon name="eye" class="size-3.5" />
+                                                    قابلیت‌ها و پکیج‌ها
+                                                </button>
                                             </div>
                                         @endforeach
                                     </div>
@@ -331,6 +341,126 @@
                                     پس از پرداخت، درخواست شما برای تأیید مدیر ارسال می‌شود و اشتراک پس از تأیید فعال خواهد شد.
                                 </p>
                             </form>
+                        @endif
+
+                        {{-- ============ مودال «جزئیات مدت» (Task 64) ============
+                             کاملاً سمت مرورگر با Alpine — بدون رفت‌وبرگشت سرور، بازشدن آنی.
+                             داده‌ها از durationDetailsFor() (ارث‌بری رعایت شده) در x-data --}}
+                        @if($hasDurs)
+                        <div x-cloak x-show="open" class="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+                             role="dialog" aria-modal="true" aria-label="جزئیات مدت اعتبار"
+                             @keydown.escape.window="open = false">
+                            {{-- backdrop --}}
+                            <div x-show="open"
+                                 x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                 x-transition:leave="transition ease-in duration-150"
+                                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                                 class="absolute inset-0 bg-zinc-950/60 backdrop-blur-sm"
+                                 @click="open = false" aria-hidden="true"></div>
+
+                            {{-- dialog --}}
+                            <div x-show="open"
+                                 x-transition:enter="transition ease-out duration-200"
+                                 x-transition:enter-start="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95"
+                                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                 x-transition:leave="transition ease-in duration-150"
+                                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                 x-transition:leave-end="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95"
+                                 class="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-clip rounded-3xl bg-white shadow-pop ring-1 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-white/10">
+
+                                {{-- هدر گرادیانی برند --}}
+                                <div class="relative overflow-hidden bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 px-5 py-4 text-white">
+                                    <div class="pointer-events-none absolute -end-10 -top-14 size-40 rounded-full bg-white/10 blur-2xl" aria-hidden="true"></div>
+                                    <div class="pointer-events-none absolute -bottom-16 -start-8 size-32 rounded-full bg-white/10 blur-2xl" aria-hidden="true"></div>
+                                    <div class="relative flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="flex items-center gap-1.5 text-[11px] font-medium text-white/75">
+                                                <x-icon name="crown" class="size-3.5 shrink-0" />
+                                                <span class="truncate">{{ $plan->name }}</span>
+                                            </p>
+                                            <h3 class="mt-1 truncate text-lg font-black" x-text="durs[cur]?.label"></h3>
+                                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                                <span class="inline-flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1 text-xs font-black ring-1 ring-white/25"
+                                                      x-text="durs[cur]?.price"></span>
+                                                <template x-if="durs[cur]?.original">
+                                                    <span class="text-[11px] tabular-nums text-white/60 line-through" x-text="durs[cur]?.original"></span>
+                                                </template>
+                                                <template x-if="durs[cur]?.percent > 0">
+                                                    <span class="rounded-xl bg-amber-300/90 px-2 py-1 text-[10px] font-black text-amber-950" x-text="faNum(durs[cur]?.percent ?? 0) + '٪ تخفیف'"></span>
+                                                </template>
+                                                <template x-if="durs[cur]?.custom">
+                                                    <span class="inline-flex items-center gap-1 rounded-xl bg-white/15 px-2 py-1 text-[10px] font-black ring-1 ring-white/25">
+                                                        <x-icon name="sparkles" class="size-3" />
+                                                        پیکربندی اختصاصی
+                                                    </span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <button type="button" @click="open = false"
+                                                class="rounded-xl p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                                                aria-label="بستن">
+                                            <x-icon name="x" class="size-5" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {{-- بدنه --}}
+                                <div class="min-h-0 flex-1 overflow-y-auto">
+                                    <template x-if="durs[cur]">
+                                        <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                                            {{-- قابلیت‌های همراه این مدت --}}
+                                            <section class="px-5 py-4">
+                                                <p class="flex items-center gap-1.5 text-xs font-black text-zinc-700 dark:text-zinc-200">
+                                                    <x-icon name="list-checks" class="size-4 text-brand-600 dark:text-brand-400" />
+                                                    قابلیت‌های همراه این مدت
+                                                    <span class="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                                                          x-text="faNum(durs[cur].features.length) + ' مورد'"></span>
+                                                </p>
+                                                <ul class="mt-3 space-y-2" x-show="durs[cur].features.length">
+                                                    <template x-for="(feature, fi) in durs[cur].features" :key="'f' + cur + '-' + fi">
+                                                        <li class="flex items-start gap-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                                                            <x-icon name="check-circle" class="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                                                            <span x-text="feature"></span>
+                                                        </li>
+                                                    </template>
+                                                </ul>
+                                                <p class="mt-3 text-xs text-zinc-400" x-show="!durs[cur].features.length">قابلیتی برای این مدت ثبت نشده است.</p>
+                                            </section>
+
+                                            {{-- پکیج‌های رایگان این مدت --}}
+                                            <section class="px-5 py-4">
+                                                <p class="flex items-center gap-1.5 text-xs font-black text-zinc-700 dark:text-zinc-200">
+                                                    <x-icon name="package" class="size-4 text-brand-600 dark:text-brand-400" />
+                                                    پکیج‌های رایگان این مدت
+                                                    <span class="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                                                          x-text="faNum(durs[cur].packages.length) + ' پکیج'"></span>
+                                                </p>
+                                                <ul class="mt-3 space-y-2" x-show="durs[cur].packages.length">
+                                                    <template x-for="(pkg, pi) in durs[cur].packages" :key="'p' + cur + '-' + pi">
+                                                        <li class="flex items-center justify-between gap-2 rounded-xl bg-zinc-50 px-3 py-2 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
+                                                            <span class="flex min-w-0 items-center gap-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                                                                <x-icon name="download" class="size-3.5 shrink-0 text-zinc-400" />
+                                                                <span class="truncate" x-text="pkg.name"></span>
+                                                            </span>
+                                                            <span class="shrink-0 rounded-lg bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"
+                                                                  x-text="pkg.free"></span>
+                                                        </li>
+                                                    </template>
+                                                </ul>
+                                                <p class="mt-3 text-xs text-zinc-400" x-show="!durs[cur].packages.length">پکیج رایگانی برای این مدت تعریف نشده است.</p>
+                                            </section>
+
+                                            {{-- یادآوری --}}
+                                            <p class="flex items-center justify-center gap-1.5 bg-zinc-50/60 px-5 py-3 text-center text-[10px] leading-5 text-zinc-400 dark:bg-zinc-800/40">
+                                                <x-icon name="info" class="size-3.5 shrink-0" />
+                                                پیکربندی هر مدت می‌تواند متفاوت باشد؛ هنگام خرید، دقیقاً پیکربندی همین مدت اعمال می‌شود.
+                                            </p>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
                         @endif
                     </div>
                 @endforeach
