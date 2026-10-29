@@ -109,6 +109,15 @@
                             </button>
                             @if($openDurationConfigs[$i] ?? false)
                             <div class="mt-2 grid gap-3 rounded-xl bg-white p-3 ring-1 ring-zinc-200/70 lg:grid-cols-2 dark:bg-zinc-900/40 dark:ring-zinc-700/50">
+                                {{-- کدام مدت در حال ویرایش است — وضوح بیشتر (Task 67) --}}
+                                <p class="col-span-full flex flex-wrap items-center gap-1.5 border-b border-zinc-100 pb-2 text-[11px] font-black text-brand-600 dark:border-zinc-800 dark:text-brand-400">
+                                    <x-icon name="calendar-clock" class="size-3.5 shrink-0" />
+                                    پیکربندی اختصاصی مدت
+                                    <span class="rounded-lg bg-brand-50 px-2 py-0.5 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
+                                        {{ ((int) ($row['duration_months'] ?? 0)) === 0 ? 'نامحدود' : fa_num($row['duration_months']) . ' ماه' }}
+                                    </span>
+                                    <span class="font-medium text-zinc-400">— فقط به همین مدت اعمال می‌شود؛ خالی بودن هر بخش = ارث‌بری از طرح</span>
+                                </p>
                                 {{-- قابلیت‌های اختصاصی این مدت — ریپیتر افزودن/حذف مثل قابلیت‌های طرح --}}
                                 <div>
                                     <div class="mb-1 flex items-center justify-between gap-2">

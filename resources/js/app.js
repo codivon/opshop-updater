@@ -2,6 +2,7 @@ import './livewire-config';
 import './ckeditor';
 import './loading';
 import { Livewire, Alpine } from '../../vendor/livewire/livewire/dist/livewire.esm';
+import './scroll-preserve';
 
 /* ------------------------------------------------------------------ */
 /*  Dark mode (persisted, class-based)                                 */

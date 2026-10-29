@@ -75,7 +75,9 @@
             </header>
         @endif
 
-        <div class="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+        {{-- data-scroll-preserve: موقعیت اسکرول مودال در طول morph لایووایر حفظ می‌شود
+             (پرش اسکرول به بالای مودال بعد از هر تعامل — resources/js/scroll-preserve.js) --}}
+        <div data-scroll-preserve="modal-body" class="min-h-0 flex-1 overflow-y-auto px-5 py-5">
             {{ $slot }}
         </div>
 

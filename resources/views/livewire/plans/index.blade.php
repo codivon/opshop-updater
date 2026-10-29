@@ -212,6 +212,22 @@
     {{-- فرم افزودن/ویرایش (کامپوننت مجزا Plans\Form) — تعامل‌های داخل مودال فقط مودال را رندر می‌کنند، نه جدول (رفع کندی — Task 64) --}}
     <livewire:plans.form />
 
+    {{-- پوشش تمام‌صفحهٔ «در حال کپی» (Task 67) — از شروع درخواست کپی تا پاسخ نمایش داده می‌شود --}}
+    <div wire:loading wire:target="copy" x-cloak
+         class="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-3 bg-zinc-950/50 backdrop-blur-sm"
+         role="status" aria-live="polite">
+        <span class="flex size-16 items-center justify-center rounded-3xl bg-white shadow-pop ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-white/10">
+            <x-icon name="copy" class="size-7 animate-pulse text-sky-600 dark:text-sky-400" />
+        </span>
+        <p class="flex items-center gap-2 text-sm font-black text-white drop-shadow-md">
+            <x-icon name="loader" class="size-4.5 animate-spin" />
+            در حال کپی طرح…
+        </p>
+        <p class="max-w-xs text-center text-xs leading-5 text-white/85">
+            در حال ساختن نسخهٔ کامل با همهٔ مدت‌ها، قابلیت‌ها و پکیج‌های هر مدت…
+        </p>
+    </div>
+
     {{-- delete confirm --}}
     <x-modal wire:model="deleteId" title="حذف طرح اشتراک" size="sm">
         @if($deleteId)

@@ -381,19 +381,30 @@
                                  x-transition:leave-end="opacity-0 translate-y-6 sm:translate-y-0 sm:scale-95"
                                  class="relative flex max-h-[88vh] w-full max-w-lg flex-col overflow-clip rounded-3xl bg-white shadow-pop ring-1 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-white/10">
 
-                                {{-- هدر گرادیانی برند --}}
+                                {{-- هدر گرادیانی برند — چیدمان مرتب: نام طرح/بستن ↑ ، مدت + قیمت ↓ ، نشان پیکربندی اختصاصی جدا (Task 67) --}}
                                 <div class="relative overflow-hidden bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 px-5 py-4 text-white">
                                     <div class="pointer-events-none absolute -end-10 -top-14 size-40 rounded-full bg-white/10 blur-2xl" aria-hidden="true"></div>
                                     <div class="pointer-events-none absolute -bottom-16 -start-8 size-32 rounded-full bg-white/10 blur-2xl" aria-hidden="true"></div>
-                                    <div class="relative flex items-start justify-between gap-3">
-                                        <div class="min-w-0">
-                                            <p class="flex items-center gap-1.5 text-[11px] font-medium text-white/75">
-                                                <x-icon name="crown" class="size-3.5 shrink-0" />
+
+                                    <div class="relative">
+                                        {{-- ردیف بالا: نام طرح + دکمهٔ بستن --}}
+                                        <div class="flex items-center justify-between gap-3">
+                                            <p class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-white/80">
+                                                <x-icon name="crown" class="size-3.5 shrink-0 text-amber-300" />
                                                 <span class="truncate">{{ $plan->name }}</span>
                                             </p>
-                                            <h3 class="mt-1 truncate text-lg font-black" x-text="durs[cur]?.label"></h3>
-                                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                                <span class="inline-flex items-center gap-1 rounded-xl bg-white/15 px-2.5 py-1 text-xs font-black ring-1 ring-white/25"
+                                            <button type="button" @click="open = false"
+                                                    class="-me-1 shrink-0 rounded-lg p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                                                    aria-label="بستن">
+                                                <x-icon name="x" class="size-5" />
+                                            </button>
+                                        </div>
+
+                                        {{-- ردیف اصلی: برچسب مدت (راست) + قیمت و تخفیف (چپ) در یک خط هم‌راستا --}}
+                                        <div class="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                                            <h3 class="text-lg font-black leading-none" x-text="durs[cur]?.label"></h3>
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <span class="inline-flex items-center rounded-xl bg-white/15 px-2.5 py-1 text-sm font-black tabular-nums ring-1 ring-white/25"
                                                       x-text="durs[cur]?.price"></span>
                                                 <template x-if="durs[cur]?.original">
                                                     <span class="text-[11px] tabular-nums text-white/60 line-through" x-text="durs[cur]?.original"></span>
@@ -401,19 +412,18 @@
                                                 <template x-if="durs[cur]?.percent > 0">
                                                     <span class="rounded-xl bg-amber-300/90 px-2 py-1 text-[10px] font-black text-amber-950" x-text="faNum(durs[cur]?.percent ?? 0) + '٪ تخفیف'"></span>
                                                 </template>
-                                                <template x-if="durs[cur]?.custom">
-                                                    <span class="inline-flex items-center gap-1 rounded-xl bg-white/15 px-2 py-1 text-[10px] font-black ring-1 ring-white/25">
-                                                        <x-icon name="sparkles" class="size-3" />
-                                                        پیکربندی اختصاصی
-                                                    </span>
-                                                </template>
                                             </div>
                                         </div>
-                                        <button type="button" @click="open = false"
-                                                class="rounded-xl p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
-                                                aria-label="بستن">
-                                            <x-icon name="x" class="size-5" />
-                                        </button>
+
+                                        {{-- نشان پیکربندی اختصاصی — ردیف مستقل تا هدر شلوغ نشود --}}
+                                        <template x-if="durs[cur]?.custom">
+                                            <div class="mt-2.5 flex">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-black ring-1 ring-white/25">
+                                                    <x-icon name="sparkles" class="size-3 shrink-0 text-amber-300" />
+                                                    این مدت پیکربندی اختصاصی دارد
+                                                </span>
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
 
