@@ -8,6 +8,9 @@ use App\Models\Customer;
 use App\Models\Package;
 use App\Models\PackageLicense;
 use App\Models\PackagePurchase;
+use App\Models\Ticket;
+use App\Models\TicketReply;
+use App\Services\SubscriptionService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -26,7 +29,7 @@ class CustomerProfile extends Component
 {
     use WithToasts;
 
-    /** تب فعال: purchases | licenses | info */
+    /** تب فعال: purchases | licenses | tickets | info */
     public string $tab = 'purchases';
 
     /* ---- فیلتر بخش لایسنس‌ها ---- */
@@ -42,6 +45,20 @@ class CustomerProfile extends Component
         'phone'       => '',
         'website_url' => '',
     ];
+
+    /* ---- تیکت‌های پشتیبانی (فقط با اشتراک فعال) ---- */
+    public bool $showTicketForm = false;
+
+    public string $ticketSubject = '';
+
+    public string $ticketBody = '';
+
+    /** گفتگوی باز (شناسهٔ تیکت) */
+    public ?int $openTicketId = null;
+
+    public string $replyBody = '';
+
+    protected const TABS = ['purchases', 'licenses', 'tickets', 'info'];
 
     public function mount(): void
     {
@@ -59,7 +76,7 @@ class CustomerProfile extends Component
             'website_url' => (string) $customer->website_url,
         ];
 
-        if (!in_array($this->tab, ['purchases', 'licenses', 'info'], true)) {
+        if (!in_array($this->tab, self::TABS, true)) {
             $this->tab = 'purchases';
         }
     }
@@ -74,7 +91,7 @@ class CustomerProfile extends Component
 
     public function switchTab(string $tab): void
     {
-        $this->tab = in_array($tab, ['purchases', 'licenses', 'info'], true) ? $tab : 'purchases';
+        $this->tab = in_array($tab, self::TABS, true) ? $tab : 'purchases';
     }
 
     public function updatedLicenseSearch(): void
@@ -135,6 +152,156 @@ class CustomerProfile extends Component
     }
 
     /* ---------------------------------------------------------------- */
+    /*  تیکت‌های پشتیبانی (گات: فقط با اشتراک فعال)                       */
+    /* ---------------------------------------------------------------- */
+
+    /** پیام یکسان گات — هم در UI هم در اکشن‌ها */
+    public static function ticketGateMessage(): string
+    {
+        return 'برای استفاده از پشتیبانی (ثبت تیکت) باید اشتراک فعال داشته باشید.';
+    }
+
+    public function openTicketForm(): void
+    {
+        if (!$this->canUseTickets()) {
+            $this->toast(self::ticketGateMessage(), 'error');
+
+            return;
+        }
+
+        $this->showTicketForm = true;
+        $this->openTicketId = null;
+    }
+
+    public function hideTicketForm(): void
+    {
+        $this->showTicketForm = false;
+    }
+
+    /** ثبت تیکت جدید (سؤال اصلی + اولین پاسخ مشتری) */
+    public function createTicket(): void
+    {
+        if (!$this->canUseTickets()) {
+            $this->toast(self::ticketGateMessage(), 'error');
+
+            return;
+        }
+
+        $data = $this->validate([
+            'ticketSubject' => ['required', 'string', 'min:3', 'max:150'],
+            'ticketBody'    => ['required', 'string', 'min:10', 'max:5000'],
+        ], [
+            'ticketSubject.required' => 'موضوع تیکت الزامی است.',
+            'ticketSubject.min'      => 'موضوع تیکت حداقل ۳ حرف است.',
+            'ticketSubject.max'      => 'موضوع تیکت حداکثر ۱۵۰ حرف است.',
+            'ticketBody.required'    => 'متن تیکت الزامی است.',
+            'ticketBody.min'         => 'متن تیکت حداقل ۱۰ حرف است — مشکل را کامل توضیح دهید.',
+            'ticketBody.max'         => 'متن تیکت حداکثر ۵۰۰۰ حرف است.',
+        ]);
+
+        $customer = $this->customer();
+        $subscription = app(SubscriptionService::class)->activePlanSubscriptions($customer)->first();
+
+        $ticket = Ticket::create([
+            'customer_id'    => $customer->id,
+            'subscription_id' => $subscription?->id,
+            'subject'        => trim($data['ticketSubject']),
+            'status'         => Ticket::STATUS_OPEN,
+        ]);
+
+        TicketReply::create([
+            'ticket_id'   => $ticket->id,
+            'author_type' => TicketReply::AUTHOR_CUSTOMER,
+            'body'        => trim($data['ticketBody']),
+        ]);
+
+        $this->reset('ticketSubject', 'ticketBody', 'showTicketForm');
+        $this->openTicketId = $ticket->id;
+        unset($this->myTickets);
+
+        $this->toast('تیکت شما ثبت شد؛ کارشناسان ما به‌زودی پاسخ می‌دهند.');
+    }
+
+    /** باز/بسته کردن گفتگوی یک تیکت */
+    public function toggleConversation(int $ticketId): void
+    {
+        $this->openTicketId = ($this->openTicketId === $ticketId) ? null : $ticketId;
+        $this->replyBody = '';
+    }
+
+    /** پاسخ مشتری به تیکت خودش */
+    public function replyToTicket(int $ticketId): void
+    {
+        $customer = $this->customer();
+
+        // گات: پاسخ‌دادن هم مثل ثبت تیکت نیاز به اشتراک فعال دارد
+        if (!$customer || !app(SubscriptionService::class)->canCreateTicket($customer)) {
+            $this->toast(self::ticketGateMessage(), 'error');
+
+            return;
+        }
+
+        $ticket = Ticket::query()
+            ->where('customer_id', $customer->id)
+            ->find($ticketId);
+
+        if (!$ticket) {
+            $this->toast('تیکت یافت نشد.', 'error');
+
+            return;
+        }
+
+        if ($ticket->isClosed()) {
+            $this->toast('این تیکت بسته شده است؛ برای موضوع جدید یک تیکت تازه بزنید.', 'warning');
+
+            return;
+        }
+
+        $data = $this->validate([
+            'replyBody' => ['required', 'string', 'min:2', 'max:5000'],
+        ], [
+            'replyBody.required' => 'متن پاسخ الزامی است.',
+            'replyBody.min'      => 'متن پاسخ حداقل ۲ حرف است.',
+            'replyBody.max'      => 'متن پاسخ حداکثر ۵۰۰۰ حرف است.',
+        ]);
+
+        TicketReply::create([
+            'ticket_id'   => $ticket->id,
+            'author_type' => TicketReply::AUTHOR_CUSTOMER,
+            'body'        => trim($data['replyBody']),
+        ]);
+
+        // پاسخ مشتری → وضعیت برمی‌گردد به «در انتظار پاسخ»
+        $ticket->update(['status' => Ticket::STATUS_OPEN, 'last_reply_at' => now()]);
+
+        $this->reset('replyBody');
+        unset($this->myTickets);
+
+        $this->toast('پاسخ شما ثبت شد.');
+    }
+
+    /** بستن تیکت توسط مشتری (مشکل حل شد) */
+    public function closeTicket(int $ticketId): void
+    {
+        $customer = $this->customer();
+
+        $ticket = Ticket::query()
+            ->where('customer_id', $customer?->id ?? 0)
+            ->find($ticketId);
+
+        if (!$ticket || $ticket->isClosed()) {
+            $this->toast('این تیکت بسته است.', 'warning');
+
+            return;
+        }
+
+        $ticket->update(['status' => Ticket::STATUS_CLOSED, 'last_reply_at' => now()]);
+        unset($this->myTickets);
+
+        $this->toast('تیکت بسته شد. برای موضوع جدید یک تیکت تازه بزنید.');
+    }
+
+    /* ---------------------------------------------------------------- */
     /*  Computed                                                         */
     /* ---------------------------------------------------------------- */
 
@@ -188,6 +355,41 @@ class CustomerProfile extends Component
     public function mySubscription()
     {
         return $this->customer()?->activePlanSubscription();
+    }
+
+    /** گات تیکت: آیا مشتری اجازهٔ استفاده از سیستم تیکت را دارد؟ (اشتراک فعال = شرط)
+     *  هم به‌صورت $this->canUseTickets (نشان Computed در ویو) و هم $this->canUseTickets() قابل استفاده است. */
+    #[Computed]
+    public function canUseTickets(): bool
+    {
+        $customer = $this->customer();
+
+        return $customer && app(SubscriptionService::class)->canCreateTicket($customer);
+    }
+
+    /** تیکت‌های مشتری با پاسخ‌ها */
+    #[Computed]
+    public function myTickets()
+    {
+        $customer = $this->customer();
+
+        if (!$customer) {
+            return Ticket::query()->whereRaw('1 = 0')->paginate(8, pageName: 'ticketsPage');
+        }
+
+        return $customer->tickets()
+            ->with(['replies', 'subscription:id,subscription_plan_id,status,expires_at'])
+            ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'answered' THEN 1 ELSE 2 END")
+            ->orderByDesc('id')
+            ->paginate(8, pageName: 'ticketsPage');
+    }
+
+    #[Computed]
+    public function ticketsCount(): int
+    {
+        $customer = $this->customer();
+
+        return $customer ? $customer->tickets()->count() : 0;
     }
 
     #[Computed]

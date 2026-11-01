@@ -61,10 +61,11 @@
     </section>
 
     {{-- ============ Tabs ============ --}}
-    <div class="flex items-center justify-center">
-        <div class="inline-flex rounded-2xl bg-zinc-200/70 p-1 dark:bg-zinc-800/70" role="tablist">
+    <div class="flex items-center justify-center px-3">
+        {{-- max-w-full + اسکرول افقی: با ۴ تب، در موبایل سرریز نمی‌کند (نوار پنهان) --}}
+        <div class="inline-flex max-w-full overflow-x-auto rounded-2xl bg-zinc-200/70 p-1 [scrollbar-width:none] dark:bg-zinc-800/70 [&::-webkit-scrollbar]:hidden" role="tablist">
             <button type="button" wire:click="switchTab('purchases')" role="tab"
-                    @class(['flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition-all',
+                    @class(['flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black transition-all',
                         $tab === 'purchases' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400'])
                     aria-current="{{ $tab === 'purchases' ? 'true' : 'false' }}">
                 <x-icon name="package" class="size-4" /> پکیج‌های من
@@ -73,7 +74,7 @@
                 @endif
             </button>
             <button type="button" wire:click="switchTab('licenses')" role="tab"
-                    @class(['flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition-all',
+                    @class(['flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black transition-all',
                         $tab === 'licenses' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400'])
                     aria-current="{{ $tab === 'licenses' ? 'true' : 'false' }}">
                 <x-icon name="shield-check" class="size-4" /> لایسنس‌ها
@@ -81,8 +82,17 @@
                     <span class="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] tabular-nums text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">{{ fa_num($this->stats['licenses_total']) }}</span>
                 @endif
             </button>
+            <button type="button" wire:click="switchTab('tickets')" role="tab"
+                    @class(['flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black transition-all',
+                        $tab === 'tickets' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400'])
+                    aria-current="{{ $tab === 'tickets' ? 'true' : 'false' }}">
+                <x-icon name="message-circle" class="size-4" /> تیکت‌های پشتیبانی
+                @if($this->ticketsCount)
+                    <span class="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] tabular-nums text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">{{ fa_num($this->ticketsCount) }}</span>
+                @endif
+            </button>
             <button type="button" wire:click="switchTab('info')" role="tab"
-                    @class(['flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-black transition-all',
+                    @class(['flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black transition-all',
                         $tab === 'info' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400'])
                     aria-current="{{ $tab === 'info' ? 'true' : 'false' }}">
                 <x-icon name="user-pen" class="size-4" /> مشخصات
@@ -237,6 +247,148 @@
                 <x-empty icon="shield-check"
                          title="لایسنسی یافت نشد"
                          description="{{ ($licenseSearch !== '' || $licenseStatus !== '') ? 'با این فیلترها لایسنسی یافت نشد؛ فیلترها را تغییر دهید.' : 'پس از خرید پکیج، لایسنس آن در این بخش نمایش داده می‌شود.' }}" />
+            </div>
+        @endif
+
+    {{-- ==================== TAB: تیکت‌های پشتیبانی ==================== --}}
+    @elseif($tab === 'tickets')
+        @php($gate = $this->canUseTickets)
+        @if(!$gate)
+            {{-- گات: بدون اشتراک فعال — پیام واضح به‌جای فرم --}}
+            <div class="card mx-auto max-w-xl p-6 text-center">
+                <span class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+                    <x-icon name="lock" class="size-7" />
+                </span>
+                <h3 class="mt-4 text-base font-black text-zinc-900 dark:text-zinc-50">پشتیبانی مخصوص مشتریانِ دارای اشتراک فعال است</h3>
+                <p class="mx-auto mt-2 max-w-sm text-sm leading-7 text-zinc-500 dark:text-zinc-400">
+                    برای ثبت تیکت و گفتگو با تیم پشتیبانی باید اشتراک فعال داشته باشید.
+                    با خرید هر طرح اشتراک، پشتیبانی فوری و ثبت تیکت برای شما باز می‌شود.
+                </p>
+                <div class="mt-5 flex flex-wrap items-center justify-center gap-2">
+                    <a href="{{ route('shop.subscriptions') }}" wire:navigate>
+                        <x-btn icon="crown">مشاهده طرح‌های اشتراک</x-btn>
+                    </a>
+                    @if($this->mySubscription)
+                        <a href="{{ route('shop.package', $this->mySubscription->plan?->slug ?? '') }}" wire:navigate>
+                            <x-btn variant="secondary" icon="external-link">طرح من</x-btn>
+                        </a>
+                    @endif
+                </div>
+            </div>
+        @else
+            <div class="space-y-4">
+                {{-- سربرگ: دکمهٔ تیکت جدید --}}
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+                        <span class="inline-flex size-2 rounded-full bg-emerald-500"></span>
+                        اشتراک شما فعال است — می‌توانید تیکت ثبت کنید.
+                    </p>
+                    @if(!$showTicketForm)
+                        <x-btn icon="plus" wire:click="openTicketForm" :loading="true">تیکت جدید</x-btn>
+                    @endif
+                </div>
+
+                {{-- فرم تیکت جدید --}}
+                @if($showTicketForm)
+                    <form wire:submit="createTicket" class="card space-y-4 p-5">
+                        <div class="flex items-center gap-2 border-b border-zinc-100 pb-3 dark:border-zinc-800">
+                            <x-icon name="message-circle" class="size-5 text-brand-600" />
+                            <h3 class="text-sm font-black text-zinc-900 dark:text-zinc-50">ثبت تیکت جدید</h3>
+                        </div>
+
+                        <x-field label="موضوع" for="ticket-subject" required>
+                            <x-input id="ticket-subject" wire:model="ticketSubject" placeholder="مثلاً: خطا در نصب پکیج روی سایت" class="{{ $errors->has('ticketSubject') ? 'input-error' : '' }}" />
+                            @error('ticketSubject') <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ $message }}</p> @enderror
+                        </x-field>
+
+                        <x-field label="توضیحات" for="ticket-body" required hint="مشکل را کامل توضیح دهید؛ اگر خطا دارید متن خطا را هم بنویسید.">
+                            <textarea id="ticket-body" wire:model="ticketBody" rows="5" placeholder="توضیح کامل مشکل…"
+                                      class="input {{ $errors->has('ticketBody') ? 'input-error' : '' }}"></textarea>
+                            @error('ticketBody') <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ $message }}</p> @enderror
+                        </x-field>
+
+                        <div class="flex items-center justify-start gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
+                            <x-btn type="submit" icon="send" :loading="true">ارسال تیکت</x-btn>
+                            <x-btn type="button" variant="secondary" wire:click="hideTicketForm">انصراف</x-btn>
+                        </div>
+                    </form>
+                @endif
+
+                {{-- لیست تیکت‌ها --}}
+                @forelse($this->myTickets as $ticket)
+                    <div wire:key="ticket-{{ $ticket->id }}" class="card overflow-hidden p-0">
+                        {{-- ردیف تیکت --}}
+                        <button type="button" wire:click="toggleConversation({{ $ticket->id }})"
+                                class="flex w-full cursor-pointer flex-wrap items-center gap-3 p-4 text-start transition-colors hover:bg-zinc-50/80 sm:p-5 dark:hover:bg-zinc-800/40">
+                            <span class="flex size-9 shrink-0 items-center justify-center rounded-xl {{ $ticket->isClosed() ? 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800' : 'bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400' }}">
+                                <x-icon name="{{ $ticket->isClosed() ? 'check-circle' : 'message-circle' }}" class="size-4.5" />
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="flex flex-wrap items-center gap-2">
+                                    <span class="truncate text-sm font-black text-zinc-900 dark:text-zinc-50">{{ $ticket->subject }}</span>
+                                    @if($ticket->isOpen())
+                                        <x-badge variant="warning" icon="clock">در انتظار پاسخ</x-badge>
+                                    @elseif($ticket->isAnswered())
+                                        <x-badge variant="success" icon="corner-up-left">پاسخ داده شد</x-badge>
+                                    @else
+                                        <x-badge variant="neutral" icon="archive">بسته‌شده</x-badge>
+                                    @endif
+                                </span>
+                                <span class="mt-1 block text-xs text-zinc-400">
+                                    {{ verta_date($ticket->created_at) }} · {{ fa_num($ticket->replies->count()) }} پیام
+                                    @if($openTicketId === $ticket->id) · برای بستن کلیک کنید @else · برای گفتگو کلیک کنید @endif
+                                </span>
+                            </span>
+                            <x-icon name="chevron-down" class="size-4 shrink-0 text-zinc-400 {{ $openTicketId === $ticket->id ? 'rotate-180 transition-transform' : '' }}" />
+                        </button>
+
+                        {{-- گفتگو --}}
+                        @if($openTicketId === $ticket->id)
+                            <div class="space-y-3 border-t border-zinc-100 bg-zinc-50/60 p-4 sm:p-5 dark:border-zinc-800 dark:bg-zinc-800/30">
+                                @foreach($ticket->replies as $reply)
+                                    <div wire:key="reply-{{ $reply->id }}"
+                                         class="flex flex-col gap-1.5 rounded-2xl p-4 ring-1 {{ $reply->isFromAdmin()
+                                             ? 'bg-brand-50/80 ring-brand-100 dark:bg-brand-500/10 dark:ring-brand-400/20'
+                                             : 'bg-white ring-zinc-200/70 dark:bg-zinc-900 dark:ring-zinc-700/60' }}">
+                                        <p class="flex items-center gap-2 text-xs font-black {{ $reply->isFromAdmin() ? 'text-brand-700 dark:text-brand-400' : 'text-zinc-600 dark:text-zinc-300' }}">
+                                            <x-icon name="{{ $reply->isFromAdmin() ? 'badge-check' : 'user' }}" class="size-3.5" />
+                                            {{ $reply->authorLabel() }}
+                                            <span class="font-medium text-zinc-400">{{ verta_date($reply->created_at) }}</span>
+                                        </p>
+                                        <p class="whitespace-pre-line text-sm leading-7 text-zinc-700 dark:text-zinc-200">{{ $reply->body }}</p>
+                                    </div>
+                                @endforeach
+
+                                {{-- فرم پاسخ مشتری (تیکت باز) --}}
+                                @if(!$ticket->isClosed())
+                                    <form wire:submit="replyToTicket({{ $ticket->id }})" class="flex items-end gap-2 pt-1">
+                                        <div class="flex-1">
+                                            <textarea wire:model="replyBody" rows="2" placeholder="پاسخ خود را بنویسید…"
+                                                      class="input {{ $errors->has('replyBody') ? 'input-error' : '' }}"></textarea>
+                                            @error('replyBody') <p class="mt-1 text-xs text-rose-600 dark:text-rose-400">{{ $message }}</p> @enderror
+                                        </div>
+                                        <x-btn type="submit" icon="send" :loading="true">ارسال</x-btn>
+                                    </form>
+                                    <div class="flex items-center justify-end">
+                                        <x-btn variant="secondary" size="sm" icon="archive" wire:click="closeTicket({{ $ticket->id }})">مشکل حل شد — بستن تیکت</x-btn>
+                                    </div>
+                                @else
+                                    <p class="rounded-xl bg-zinc-100 p-3 text-center text-xs text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400">
+                                        این تیکت بسته شده است؛ برای موضوع جدید یک تیکت تازه ثبت کنید.
+                                    </p>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
+                @empty
+                    <div class="card">
+                        <x-empty icon="message-circle"
+                                 title="تیکتی یافت نشد"
+                                 description="هنوز تیکتی ثبت نکرده‌اید. با «تیکت جدید» سؤال یا مشکل خود را مطرح کنید." />
+                    </div>
+                @endforelse
+
+                <div>{{ $this->myTickets->links() }}</div>
             </div>
         @endif
 

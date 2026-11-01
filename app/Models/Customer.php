@@ -59,6 +59,12 @@ class Customer extends Model implements AuthenticatableContract
         return $this->hasMany(PackagePurchase::class);
     }
 
+    /** تیکت‌های پشتیبانی این مشتری */
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class);
+    }
+
     /** لایسنس‌های پکیج این مشتری */
     public function licenses(): HasMany
     {

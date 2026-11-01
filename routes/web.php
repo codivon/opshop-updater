@@ -184,6 +184,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', \App\Http\Middleware
     Route::get('subscription-plans', \App\Livewire\Plans\Index::class)->name('plans.index');
     Route::get('subscription-orders', \App\Livewire\Subscriptions\Orders::class)->name('subscriptions.orders');
 
+    // تیکت‌های پشتیبانی (فقط مشتریِ دارای اشتراک فعال می‌تواند تیکت ثبت کند)
+    Route::get('tickets', \App\Livewire\Tickets\Index::class)->name('tickets.index');
+
     // سیستم
     Route::get('reports', \App\Livewire\Reports\Index::class)->name('reports.index');
     Route::get('logs', \App\Livewire\Logs\Index::class)->name('logs.index');
