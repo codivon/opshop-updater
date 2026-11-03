@@ -1,5 +1,9 @@
 {{--
-    کپچای خودمیزبان (سؤال ریاضی از CaptchaService) — برای فرم‌های Livewire و کلاسیک.
+    کپچای خودمیزبان — «تصویر PNG» سؤال امنیتی (CaptchaImageRenderer) برای فرم‌های Livewire و کلاسیک.
+
+    چرا تصویر؟ سؤال متنی در HTML با اسکریپت (regex + محاسبه) قابل حل است؛ تصویرِ دارای
+    نویز/چرخش نیاز به OCR دارد. پاسخ فقط در سشن سرور است و هیچ‌جا در HTML نمی‌آید.
+    تصویر و کادر آن قابل کلیک‌اند = «سؤال دیگر».
 
     استفاده در کامپوننت Livewire (با متد refreshCaptcha() روی همان کامپوننت):
         <x-captcha wireTarget="captcha" refreshWire="refreshCaptcha" />
@@ -14,15 +18,35 @@
     'label'       => 'سؤال امنیتی',
 ])
 
-@php($question = \App\Services\CaptchaService::question())
+@php($version = \App\Services\CaptchaService::version())
 
 <div {{ $attributes->merge(['class' => 'space-y-1.5']) }}>
     <div class="flex items-center justify-between gap-2 rounded-xl bg-zinc-50 px-3.5 py-2.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/60">
-        <span class="flex items-center gap-2 text-sm">
+        <span class="flex min-w-0 items-center gap-2 text-sm">
             <x-icon name="shield-check" class="size-4.5 shrink-0 text-brand-600 dark:text-brand-400" />
             <span class="font-medium text-zinc-600 dark:text-zinc-300">{{ $label }}:</span>
-            <span class="font-black tabular-nums text-zinc-900 dark:text-zinc-50" dir="ltr">{{ $question }} = ؟</span>
         </span>
+
+        {{-- تصویر سؤال — قابل کلیک برای سؤال دیگر؛ v= نسخهٔ سشن برای cache-busting --}}
+        @if($refreshWire)
+            <button type="button" wire:click="{{ $refreshWire }}" wire:loading.attr="disabled"
+                    class="inline-flex shrink-0 cursor-pointer items-center rounded-lg bg-white p-1 ring-1 ring-zinc-200/80 transition-opacity hover:opacity-75 dark:bg-white dark:ring-zinc-300/40"
+                    title="سؤال دیگر — برای خوانایی کلیک کنید">
+                <img src="{{ route('captcha.image') }}?v={{ $version }}"
+                     alt="تصویر سؤال امنیتی؛ دو عدد و عملگر را بخوانید"
+                     width="120" height="38"
+                     class="block h-9 w-auto select-none" draggable="false" />
+            </button>
+        @else
+            <a href="{{ route('captcha.refresh') }}"
+               class="inline-flex shrink-0 items-center rounded-lg bg-white p-1 ring-1 ring-zinc-200/80 transition-opacity hover:opacity-75 dark:bg-white dark:ring-zinc-300/40"
+               title="سؤال دیگر — برای خوانایی کلیک کنید">
+                <img src="{{ route('captcha.image') }}?v={{ $version }}"
+                     alt="تصویر سؤال امنیتی؛ دو عدد و عملگر را بخوانید"
+                     width="120" height="38"
+                     class="block h-9 w-auto select-none" draggable="false" />
+            </a>
+        @endif
 
         @if($refreshWire)
             <button type="button" wire:click="{{ $refreshWire }}" wire:loading.attr="disabled"

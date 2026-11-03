@@ -120,9 +120,13 @@ Route::get('get-update/{code}', [UpdateDownloadController::class, 'download'])
 
 /*
 |--------------------------------------------------------------------------
-| کپچای خودمیزبان — تازه‌سازی سؤال امنیتی (لینک «سؤال دیگر» فرم‌های کلاسیک)
+| کپچای خودمیزبان — تصویر سؤال + تازه‌سازی (لینک «سؤال دیگر» فرم‌های کلاسیک)
 |--------------------------------------------------------------------------
 */
+Route::get('captcha/image', [\App\Http\Controllers\CaptchaImageController::class, 'show'])
+    ->name('captcha.image')
+    ->middleware('throttle:120,1');
+
 Route::get('captcha/refresh', function () {
     \App\Services\CaptchaService::fresh();
 
