@@ -282,6 +282,135 @@ class HomeShowcaseTest extends TestCase
         $this->assertDatabaseMissing('home_slides', ['id' => $second->id]);
     }
 
+    /* -------------------------------------------------------------- */
+    /*  شخصی‌سازی کامل اسلایدها و اسلایدر (Task 73) */
+    /* -------------------------------------------------------------- */
+
+    public function test_slide_customization_persists_and_flows_to_homepage(): void
+    {
+        $this->actingAs($this->admin);
+
+        Livewire::test(SettingsHomePage::class)
+            ->call('newSlide')
+            ->set('slide.title', 'اسلاید شخصی‌سازی‌شده')
+            ->set('slide.link', 'https://example.com/external')
+            ->set('slide.link_text', 'برو بیرون')
+            ->set('slide.content_align', 'center')
+            ->set('slide.content_vpos', 'bottom')
+            ->set('slide.button_style', 'soft')
+            ->set('slide.overlay', 55)
+            ->set('slide.new_tab', true)
+            ->set('slide.sort_order', 1)
+            ->call('saveSlide')
+            ->assertHasNoErrors();
+
+        $slide = HomeSlide::query()->where('title', 'اسلاید شخصی‌سازی‌شده')->firstOrFail();
+
+        $this->assertSame('center', $slide->content_align);
+        $this->assertSame('bottom', $slide->content_vpos);
+        $this->assertSame('soft', $slide->button_style);
+        $this->assertSame(55, $slide->overlay);
+        $this->assertTrue($slide->new_tab);
+
+        // صفحهٔ اصلی: جایگاه محتوا، استایل دکمهٔ ملایم، overlay عددی و تب جدید
+        $response = $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertSee('اسلاید شخصی‌سازی‌شده');
+
+        $html = $response->getContent();
+
+        $this->assertStringContainsString('justify-end', $html);          // vpos=bottom
+        $this->assertStringContainsString('text-center', $html);         // align=center
+        $this->assertStringContainsString('mx-auto', $html);             // align=center → بلوک وسط
+        $this->assertStringContainsString('rgba(9, 9, 11, 0.55)', $html); // overlay=55 inline
+        $this->assertStringContainsString('bg-white/15', $html);         // button_style=soft
+        $this->assertStringContainsString('target="_blank"', $html);     // new_tab=true
+
+        // خروجی یکسان‌شدهٔ Showcase ساختار کامل دارد
+        $shaped = Showcase::slides()[0];
+        $this->assertSame('center', $shaped['content_align']);
+        $this->assertSame('bottom', $shaped['content_vpos']);
+        $this->assertSame('soft', $shaped['button_style']);
+        $this->assertSame(55, $shaped['overlay']);
+        $this->assertTrue($shaped['new_tab']);
+    }
+
+    public function test_slide_customization_validations(): void
+    {
+        $this->actingAs($this->admin);
+
+        Livewire::test(SettingsHomePage::class)
+            ->call('newSlide')
+            ->set('slide.title', 'اعتبارسنجی')
+            ->set('slide.content_align', 'diagonal')
+            ->set('slide.content_vpos', 'sideways')
+            ->set('slide.button_style', 'neon')
+            ->set('slide.overlay', 120)
+            ->call('saveSlide')
+            ->assertHasErrors(['slide.content_align', 'slide.content_vpos', 'slide.button_style', 'slide.overlay']);
+    }
+
+    public function test_slider_behavior_settings_are_customizable(): void
+    {
+        $this->actingAs($this->admin);
+
+        Livewire::test(SettingsHomePage::class)
+            ->set('form.home_showcase_eyebrow', 'برچسب اسلایدر')
+            ->set('form.home_showcase_heading', 'عنوان اختصاصی اسلایدر')
+            ->set('form.home_showcase_autoplay', false)
+            ->set('form.home_showcase_autoplay_speed', 9)
+            ->set('form.home_showcase_dots', false)
+            ->set('form.home_showcase_arrows', false)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertSee('عنوان اختصاصی اسلایدر')
+            ->assertSee('برچسب اسلایدر')
+            // پخش خودکار خاموش → پارامتر Alpine
+            ->assertSee('showcaseSlider(')
+            // دات‌ها خاموش → تب ناوبری رندر نمی‌شود
+            ->assertDontSee('role="tablist"');
+
+        $html = $this->get(route('shop.home'))->getContent();
+
+        // autoplay=false → false به Alpine پاس می‌شود؛ سرعت ۹ ثانیه → ۹۰۰۰
+        $this->assertStringContainsString('false, 9000', $html);
+        // فلش‌های ناوبری رندر نشده‌اند
+        $this->assertStringNotContainsString('aria-label="اسلاید قبلی"', $html);
+    }
+
+    public function test_slider_behavior_validates_autoplay_speed_range(): void
+    {
+        $this->actingAs($this->admin);
+
+        Livewire::test(SettingsHomePage::class)
+            ->set('form.home_showcase_autoplay_speed', 2)
+            ->call('save')
+            ->assertHasErrors(['form.home_showcase_autoplay_speed']);
+
+        Livewire::test(SettingsHomePage::class)
+            ->set('form.home_showcase_autoplay_speed', 16)
+            ->call('save')
+            ->assertHasErrors(['form.home_showcase_autoplay_speed']);
+    }
+
+    public function test_default_slides_have_auto_customization_shape(): void
+    {
+        $slides = Showcase::slides();
+
+        $this->assertNotEmpty($slides);
+
+        foreach ($slides as $slide) {
+            $this->assertSame('start', $slide['content_align']);
+            $this->assertSame('center', $slide['content_vpos']);
+            $this->assertSame('solid', $slide['button_style']);
+            $this->assertNull($slide['overlay']);
+            $this->assertFalse($slide['new_tab']);
+        }
+    }
+
     public function test_panel_validates_slide_title(): void
     {
         $this->actingAs($this->admin);

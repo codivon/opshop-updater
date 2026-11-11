@@ -1,5 +1,8 @@
-@extends('errors::minimal')
-
-@section('title', __('Page Expired'))
-@section('code', '419')
-@section('message', __('Page Expired'))
+{{-- ۴۱۹ — منقضی‌شدن صفحه (توکن CSRF) — Task 73: طراحی مدرن فارسی --}}
+@include('errors.modern', [
+    'code' => '۴۱۹',
+    'icon' => 'clock',
+    'tone' => 'amber',
+    'title' => 'صفحه منقضی شد',
+    'message' => 'این صفحه مدت زیادی باز مانده بود؛ صفحه را دوباره بارگذاری کنید و یک‌بار دیگر تلاش کنید.',
+])

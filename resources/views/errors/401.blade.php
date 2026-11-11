@@ -1,5 +1,8 @@
-@extends('errors::minimal')
-
-@section('title', __('Unauthorized'))
-@section('code', '401')
-@section('message', __('Unauthorized'))
+{{-- ۴۰۱ — احراز هویت لازم است (Task 73: طراحی مدرن فارسی) --}}
+@include('errors.modern', [
+    'code' => '۴۰۱',
+    'icon' => 'shield',
+    'tone' => 'sky',
+    'title' => 'ابتدا وارد شوید',
+    'message' => 'برای مشاهدهٔ این بخش باید وارد حساب کاربری خود شوید.',
+])

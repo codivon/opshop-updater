@@ -43,6 +43,11 @@ class Showcase
                 image: $slide->image !== null ? template_asset_url($slide->image) : null,
                 link: (string) $slide->link,
                 linkText: (string) $slide->link_text,
+                contentAlign: $slide->content_align,
+                contentVpos: $slide->content_vpos,
+                buttonStyle: $slide->button_style,
+                overlay: $slide->overlay,
+                newTab: $slide->new_tab,
             ))
             ->all();
 
@@ -93,8 +98,23 @@ class Showcase
         );
     }
 
-    private static function format(string $badge, string $title, string $text, ?string $image, string $link, string $linkText): array
-    {
+    /**
+     * آرایهٔ یکسان‌شدهٔ اسلاید برای ویو — دستی و پیش‌فرض هر دو ساختار دارند؛
+     * اسلایدهای پیش‌فرض با موقعیت/استایل «خودکار» (رفتار همیشگی) هستند.
+     */
+    private static function format(
+        string $badge,
+        string $title,
+        string $text,
+        ?string $image,
+        string $link,
+        string $linkText,
+        string $contentAlign = 'start',
+        string $contentVpos = 'center',
+        string $buttonStyle = 'solid',
+        ?int $overlay = null,
+        bool $newTab = false,
+    ): array {
         return [
             'badge' => trim($badge),
             'title' => trim($title),
@@ -102,6 +122,11 @@ class Showcase
             'image' => $image,
             'link' => trim($link),
             'link_text' => trim($linkText) ?: 'مشاهده',
+            'content_align' => array_key_exists($contentAlign, HomeSlide::ALIGNS) ? $contentAlign : 'start',
+            'content_vpos' => array_key_exists($contentVpos, HomeSlide::VPOSS) ? $contentVpos : 'center',
+            'button_style' => array_key_exists($buttonStyle, HomeSlide::BUTTON_STYLES) ? $buttonStyle : 'solid',
+            'overlay' => $overlay !== null ? max(0, min(HomeSlide::OVERLAY_MAX, $overlay)) : null,
+            'new_tab' => $newTab,
         ];
     }
 }

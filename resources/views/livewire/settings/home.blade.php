@@ -143,7 +143,7 @@
                 </div>
             </x-slot:hero>
 
-            {{-- ==================== اسلایدر معرفی (Task 71) ==================== --}}
+            {{-- ==================== اسلایدر معرفی (Task 71 + Task 73) ==================== --}}
             <x-slot:showcase>
                 <div class="space-y-6">
                     {{-- راهنمای قاعدهٔ نمایش --}}
@@ -151,8 +151,48 @@
                         <strong class="font-black">قاعدهٔ نمایش:</strong>
                         تا وقتی هیچ اسلاید دستیِ فعالی نداشته باشید، اسلایدر به‌صورت خودکار از «پکیج‌های فعال» + «بنر ویژهٔ InstaShop» ساخته می‌شود.
                         با افزودن اولین اسلاید دستی، فقط اسلایدهای دستی نمایش داده می‌شوند (برای بازگشت به پیش‌فرض، همهٔ اسلایدهای دستی را حذف یا غیرفعال کنید).
-                        اکشن‌های اسلاید (افزودن/ویرایش/حذف/ترتیب) بلافاصله ذخیره می‌شوند؛ کلیدهای روشن/خاموش و متن‌های بنر InstaShop با «ذخیره تنظیمات» اعمال می‌شوند.
+                        اکشن‌های اسلاید (افزودن/ویرایش/حذف/ترتیب) بلافاصله ذخیره می‌شوند؛ کلیدهای روشن/خاموش، تنظیمات نمایش و متن‌های بنر InstaShop با «ذخیره تنظیمات» اعمال می‌شوند.
                     </div>
+
+                    {{-- تنظیمات نمایش اسلایدر (Task 73) — بخشی از فرم اصلی --}}
+                    <x-card title="تنظیمات نمایش اسلایدر" subtitle="رفتار و ظاهر کلی اسلایدر — با دکمهٔ «ذخیره تنظیمات» پایین صفحه اعمال می‌شود.">
+                        <div class="space-y-5">
+                            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">نمایش سربرگ بخش (برچسب + عنوان بالای اسلایدر)</span>
+                                <x-toggle wire:model="form.home_showcase_header_enabled" id="home_showcase_header_enabled" />
+                            </div>
+
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <x-field label="برچسب کوچک سربرگ" for="showcase_eyebrow" hint="خالی = مخفی">
+                                    <x-input id="showcase_eyebrow" wire:model="form.home_showcase_eyebrow" placeholder="ویترین محصولات" />
+                                </x-field>
+                                <x-field label="عنوان سربرگ" for="showcase_heading" hint="خالی = مخفی">
+                                    <x-input id="showcase_heading" wire:model="form.home_showcase_heading" placeholder="محصولات ویژهٔ ما را ببینید" />
+                                </x-field>
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">پخش خودکار اسلایدها</span>
+                                <x-toggle wire:model="form.home_showcase_autoplay" id="home_showcase_autoplay" />
+                            </div>
+
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <x-field label="سرعت پخش خودکار (ثانیه)" for="showcase_autoplay_speed" hint="بین ۳ تا ۱۵ ثانیه">
+                                    <x-input id="showcase_autoplay_speed" wire:model="form.home_showcase_autoplay_speed" type="number" min="3" max="15" dir="ltr" :error="'form.home_showcase_autoplay_speed'" />
+                                </x-field>
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">دات‌های ناوبری (پایین اسلایدر)</span>
+                                <x-toggle wire:model="form.home_showcase_dots" id="home_showcase_dots" />
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">فلش‌های قبلی/بعدی (دسکتاپ)</span>
+                                <x-toggle wire:model="form.home_showcase_arrows" id="home_showcase_arrows" />
+                            </div>
+                        </div>
+                    </x-card>
 
                     {{-- پیش‌فرض‌ها — بخشی از فرم اصلی (ذخیره با دکمهٔ «ذخیره تنظیمات») --}}
                     <x-card title="پیش‌فرض‌ها (وقتی اسلاید دستی فعال ندارید)" subtitle="بنر خودکار پکیج‌ها: از تصویر/عنوان/متن هر پکیج فعال. بنر ویژهٔ InstaShop: تصویر اختصاصی با متن قابل ویرایش.">
@@ -204,7 +244,10 @@
                                     @endif
 
                                     <div class="min-w-0 flex-1">
-                                        <p class="truncate text-sm font-black text-zinc-900 dark:text-zinc-50">{{ $s->title }}</p>
+                                        <p class="truncate text-sm font-black text-zinc-900 dark:text-zinc-50">
+                                            <span class="me-1.5 inline-flex size-5 items-center justify-center rounded-md bg-zinc-200/80 text-[10px] font-black text-zinc-600 dark:bg-zinc-700/80 dark:text-zinc-300">{{ fa_num($loop->index + 1) }}</span>
+                                            {{ $s->title }}
+                                        </p>
                                         <p class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
                                             @if($s->badge)
                                                 <span class="rounded-full bg-zinc-200/70 px-2 py-0.5 dark:bg-zinc-700/70">{{ $s->badge }}</span>
@@ -212,6 +255,7 @@
                                             @if($s->link)
                                                 <span class="inline-flex items-center gap-1"><x-icon name="link" class="size-3" /> دکمه دارد</span>
                                             @endif
+                                            <span class="inline-flex items-center gap-1"><x-icon name="move" class="size-3" /> جایگاه {{ fa_num($s->sort_order) }}</span>
                                             <span class="{{ $s->is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400' }}">
                                                 {{ $s->is_active ? 'فعال' : 'غیرفعال' }}
                                             </span>
@@ -288,6 +332,24 @@
                                         <x-field label="لینک دکمه (اختیاری)" for="slide_link" class="sm:col-span-2" :error="'slide.link'">
                                             <x-input id="slide_link" wire:model="slide.link" wire:keydown.enter.prevent="saveSlide" dir="ltr" placeholder="https:// یا /packages/…" />
                                         </x-field>
+
+                                        {{-- شخصی‌سازی جایگاه و ظاهر (Task 73) --}}
+                                        <x-field label="جایگاه اسلاید" for="slide_sort_order" hint="عدد کوچک‌تر = نمایش زودتر؛ فلش‌ها هم همین را تغییر می‌دهند">
+                                            <x-input id="slide_sort_order" wire:model="slide.sort_order" type="number" min="1" max="999" dir="ltr" :error="'slide.sort_order'" />
+                                        </x-field>
+                                        <x-field label="محل افقی محتوا" for="slide_align">
+                                            <x-select id="slide_align" wire:model="slide.content_align" :options="\App\Models\HomeSlide::ALIGNS" />
+                                        </x-field>
+                                        <x-field label="محل عمودی محتوا" for="slide_vpos">
+                                            <x-select id="slide_vpos" wire:model="slide.content_vpos" :options="\App\Models\HomeSlide::VPOSS" />
+                                        </x-field>
+                                        <x-field label="استایل دکمه" for="slide_button_style">
+                                            <x-select id="slide_button_style" wire:model="slide.button_style" :options="\App\Models\HomeSlide::BUTTON_STYLES" />
+                                        </x-field>
+                                        <x-field label="شدت تیرگی روی تصویر (٪)" for="slide_overlay" hint="خالی = خودکار (گرادیان هوشمند)؛ ۰ تا ۹۰">
+                                            <x-input id="slide_overlay" wire:model="slide.overlay" type="number" min="0" max="90" dir="ltr" placeholder="خودکار" :error="'slide.overlay'" />
+                                        </x-field>
+
                                         <x-field label="تصویر اسلاید (اختیاری — JPG/PNG/WEBP تا ۳MB)" for="slide_image" class="sm:col-span-2" :error="'slideImage'">
                                             <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" wire:model="slideImage" id="slide_image" class="input" />
                                             <x-upload-progress target="slideImage" label="در حال آپلود تصویر اسلاید" />
@@ -298,10 +360,16 @@
                                     </div>
 
                                     <div class="flex flex-wrap items-center justify-between gap-3">
-                                        <label class="flex cursor-pointer items-center gap-2 text-sm font-bold text-zinc-700 dark:text-zinc-200">
-                                            <input type="checkbox" wire:model="slide.is_active" class="checkbox" />
-                                            فعال (نمایش در صفحهٔ اصلی)
-                                        </label>
+                                        <span class="flex flex-wrap items-center gap-4">
+                                            <label class="flex cursor-pointer items-center gap-2 text-sm font-bold text-zinc-700 dark:text-zinc-200">
+                                                <input type="checkbox" wire:model="slide.is_active" class="checkbox" />
+                                                فعال (نمایش در صفحهٔ اصلی)
+                                            </label>
+                                            <label class="flex cursor-pointer items-center gap-2 text-sm font-bold text-zinc-700 dark:text-zinc-200">
+                                                <input type="checkbox" wire:model="slide.new_tab" class="checkbox" />
+                                                باز شدن دکمه در تب جدید
+                                            </label>
+                                        </span>
                                         <span class="flex items-center gap-2">
                                             <button type="button" wire:click="closeSlideForm"
                                                     class="rounded-xl px-4 py-2 text-sm font-bold text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800">

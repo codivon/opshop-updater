@@ -259,6 +259,64 @@ class DeveloperSettingsTest extends TestCase
             ->assertDispatched('toast');
     }
 
+    /* -------------------------------------------------------------- */
+    /*  نشست ازدست‌رفته (Task 73) — مهمان به‌جای 403 به ورود برمی‌گردد */
+    /* -------------------------------------------------------------- */
+
+    public function test_guest_action_redirects_to_login_instead_of_403(): void
+    {
+        // شبیه‌سازی «تب باز + سشن مرده»: کامپوننت با کاربر لاگین‌کرده بالا
+        // می‌آید، سپس سشن/کاربر از بین می‌رود و اکشن با مهمان اجرا می‌شود —
+        // قبلاً این حالت 403 گمراه‌کننده می‌داد، حالا به ورود برمی‌گردد.
+        $this->actingAs($this->admin);
+
+        $component = Livewire::test(Developer::class);
+
+        auth()->logout();
+
+        $component->call('clearCache', 'all')
+            ->assertRedirect(route('login'));
+
+        // اکشن‌های دیگر هم همین رفتار را دارند (هر بار بوت تازه + خروج)
+        foreach (['runMigrations', 'saveDebug', 'saveEnvironment', 'optimize'] as $action) {
+            $this->actingAs($this->admin);
+
+            $component = Livewire::test(Developer::class);
+            auth()->logout();
+
+            $component->call($action)
+                ->assertRedirect(route('login'));
+        }
+
+        // خودِ رندر اولیهٔ مهمان هم 403 نیست — redirect است
+        $this->actingAs($this->admin);
+        auth()->logout();
+        $this->get(route('admin.settings.developer'))
+            ->assertRedirect(route('login'));
+    }
+
+    /** پاک‌سازی کش نباید احراز هویت کاربر جاری را بشکند (نجات سشن در runCacheCommand) */
+    public function test_cache_clear_keeps_current_session_alive(): void
+    {
+        $this->actingAs($this->admin);
+
+        // cache:clear — خطرناک‌ترین هدف برای سشن (استور مشترک)
+        Livewire::test(Developer::class)
+            ->call('clearCache', 'app')
+            ->assertDispatched('toast')
+            ->assertNoRedirect();
+
+        // کاربر همچنان احراز هویت است (برخلاف حالت مهمان که redirect می‌گیرد)
+        $this->assertAuthenticatedAs($this->admin);
+
+        // اکشن «همهٔ کش‌ها» هم وضعیت لاگین را نمی‌شکند
+        Livewire::test(Developer::class)
+            ->call('clearCache', 'all')
+            ->assertDispatched('toast');
+
+        $this->assertAuthenticatedAs($this->admin);
+    }
+
     public function test_optimize_runs(): void
     {
         $this->actingAs($this->admin);

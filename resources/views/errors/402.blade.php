@@ -1,5 +1,8 @@
-@extends('errors::minimal')
-
-@section('title', __('Payment Required'))
-@section('code', '402')
-@section('message', __('Payment Required'))
+{{-- ۴۰۲ — Payment Required (Task 73: هم‌خانوادهٔ طراحی مدرن) --}}
+@include('errors.modern', [
+    'code' => '۴۰۲',
+    'icon' => 'shield',
+    'tone' => 'sky',
+    'title' => 'درخواست پرداخت',
+    'message' => 'برای دسترسی به این بخش، پرداخت یا اشتراک معتبر لازم است.',
+])

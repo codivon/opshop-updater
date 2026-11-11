@@ -1,5 +1,8 @@
-@extends('errors::minimal')
-
-@section('title', __('Not Found'))
-@section('code', '404')
-@section('message', __('Not Found'))
+{{-- ۴۰۴ — صفحه پیدا نشد (Task 73: طراحی مدرن فارسی) --}}
+@include('errors.modern', [
+    'code' => '۴۰۴',
+    'icon' => 'compass',
+    'tone' => 'brand',
+    'title' => 'صفحه پیدا نشد',
+    'message' => 'آدرسی که دنبالش بودید وجود ندارد یا جابه‌جا شده است. از دکمه‌های زیر ادامه دهید یا آدرس را بازبینی کنید.',
+])

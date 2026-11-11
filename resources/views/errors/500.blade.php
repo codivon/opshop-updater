@@ -1,5 +1,8 @@
-@extends('errors::minimal')
-
-@section('title', __('Server Error'))
-@section('code', '500')
-@section('message', __('Server Error'))
+{{-- ۵۰۰ — خطای غیرمنتظرهٔ سرور (Task 73: طراحی مدرن فارسی) --}}
+@include('errors.modern', [
+    'code' => '۵۰۰',
+    'icon' => 'crash',
+    'tone' => 'amber',
+    'title' => 'خطای غیرمنتظره',
+    'message' => 'مشکلی در سرور پیش آمد؛ چند لحظه بعد دوباره تلاش کنید. اگر مشکل باقی ماند، تیم فنی در جریان است.',
+])

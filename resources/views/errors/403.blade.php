@@ -1,5 +1,10 @@
-@extends('errors::minimal')
-
-@section('title', __('Forbidden'))
-@section('code', '403')
-@section('message', __($exception->getMessage() ?: 'Forbidden'))
+{{-- ۴۰۳ — دسترسی غیرمجاز (Task 73: طراحی مدرن فارسی) — پیام abort از $exception می‌آید --}}
+@include('errors.modern', [
+    'code' => '۴۰۳',
+    'icon' => 'lock',
+    'tone' => 'rose',
+    'title' => 'دسترسی غیرمجاز',
+    'message' => ($exception->getMessage() ?? '') !== ''
+        ? $exception->getMessage()
+        : 'شما اجازهٔ دسترسی به این بخش را ندارید؛ اگر فکر می‌کنید این یک اشتباه است، با مدیر سامانه تماس بگیرید.',
+])

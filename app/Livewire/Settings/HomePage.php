@@ -302,7 +302,13 @@ class HomePage extends Component
             'text' => '',
             'link' => '',
             'link_text' => '',
+            'content_align' => 'start',
+            'content_vpos' => 'center',
+            'button_style' => 'solid',
+            'overlay' => null,
+            'new_tab' => false,
             'is_active' => true,
+            'sort_order' => (int) HomeSlide::query()->max('sort_order') + 1,
         ];
         $this->showSlideForm = true;
     }
@@ -320,7 +326,13 @@ class HomePage extends Component
             'text' => (string) $slide->text,
             'link' => (string) $slide->link,
             'link_text' => (string) $slide->link_text,
+            'content_align' => (string) $slide->content_align,
+            'content_vpos' => (string) $slide->content_vpos,
+            'button_style' => (string) $slide->button_style,
+            'overlay' => $slide->overlay,
+            'new_tab' => $slide->new_tab,
             'is_active' => $slide->is_active,
+            'sort_order' => (int) $slide->sort_order,
         ];
         $this->showSlideForm = true;
     }
@@ -339,13 +351,24 @@ class HomePage extends Component
     {
         $this->validate($this->slideRules(), $this->slideMessages());
 
+        $overlay = $this->slide['overlay'] ?? null;
+
         $data = [
             'badge' => trim((string) ($this->slide['badge'] ?? '')) ?: null,
             'title' => trim((string) $this->slide['title']),
             'text' => trim((string) ($this->slide['text'] ?? '')) ?: null,
             'link' => trim((string) ($this->slide['link'] ?? '')) ?: null,
             'link_text' => trim((string) ($this->slide['link_text'] ?? '')) ?: null,
+            'content_align' => array_key_exists((string) ($this->slide['content_align'] ?? ''), HomeSlide::ALIGNS)
+                ? $this->slide['content_align'] : 'start',
+            'content_vpos' => array_key_exists((string) ($this->slide['content_vpos'] ?? ''), HomeSlide::VPOSS)
+                ? $this->slide['content_vpos'] : 'center',
+            'button_style' => array_key_exists((string) ($this->slide['button_style'] ?? ''), HomeSlide::BUTTON_STYLES)
+                ? $this->slide['button_style'] : 'solid',
+            'overlay' => $overlay === null || $overlay === '' ? null : max(0, min(HomeSlide::OVERLAY_MAX, (int) $overlay)),
+            'new_tab' => (bool) ($this->slide['new_tab'] ?? false),
             'is_active' => (bool) ($this->slide['is_active'] ?? true),
+            'sort_order' => max(1, (int) ($this->slide['sort_order'] ?? 1)),
         ];
 
         $imageService = app(ImageUploadService::class);
@@ -367,9 +390,18 @@ class HomePage extends Component
             HomeSlide::query()->whereKey($this->editingSlideId)->update($data);
             $this->toast('اسلاید ویرایش شد.');
         } else {
-            $data['sort_order'] = (int) HomeSlide::query()->max('sort_order') + 1;
+            // «جایگاه» خواسته‌شدهٔ مدیر: در افزودن هم قابل تعیین است؛
+            // پیش‌فرض = آخرِ لیست (بزرگ‌ترین sort_order + ۱)
+            $data['sort_order'] ??= (int) HomeSlide::query()->max('sort_order') + 1;
             HomeSlide::query()->create($data);
             $this->toast('اسلاید اضافه شد.');
+        }
+
+        // بازنویسی صعودی sort_order تا جایگاه‌های تکراری/شکاف‌دار یکدست شوند
+        foreach (HomeSlide::query()->orderBy('sort_order')->orderBy('id')->get() as $i => $slide) {
+            if ($slide->sort_order !== $i + 1) {
+                $slide->update(['sort_order' => $i + 1]);
+            }
         }
 
         $this->closeSlideForm();
@@ -438,7 +470,13 @@ class HomePage extends Component
             'slide.text' => ['nullable', 'string', 'max:500'],
             'slide.link' => ['nullable', 'string', 'max:300'],
             'slide.link_text' => ['nullable', 'string', 'max:50'],
+            'slide.content_align' => ['nullable', 'in:'.implode(',', array_keys(HomeSlide::ALIGNS))],
+            'slide.content_vpos' => ['nullable', 'in:'.implode(',', array_keys(HomeSlide::VPOSS))],
+            'slide.button_style' => ['nullable', 'in:'.implode(',', array_keys(HomeSlide::BUTTON_STYLES))],
+            'slide.overlay' => ['nullable', 'integer', 'min:0', 'max:'.HomeSlide::OVERLAY_MAX],
+            'slide.new_tab' => ['nullable', 'boolean'],
             'slide.is_active' => ['nullable', 'boolean'],
+            'slide.sort_order' => ['nullable', 'integer', 'min:1', 'max:999'],
             'slideImage' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
         ];
     }
@@ -452,6 +490,13 @@ class HomePage extends Component
             'slide.text.max' => 'متن اسلاید حداکثر ۵۰۰ کاراکتر است.',
             'slide.link.max' => 'لینک حداکثر ۳۰۰ کاراکتر است.',
             'slide.link_text.max' => 'متن دکمه حداکثر ۵۰ کاراکتر است.',
+            'slide.content_align.in' => 'محل افقی محتوا معتبر نیست.',
+            'slide.content_vpos.in' => 'محل عمودی محتوا معتبر نیست.',
+            'slide.button_style.in' => 'استایل دکمه معتبر نیست.',
+            'slide.overlay.integer' => 'شدت تیرگی باید عدد باشد.',
+            'slide.overlay.max' => 'شدت تیرگی حداکثر ۹۰ درصد است.',
+            'slide.sort_order.integer' => 'جایگاه اسلاید باید عدد باشد.',
+            'slide.sort_order.min' => 'جایگاه اسلاید حداقل ۱ است.',
             'slideImage.image' => 'فایل انتخابی تصویر نیست.',
             'slideImage.mimes' => 'فرمت تصویر مجاز نیست؛ فقط JPG، PNG، WEBP یا GIF.',
             'slideImage.max' => 'حجم تصویر حداکثر ۳ مگابایت است.',
@@ -548,6 +593,11 @@ class HomePage extends Component
             'form.home_showcase_instashop_link' => $max(300),
             'form.home_showcase_instashop_link_text' => $max(50),
 
+            // اسلایدر معرفی — رفتار و ظاهر (Task 73)
+            'form.home_showcase_eyebrow' => $max(60),
+            'form.home_showcase_heading' => $max(120),
+            'form.home_showcase_autoplay_speed' => ['required', 'integer', 'min:3', 'max:15'],
+
             // فوتر — اینماد
             'form.footer_enamad_code' => ['nullable', 'string', 'max:5000'],
         ];
@@ -580,6 +630,12 @@ class HomePage extends Component
             'form.contact_email.email' => 'ایمیل معتبر نیست.',
             'form.contact_email.max' => 'ایمیل حداکثر ۱۹۰ کاراکتر است.',
             'form.footer_enamad_code.max' => 'کد اینماد حداکثر ۵٬۰۰۰ کاراکتر است.',
+            'form.home_showcase_eyebrow.max' => 'برچسب سربرگ اسلایدر حداکثر ۶۰ کاراکتر است.',
+            'form.home_showcase_heading.max' => 'عنوان سربرگ اسلایدر حداکثر ۱۲۰ کاراکتر است.',
+            'form.home_showcase_autoplay_speed.required' => 'سرعت پخش خودکار الزامی است.',
+            'form.home_showcase_autoplay_speed.integer' => 'سرعت پخش خودکار باید عدد باشد.',
+            'form.home_showcase_autoplay_speed.min' => 'سرعت پخش خودکار حداقل ۳ ثانیه است.',
+            'form.home_showcase_autoplay_speed.max' => 'سرعت پخش خودکار حداکثر ۱۵ ثانیه است.',
         ];
     }
 }

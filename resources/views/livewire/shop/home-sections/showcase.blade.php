@@ -1,44 +1,55 @@
 {{-- ============================================================
-     اسلایدر معرفی محصول (Task 71) — تصویر + متن، لمسی/سوایپ، RTL
+     اسلایدر معرفی محصول (Task 71 + Task 73) — تصویر + متن، لمسی/سوایپ، RTL
      - مکانیزم: scroll-snap بومی مرورگر (سوایپ لمسی رایگان) + Alpine
        برای دات‌ها/فلش‌ها/پخش خودکار — scrollIntoView هم در LTR و RTL
        و هر مرورگری درست کار می‌کند (بدون محاسبهٔ دستی scrollLeft).
      - اسلایدها از App\Support\Showcase (دستی اولویت، وگرنه پیش‌فرض‌ها).
-     - غیرفعال/جابه‌جایی از پنل: تب «بخش‌ها» صفحهٔ «صفحهٔ اصلی فروشگاه».
+     - Task 73 — همه‌چیز از پنل شخصی‌سازی می‌شود:
+         رفتار: پخش خودکار + سرعت، دات‌ها، فلش‌ها، سربرگ (نمایش/متن)
+         هر اسلاید: محل افقی/عمودی محتوا، شدت تیرگی overlay، استایل دکمه،
+                    تب جدید، ترتیب (جایگاه) و فعال/غیرفعال
      متغیرها: $showcaseSlides، $ho
 ============================================================ --}}
 @if($ho['home_showcase_enabled'] && count($showcaseSlides))
 <section id="showcase" class="mx-auto w-full max-w-7xl px-4 sm:px-6" aria-label="ویترین محصولات">
-    <div x-data="showcaseSlider({{ count($showcaseSlides) }})"
+    <div x-data="showcaseSlider({{ count($showcaseSlides) }}, {{ $ho['home_showcase_autoplay'] ? 'true' : 'false' }}, {{ max(3, (int) $hs['home_showcase_autoplay_speed']) * 1000 }})"
          wire:key="showcase-slider"
          @pointerenter="stop()" @pointerleave="play()">
 
-        {{-- سربرگ بخش --}}
-        <div class="mb-4 flex items-end justify-between gap-3">
-            <div class="min-w-0">
-                <p class="flex items-center gap-1.5 text-xs font-bold text-brand-600 dark:text-brand-400">
-                    <x-icon name="sparkles" class="size-3.5" />
-                    ویترین محصولات
-                </p>
-                <h2 class="mt-1 text-xl font-black text-zinc-900 dark:text-zinc-50 sm:text-2xl">
-                    محصولات ویژهٔ ما را ببینید
-                </h2>
-            </div>
+        {{-- سربرگ بخش — نمایش و متنش از پنل --}}
+        @if($ho['home_showcase_header_enabled'])
+            <div class="mb-4 flex items-end justify-between gap-3">
+                <div class="min-w-0">
+                    @if(trim((string) $hs['home_showcase_eyebrow']) !== '')
+                        <p class="flex items-center gap-1.5 text-xs font-bold text-brand-600 dark:text-brand-400">
+                            <x-icon name="sparkles" class="size-3.5" />
+                            {{ $hs['home_showcase_eyebrow'] }}
+                        </p>
+                    @endif
+                    @if(trim((string) $hs['home_showcase_heading']) !== '')
+                        <h2 class="mt-1 text-xl font-black text-zinc-900 dark:text-zinc-50 sm:text-2xl">
+                            {{ $hs['home_showcase_heading'] }}
+                        </h2>
+                    @endif
+                </div>
 
-            {{-- فلش‌ها (دسکتاپ) --}}
-            <div class="hidden shrink-0 items-center gap-2 sm:flex">
-                <button type="button" @click="prev(); stop()"
-                        class="rounded-xl bg-white p-2.5 text-zinc-600 shadow-sm ring-1 ring-zinc-200/70 transition-all hover:bg-brand-50 hover:text-brand-600 active:scale-95 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                        aria-label="اسلاید قبلی" x-show="count > 1">
-                    <x-icon name="chevron-right" class="size-5" />
-                </button>
-                <button type="button" @click="next(); stop()"
-                        class="rounded-xl bg-white p-2.5 text-zinc-600 shadow-sm ring-1 ring-zinc-200/70 transition-all hover:bg-brand-50 hover:text-brand-600 active:scale-95 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                        aria-label="اسلاید بعدی" x-show="count > 1">
-                    <x-icon name="chevron-left" class="size-5" />
-                </button>
+                {{-- فلش‌ها (دسکتاپ) — toggle از پنل --}}
+                @if($ho['home_showcase_arrows'])
+                    <div class="hidden shrink-0 items-center gap-2 sm:flex">
+                        <button type="button" @click="prev(); stop()"
+                                class="rounded-xl bg-white p-2.5 text-zinc-600 shadow-sm ring-1 ring-zinc-200/70 transition-all hover:bg-brand-50 hover:text-brand-600 active:scale-95 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                aria-label="اسلاید قبلی" x-show="count > 1">
+                            <x-icon name="chevron-right" class="size-5" />
+                        </button>
+                        <button type="button" @click="next(); stop()"
+                                class="rounded-xl bg-white p-2.5 text-zinc-600 shadow-sm ring-1 ring-zinc-200/70 transition-all hover:bg-brand-50 hover:text-brand-600 active:scale-95 dark:bg-zinc-900 dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                aria-label="اسلاید بعدی" x-show="count > 1">
+                            <x-icon name="chevron-left" class="size-5" />
+                        </button>
+                    </div>
+                @endif
             </div>
-        </div>
+        @endif
 
         {{-- ترک اسلایدها — سوایپ لمسی با scroll-snap بومی --}}
         <div x-ref="track"
@@ -47,6 +58,30 @@
              role="region" aria-roledescription="اسلایدر" aria-label="اسلایدهای ویترین محصولات">
 
             @foreach($showcaseSlides as $i => $slide)
+                @php
+                    // محل عمودی/افقی محتوا از پنل (Task 73) — جایگاه دلخواه هر اسلاید
+                    $vpos = $slide['content_vpos'] ?? 'center';       // top | center | bottom
+                    $align = $slide['content_align'] ?? 'start';      // start | center | end
+
+                    // عمودی: justify-* روی کانتینر تمام‌قد
+                    $justify = match ($vpos) {
+                        'top'    => 'justify-start',
+                        'bottom' => 'justify-end',
+                        default  => 'justify-center',
+                    };
+
+                    // افقی: چینش متن + جای بلوک محتوا (میان‌چین = mx-auto، چپ = ms-auto در RTL)
+                    $textAlign = match ($align) {
+                        'center' => 'text-center',
+                        'end'    => 'text-end',
+                        default  => 'text-start',
+                    };
+                    $blockPos = match ($align) {
+                        'center' => 'mx-auto',
+                        'end'    => 'ms-auto',
+                        default  => '',
+                    };
+                @endphp
                 <article class="group relative w-full shrink-0 snap-center overflow-hidden rounded-3xl bg-zinc-900 ring-1 ring-zinc-200/70 min-h-[340px] sm:min-h-[300px] lg:min-h-[380px] dark:ring-zinc-700/60"
                          wire:key="slide-{{ $i }}">
 
@@ -59,12 +94,17 @@
                         <x-icon name="package" class="absolute -bottom-10 -end-10 size-56 text-white/10" />
                     @endif
 
-                    {{-- لایهٔ خوانایی متن: موبایل از پایین، دسکتاپ از راست (RTL) --}}
-                    <div class="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/45 to-transparent sm:bg-gradient-to-l sm:from-zinc-950/85 sm:via-zinc-950/45 sm:to-transparent"></div>
+                    {{-- لایهٔ خوانایی: شدت دلخواه از پنل (inline style؛ کلاس داینامیک ممنوع)
+                        یا خودکار: موبایل از پایین، دسکتاپ از راست (RTL) --}}
+                    @if(isset($slide['overlay']) && $slide['overlay'] !== null)
+                        <div class="absolute inset-0" style="background: rgba(9, 9, 11, {{ $slide['overlay'] / 100 }});"></div>
+                    @else
+                        <div class="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/45 to-transparent sm:bg-gradient-to-l sm:from-zinc-950/85 sm:via-zinc-950/45 sm:to-transparent"></div>
+                    @endif
 
-                    {{-- محتوای اسلاید --}}
-                    <div class="relative flex size-full flex-col justify-end p-5 sm:justify-center sm:p-10 lg:p-14">
-                        <div class="max-w-md lg:max-w-xl">
+                    {{-- محتوای اسلاید — جایگاه از پنل --}}
+                    <div class="relative flex size-full flex-col {{ $justify }} p-5 sm:p-10 lg:p-14 {{ $textAlign }}">
+                        <div class="max-w-md lg:max-w-xl {{ $blockPos }}">
                             @if($slide['badge'])
                                 <span class="mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-black text-emerald-300 ring-1 ring-white/25 backdrop-blur">
                                     <x-icon name="badge-check" class="size-3.5" />
@@ -83,9 +123,16 @@
                             @endif
 
                             @if($slide['link'])
+                                {{-- استایل دکمه از پنل: solid پررنگ | soft ملایم | link متنی --}}
+                                @php($btnStyle = $slide['button_style'] ?? 'solid')
                                 <a href="{{ $slide['link'] }}"
-                                   @if(str_starts_with($slide['link'], 'http')) target="_blank" rel="noopener" @endif
-                                   class="mt-4 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-brand-500/25 transition-all hover:bg-brand-400 hover:gap-3 active:scale-95">
+                                   @if($slide['new_tab'] || str_starts_with($slide['link'], 'http')) target="_blank" rel="noopener" @endif
+                                   @class([
+                                       'mt-4 inline-flex items-center gap-2 rounded-xl text-sm font-black transition-all active:scale-95',
+                                       'bg-brand-500 px-5 py-2.5 text-white shadow-lg shadow-brand-500/25 hover:bg-brand-400 hover:gap-3' => $btnStyle === 'solid',
+                                       'bg-white/15 px-5 py-2.5 text-white ring-1 ring-white/30 backdrop-blur hover:bg-white/25 hover:gap-3' => $btnStyle === 'soft',
+                                       'px-1 py-2 text-emerald-300 hover:gap-3 hover:text-emerald-200' => $btnStyle === 'link',
+                                   ])>
                                     {{ $slide['link_text'] }}
                                     <x-icon name="arrow-left" class="size-4" />
                                 </a>
@@ -96,8 +143,8 @@
             @endforeach
         </div>
 
-        {{-- دات‌های ناوبری --}}
-        @if(count($showcaseSlides) > 1)
+        {{-- دات‌های ناوبری — toggle از پنل --}}
+        @if($ho['home_showcase_dots'] && count($showcaseSlides) > 1)
             <div class="mt-4 flex items-center justify-center gap-2" role="tablist" aria-label="انتخاب اسلاید">
                 @foreach($showcaseSlides as $i => $slide)
                     <button type="button" @click="go({{ $i }}); stop()"
@@ -113,10 +160,12 @@
 
 @script
 <script>
-    Alpine.data('showcaseSlider', (count) => ({
+    Alpine.data('showcaseSlider', (count, autoplay, interval) => ({
         count,
         current: 0,
         timer: null,
+        autoplay: autoplay !== false,
+        interval: interval || 6000,
 
         init() {
             this.sync();
@@ -151,12 +200,12 @@
         next() { this.go(this.current + 1 >= this.count ? 0 : this.current + 1); },
         prev() { this.go(this.current - 1 < 0 ? this.count - 1 : this.current - 1); },
 
-        /** پخش خودکار ملایم — با احترام به prefers-reduced-motion */
+        /** پخش خودکار ملایم — خاموش/روشن و سرعتش از پنل (Task 73) + احترام به prefers-reduced-motion */
         play() {
-            if (this.count < 2) return;
+            if (!this.autoplay || this.count < 2) return;
             if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
             this.stop();
-            this.timer = setInterval(() => this.next(), 6000);
+            this.timer = setInterval(() => this.next(), this.interval);
         },
 
         stop() {

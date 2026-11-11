@@ -60,6 +60,15 @@ class HomePage
         'home_showcase_instashop_link' => 'https://insta-shop.opashop.ir',
         'home_showcase_instashop_link_text' => 'مشاهدهٔ دمو',
 
+        // رفتار و ظاهر اسلایدر (Task 73 — همه قابل شخصی‌سازی از پنل):
+        'home_showcase_header_enabled' => '1',   // سربرگ بخش (برچسب + عنوان)
+        'home_showcase_eyebrow' => 'ویترین محصولات',
+        'home_showcase_heading' => 'محصولات ویژهٔ ما را ببینید',
+        'home_showcase_autoplay' => '1',          // پخش خودکار
+        'home_showcase_autoplay_speed' => '6',    // هر چند ثانیه (۳ تا ۱۵)
+        'home_showcase_dots' => '1',              // دات‌های ناوبری
+        'home_showcase_arrows' => '1',            // فلش‌های دسکتاپ
+
         /* -------------------- هیرو (معرفی بالا) -------------------- */
         'home_hero_badge' => 'آماده همکاری و پروژه جدید',
         'home_hero_title' => 'از اول تا بزرگ شدن استارتاپ کنار شما هستیم',
@@ -144,6 +153,8 @@ class HomePage
         'home_subscription_active_enabled', 'home_subscription_enabled', 'home_contact_enabled', 'contact_form_enabled',
         'home_track_enabled',
         'home_showcase_packages_enabled', 'home_showcase_instashop_enabled',
+        'home_showcase_header_enabled', 'home_showcase_autoplay',
+        'home_showcase_dots', 'home_showcase_arrows',
     ];
 
     /** بخش‌های صفحهٔ اصلی (کلید کوتاه) — به ترتیب پیش‌فرض؛ ترتیب واقعی از home_sort_* خوانده می‌شود */

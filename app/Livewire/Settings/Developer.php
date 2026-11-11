@@ -5,6 +5,7 @@ namespace App\Livewire\Settings;
 use App\Livewire\Concerns\WithToasts;
 use App\Support\EnvEditor;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -22,6 +23,12 @@ use Livewire\Component;
  *
  * امنیت: علاوه بر میان‌افزار پنل، همهٔ اکشن‌های این صفحه فقط برای نقش admin
  * پاسخ داده می‌شوند (حتی وقتی قفل نقش‌ها در «امنیت و امکانات» خاموش است).
+ *
+ * نشست ازدست‌رفته (Task 73): درخواست‌های POST کامپوننت‌های Livewire به
+ * /livewire/update از میان‌افزار auth پنل عبور نمی‌کنند؛ اگر سشن کاربر به هر
+ * دلیلی مرده باشد (انقضای تب باز، پاک‌شدن استور سشن روی هاست، کوکی ازدست‌رفته)
+ * قبلاً پاسخ 403 گمراه‌کننده می‌داد — حالا مهمان با پیام واضح به صفحهٔ ورود
+ * بازگردانده می‌شود و فقط کاربر واردشدهٔ غیرمدیر 403 واقعی می‌گیرد.
  */
 #[Layout('components.layouts.app')]
 #[Title('تنظیمات برنامه‌نویس')]
@@ -61,7 +68,9 @@ class Developer extends Component
 
     public function mount(): void
     {
-        $this->authorizeDeveloper();
+        if (! $this->authorizeDeveloper()) {
+            return;
+        }
 
         $this->environment = (string) config('app.env');
         $this->debug = (bool) config('app.debug');
@@ -69,18 +78,34 @@ class Developer extends Component
 
     public function render()
     {
-        $this->authorizeDeveloper();
+        if (! $this->authorizeDeveloper()) {
+            // خروجی این رندر هرگز دیده نمی‌شود (اثر redirect جایگزین صفحه می‌کند)
+            return view('livewire.settings.developer', [
+                'pendingMigrations' => [],
+                'envWritable' => false,
+                'phpVersion' => PHP_VERSION,
+                'laravelVersion' => app()->version(),
+                'dbDriver' => '',
+                'configCached' => false,
+            ]);
+        }
 
+        return view('livewire.settings.developer', $this->pageData());
+    }
+
+    /** داده‌های همیشگی ویو */
+    private function pageData(): array
+    {
         $editor = app(EnvEditor::class);
 
-        return view('livewire.settings.developer', [
+        return [
             'pendingMigrations' => $this->pendingMigrations,
             'envWritable' => $editor->writable(),
             'phpVersion' => PHP_VERSION,
             'laravelVersion' => app()->version(),
             'dbDriver' => (string) config('database.default'),
             'configCached' => is_file(base_path('bootstrap/cache/config.php')),
-        ]);
+        ];
     }
 
     /* ------------------------------------------------------------------ */
@@ -89,7 +114,9 @@ class Developer extends Component
 
     public function saveEnvironment(): void
     {
-        $this->authorizeDeveloper();
+        if (! $this->authorizeDeveloper()) {
+            return;
+        }
 
         if (! in_array($this->environment, self::ENVIRONMENTS, true)) {
             $this->toast('مقدار محیط معتبر نیست.', 'error');
@@ -122,7 +149,9 @@ class Developer extends Component
 
     public function saveDebug(): void
     {
-        $this->authorizeDeveloper();
+        if (! $this->authorizeDeveloper()) {
+            return;
+        }
 
         try {
             app(EnvEditor::class)->write('APP_DEBUG', $this->debug ? 'true' : 'false');
@@ -150,13 +179,16 @@ class Developer extends Component
     /** wire:click="clearCache('app' | 'config' | 'route' | 'view' | 'all')" */
     public function clearCache(string $what = 'all'): void
     {
-        $this->authorizeDeveloper();
+        if (! $this->authorizeDeveloper()) {
+            return;
+        }
+
         $this->confirmClearAll = false;
 
         try {
             if ($what === 'all') {
                 foreach (self::CACHE_TARGETS as $target) {
-                    Artisan::call($target['command']);
+                    $this->runCacheCommand($target['command']);
                 }
 
                 $this->toast('همهٔ کش‌ها پاک شدند.');
@@ -170,10 +202,27 @@ class Developer extends Component
                 return;
             }
 
-            Artisan::call(self::CACHE_TARGETS[$what]['command']);
+            $this->runCacheCommand(self::CACHE_TARGETS[$what]['command']);
             $this->toast(self::CACHE_TARGETS[$what]['label'].' با موفقیت پاک شد.');
         } catch (\Throwable $e) {
             $this->toast('خطا در پاک‌سازی کش: '.$e->getMessage(), 'error');
+        }
+    }
+
+    /**
+     * اجرای فرمان کش + نجات سشن کاربر جاری.
+     *
+     * روی هاست‌هایی که سشن را روی همان استور کش می‌گذارند (redis/memcached یا
+     * SESSION_DRIVER=cache)، cache:clear استور را flush می‌کند و سشن‌ها نابود
+     * می‌شوند؛ سشنِ همین کاربر را بلافاصله بازنویسی می‌کنیم تا لاگین بماند و
+     * درخواست‌های بعدی 403/لاگین‌مجدد نگیرند.
+     */
+    private function runCacheCommand(string $command): void
+    {
+        Artisan::call($command);
+
+        if ($command === 'cache:clear' && request()->hasSession()) {
+            request()->session()->save();
         }
     }
 
@@ -183,7 +232,10 @@ class Developer extends Component
 
     public function optimize(): void
     {
-        $this->authorizeDeveloper();
+        if (! $this->authorizeDeveloper()) {
+            return;
+        }
+
         $this->confirmOptimize = false;
 
         // نکته: در محیط تست، config:cache مقادیر phpunit را در کش واقعی پروژه
@@ -240,7 +292,10 @@ class Developer extends Component
     /** دکمهٔ «php artisan migrate» (+ سیدرها در صورت انتخاب) */
     public function runMigrations(): void
     {
-        $this->authorizeDeveloper();
+        if (! $this->authorizeDeveloper()) {
+            return;
+        }
+
         $this->confirmMigrate = false;
 
         if ($this->pendingMigrations === []) {
@@ -297,10 +352,36 @@ class Developer extends Component
     /*  داخلی */
     /* ------------------------------------------------------------------ */
 
-    /** محافظت اضافی: این صفحه/اکشن‌ها فقط برای نقش admin (حتی با قفل نقش‌های خاموش) */
-    protected function authorizeDeveloper(): void
+    /**
+     * محافظت اضافی: این صفحه/اکشن‌ها فقط برای نقش admin (حتی با قفل نقش‌های خاموش).
+     *
+     * - مهمان (سشن مرده/منقضی) → به‌جای 403 گمراه‌کننده، redirect به صفحهٔ ورود
+     *   (درخواست Livewire POST از auth میان‌افزار پنل عبور نمی‌کند — Task 73)
+     * - کاربر واردشدهٔ غیرمدیر → 403 واقعی
+     * - هر دو حالت در لاگ ثبت می‌شوند تا ریشهٔ گزارش «ارور ۴۰۳» از لاگ هاست
+     *   قابل تشخیص باشد (اگر در لاگ چیزی نبود، درخواست اصلاً به لاراول نرسیده
+     *   و عامل آن فایروال/CDN هاست است).
+     */
+    protected function authorizeDeveloper(): bool
     {
-        abort_unless((bool) auth()->user()?->isAdmin(), 403, 'تنظیمات برنامه‌نویس فقط برای نقش «مدیر» مجاز است.');
+        $user = auth()->user();
+
+        if (! $user) {
+            Log::warning('developer.unauthenticated', ['url' => request()->fullUrl()]);
+
+            $this->toast('نشست شما پایان یافته است؛ لطفاً دوباره وارد شوید.', 'warning');
+            $this->redirect(route('login'), navigate: true);
+
+            return false;
+        }
+
+        if (! $user->isAdmin()) {
+            Log::warning('developer.forbidden', ['user' => $user->id, 'role' => $user->role]);
+
+            abort(403, 'تنظیمات برنامه‌نویس فقط برای نقش «مدیر» مجاز است.');
+        }
+
+        return true;
     }
 
     /**

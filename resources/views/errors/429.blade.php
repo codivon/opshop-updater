@@ -1,5 +1,8 @@
-@extends('errors::minimal')
-
-@section('title', __('Too Many Requests'))
-@section('code', '429')
-@section('message', __('Too Many Requests'))
+{{-- ۴۲۹ — تعداد درخواست زیاد (Task 73: طراحی مدرن فارسی) --}}
+@include('errors.modern', [
+    'code' => '۴۲۹',
+    'icon' => 'clock',
+    'tone' => 'amber',
+    'title' => 'تعداد درخواست‌ها زیاد است',
+    'message' => 'در بازهٔ کوتاه بیش از حد مجاز درخواست ارسال شده؛ چند لحظه صبر کنید و دوباره تلاش کنید.',
+])
