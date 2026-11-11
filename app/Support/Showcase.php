@@ -4,19 +4,22 @@ namespace App\Support;
 
 use App\Models\HomeSlide;
 use App\Models\Package;
+use App\Models\Product;
 use Illuminate\Support\Str;
 
 /**
- * تأمین‌کنندهٔ اسلایدهای «اسلایدر معرفی محصول» صفحهٔ اصلی — Task 71.
+ * تأمین‌کنندهٔ اسلایدهای «اسلایدر معرفی محصول» صفحهٔ اصلی — Task 71 + Task 74.
  *
  * قاعدهٔ نمایش (ساده و قابل پیش‌بینی):
  *   - هر وقت اسلاید دستیِ فعالی در جدول home_slides باشد ← فقط همان‌ها
  *     (به ترتیب sort_order پنل) نمایش داده می‌شوند.
  *   - در غیر این صورت «پیش‌فرض‌ها» ساخته می‌شوند:
- *       ۱) بنر خودکار از پکیج‌های فعال (تصویر/عنوان/متن/لینک هر پکیج)
+ *       ۱) اسلایدهای خودکار از پکیج/محصول — انتخابِ مدیر در پنل (به ترتیب
+ *          دلخواه مدیر) و اگر چیزی انتخاب نشده باشد، ۶ پکیج فعالِ آخر
  *          — toggle: home_showcase_packages_enabled
  *       ۲) بنر ویژهٔ InstaShop (تصویر کامیت‌شده در ریپو + متن/لینک از پنل)
  *          — toggle: home_showcase_instashop_enabled
+ *          جایگاهش قابل انتخاب است: اول (پیش‌فرض) یا آخرِ اسلایدهای خودکار.
  *
  * خروجی آرایهٔ یکسان‌شدهٔ [badge,title,text,image,link,link_text] است تا ویو
  * برای اسلاید دستی/خودکار هیچ تفاوتی نداشته باشد.
@@ -26,7 +29,7 @@ class Showcase
     /** تصویر بنر ویژهٔ InstaShop (کامیت‌شده در ریپو — public/images) */
     public const INSTASHOP_IMAGE = 'images/showcase/insta-shop.webp';
 
-    /** سقف بنرهای خودکار پکیج‌ها در پیش‌فرض */
+    /** سقف بنرهای خودکار پکیج‌ها در حالت fallback (هیچ انتخابی نشده باشد) */
     public const AUTO_LIMIT = 6;
 
     /**
@@ -55,14 +58,123 @@ class Showcase
             return $manual;
         }
 
-        return array_merge(
-            HomePage::on('home_showcase_packages_enabled') ? static::packageSlides() : [],
-            HomePage::on('home_showcase_instashop_enabled') ? [static::instaShopSlide()] : [],
-        );
+        // اسلایدهای خودکار از پکیج/محصول (انتخاب مدیر، وگرنه ۶ پکیج فعالِ آخر)
+        $auto = HomePage::on('home_showcase_packages_enabled') ? static::autoSlides() : [];
+
+        // بنر InstaShop — جایگاهش از پنل: اول (پیش‌فرض) یا آخر
+        $insta = HomePage::on('home_showcase_instashop_enabled') ? [static::instaShopSlide()] : [];
+
+        return HomePage::str('home_showcase_instashop_position') === 'last'
+            ? array_merge($auto, $insta)
+            : array_merge($insta, $auto);
     }
 
     /**
-     * پیش‌فرض اول — از هر پکیج فعال یک بنر (جدیدترین‌ها اول).
+     * اسلایدهای خودکار از انتخاب مدیر (پکیج/محصول به ترتیب دلخواه)؛
+     * اگر چیزی انتخاب نشده باشد = رفتار پیش‌فرض سابق (۶ پکیج فعالِ آخر).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function autoSlides(): array
+    {
+        $refs = static::storedRefs();
+
+        if ($refs === []) {
+            return static::packageSlides();
+        }
+
+        $packageIds = array_map(fn (array $r) => $r['id'], array_filter($refs, fn (array $r) => $r['type'] === 'package'));
+        $productIds = array_map(fn (array $r) => $r['id'], array_filter($refs, fn (array $r) => $r['type'] === 'product'));
+
+        // فقط مواردِ فعال — پکیج/محصولِ حذف‌شده یا غیرفعال نادیده گرفته می‌شود
+        $packages = $packageIds === [] ? collect() : Package::query()
+            ->with(['project:id,name', 'latestVersion:id,package_id,version'])
+            ->where('status', Package::STATUS_ACTIVE)
+            ->whereIn('id', $packageIds)
+            ->get()
+            ->keyBy('id');
+
+        $products = $productIds === [] ? collect() : Product::query()
+            ->with('category:id,name')
+            ->where('status', Product::STATUS_ACTIVE)
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id');
+
+        $slides = [];
+
+        foreach ($refs as $ref) {
+            $model = $ref['type'] === 'package' ? $packages->get($ref['id']) : $products->get($ref['id']);
+
+            if ($model === null) {
+                continue;
+            }
+
+            $slides[] = $ref['type'] === 'package'
+                ? static::packageSlide($model)
+                : static::productSlide($model);
+        }
+
+        return $slides;
+    }
+
+    /**
+     * refs ذخیره‌شدهٔ پنل از تنظیم home_showcase_auto_slides.
+     *
+     * @return array<int, array{type: string, id: int}>
+     */
+    public static function storedRefs(): array
+    {
+        return static::parseRefs(HomePage::str('home_showcase_auto_slides'));
+    }
+
+    /**
+     * پارسر JSON انتخاب‌های مدیر — هم برای تنظیم ذخیره‌شدهٔ صفحهٔ اصلی و هم
+     * برای مقدارِ فرمِ پنل (قبل از «ذخیره تنظیمات») استفاده می‌شود؛
+     * ساختار نامعتبر/ناآشنا بی‌صدا حذف می‌شود.
+     *
+     * @return array<int, array{type: string, id: int}>
+     */
+    public static function parseRefs(?string $raw): array
+    {
+        $raw = trim((string) $raw);
+
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $refs = [];
+
+        foreach ($decoded as $ref) {
+            if (! is_array($ref)) {
+                continue;
+            }
+
+            $type = $ref['type'] ?? null;
+            $id = (int) ($ref['id'] ?? 0);
+
+            if (in_array($type, ['package', 'product'], true) && $id > 0) {
+                $refs[] = ['type' => $type, 'id' => $id];
+            }
+        }
+
+        return $refs;
+    }
+
+    /** انکد refs به JSON برای ذخیره در تنظیم home_showcase_auto_slides */
+    public static function encodeRefs(array $refs): string
+    {
+        return $refs === [] ? '' : (string) json_encode(array_values($refs), JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * حالت fallback — از هر پکیج فعال یک بنر (جدیدترین‌ها اول).
      */
     public static function packageSlides(): array
     {
@@ -72,14 +184,7 @@ class Showcase
             ->orderByDesc('id')
             ->limit(static::AUTO_LIMIT)
             ->get()
-            ->map(fn (Package $package) => static::format(
-                badge: (string) ($package->project?->name ?: 'پکیج آماده'),
-                title: (string) $package->name,
-                text: Str::limit(trim((string) $package->short_description), 160),
-                image: $package->thumbnail_url,
-                link: route('shop.package', ['slug' => $package->slug]),
-                linkText: 'مشاهده و خرید',
-            ))
+            ->map(fn (Package $package) => static::packageSlide($package))
             ->all();
     }
 
@@ -95,6 +200,32 @@ class Showcase
             image: asset(static::INSTASHOP_IMAGE),
             link: HomePage::str('home_showcase_instashop_link') ?: 'https://insta-shop.opashop.ir',
             linkText: HomePage::str('home_showcase_instashop_link_text') ?: 'مشاهدهٔ دمو',
+        );
+    }
+
+    /** بنر یک پکیج — نشان = نام پروژه، لینک = صفحهٔ فروش پکیج */
+    private static function packageSlide(Package $package): array
+    {
+        return static::format(
+            badge: (string) ($package->project?->name ?: 'پکیج آماده'),
+            title: (string) $package->name,
+            text: Str::limit(trim((string) $package->short_description), 160),
+            image: $package->thumbnail_url,
+            link: route('shop.package', ['slug' => $package->slug]),
+            linkText: 'مشاهده و خرید',
+        );
+    }
+
+    /** بنر یک محصول — نشان = نام دسته (یا «پروژه آماده»)، لینک = صفحهٔ فروش محصول */
+    private static function productSlide(Product $product): array
+    {
+        return static::format(
+            badge: (string) ($product->category?->name ?: 'پروژه آماده'),
+            title: (string) $product->name,
+            text: Str::limit(trim((string) $product->short_description), 160),
+            image: $product->thumbnail_url,
+            link: route('shop.product', ['slug' => $product->slug]),
+            linkText: 'مشاهده و خرید',
         );
     }
 

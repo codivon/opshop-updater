@@ -1,13 +1,14 @@
 {{-- ============================================================
-     اسلایدر معرفی محصول (Task 71 + Task 73) — تصویر + متن، لمسی/سوایپ، RTL
+     اسلایدر معرفی محصول (Task 71 + 73 + 74) — تصویر + متن، لمسی/سوایپ، RTL
      - مکانیزم: scroll-snap بومی مرورگر (سوایپ لمسی رایگان) + Alpine
-       برای دات‌ها/فلش‌ها/پخش خودکار — scrollIntoView هم در LTR و RTL
-       و هر مرورگری درست کار می‌کند (بدون محاسبهٔ دستی scrollLeft).
-     - اسلایدها از App\Support\Showcase (دستی اولویت، وگرنه پیش‌فرض‌ها).
-     - Task 73 — همه‌چیز از پنل شخصی‌سازی می‌شود:
-         رفتار: پخش خودکار + سرعت، دات‌ها، فلش‌ها، سربرگ (نمایش/متن)
-         هر اسلاید: محل افقی/عمودی محتوا، شدت تیرگی overlay، استایل دکمه،
-                    تب جدید، ترتیب (جایگاه) و فعال/غیرفعال
+       برای دات‌ها/فلش‌ها/پخش خودکار.
+     - 🐛 باگ پرش اسکرول به بالا (Task 74): scrollIntoView به همهٔ اجدادِ
+       اسکرول‌پذیر (از جمله خود صفحه) سرایت می‌کرد — وقتی کاربر پایین
+       صفحه بود و اسلاید عوض می‌شد، صفحه به سمت اسلایدر پرت می‌شد.
+       الان فقط خودِ ترک با دلتای مختصات ویوپورت جابه‌جا می‌شود + پخش
+       خودکار وقتی اسلایدر از دید خارج است با IntersectionObserver می‌ایستد.
+     - اسلایدها از App\Support\Showcase (دستی اولویت، وگرنه پیش‌فرض‌ها:
+       InstaShop اول + پکیج/محصولِ انتخابی یا ۶ پکیج آخر).
      متغیرها: $showcaseSlides، $ho
 ============================================================ --}}
 @if($ho['home_showcase_enabled'] && count($showcaseSlides))
@@ -164,12 +165,28 @@
         count,
         current: 0,
         timer: null,
+        io: null,
         autoplay: autoplay !== false,
         interval: interval || 6000,
 
         init() {
             this.sync();
             this.play();
+
+            // پخش خودکار فقط وقتی اسلایدر در دید کاربر است — وقتی پایین/بالای
+            // صفحه هستید تایمر می‌ایستد (هم بهینه است و هم احتمال هرگونه
+            // تداخل با اسکرول صفحه را صفر می‌کند)
+            if ('IntersectionObserver' in window && this.$refs.track) {
+                this.io = new IntersectionObserver((entries) => {
+                    entries.forEach((entry) => (entry.isIntersecting ? this.play() : this.stop()));
+                }, { threshold: 0.2 });
+                this.io.observe(this.$refs.track);
+            }
+        },
+
+        destroy() {
+            this.stop();
+            if (this.io) this.io.disconnect();
         },
 
         /** اسلاید فعال از روی موقعیت اسکرول واقعی (سازگار با RTL همهٔ مرورگرها) */
@@ -193,8 +210,19 @@
         go(i) {
             const track = this.$refs.track;
             if (!track || !track.children.length) return;
-            track.children[Math.max(0, Math.min(i, this.count - 1))]
-                .scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+
+            const el = track.children[Math.max(0, Math.min(i, this.count - 1))];
+            if (!el) return;
+
+            // ⚠️ scrollIntoView ممنوع — به همهٔ اجدادِ اسکرول‌پذیر (از جمله خود صفحه)
+            // سرایت می‌کند؛ وقتی کاربر پایین صفحه است و اسلایدر از دید خارج، پخش
+            // خودکار صفحه را به سمت اسلایدر (بالا) پرت می‌کرد.
+            // راه‌حل: فقط خودِ ترک با دلتای مختصات ویوپورت جابه‌جا می‌شود —
+            // چون دلتایی است، در RTL و LTR و هر مرورگری درست است و هیچ
+            // اسکرول عمودی‌ای روی صفحه ایجاد نمی‌کند.
+            const tr = track.getBoundingClientRect();
+            const er = el.getBoundingClientRect();
+            track.scrollBy({ left: er.left + er.width / 2 - (tr.left + tr.width / 2), behavior: 'smooth' });
         },
 
         next() { this.go(this.current + 1 >= this.count ? 0 : this.current + 1); },

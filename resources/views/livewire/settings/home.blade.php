@@ -149,9 +149,11 @@
                     {{-- راهنمای قاعدهٔ نمایش --}}
                     <div class="rounded-xl bg-sky-50 p-4 text-xs leading-6 text-sky-800 ring-1 ring-sky-600/20 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-400/20">
                         <strong class="font-black">قاعدهٔ نمایش:</strong>
-                        تا وقتی هیچ اسلاید دستیِ فعالی نداشته باشید، اسلایدر به‌صورت خودکار از «پکیج‌های فعال» + «بنر ویژهٔ InstaShop» ساخته می‌شود.
+                        تا وقتی هیچ اسلاید دستیِ فعالی نداشته باشید، اسلایدر خودکار ساخته می‌شود:
+                        بنر ویژهٔ InstaShop (پیش‌فرض «اول») + اسلایدهای پکیج/محصول.
+                        اگر در بخش «انتخاب پکیج/محصول» چیزی انتخاب کنید، فقط همان‌ها (به همان ترتیب) نمایش داده می‌شوند؛ اگر خالی بماند، ۶ پکیج فعالِ آخر خودکار می‌آیند.
                         با افزودن اولین اسلاید دستی، فقط اسلایدهای دستی نمایش داده می‌شوند (برای بازگشت به پیش‌فرض، همهٔ اسلایدهای دستی را حذف یا غیرفعال کنید).
-                        اکشن‌های اسلاید (افزودن/ویرایش/حذف/ترتیب) بلافاصله ذخیره می‌شوند؛ کلیدهای روشن/خاموش، تنظیمات نمایش و متن‌های بنر InstaShop با «ذخیره تنظیمات» اعمال می‌شوند.
+                        اکشن‌های اسلاید (افزودن/ویرایش/حذف/ترتیب) بلافاصله ذخیره می‌شوند؛ کلیدهای روشن/خاموش، تنظیمات نمایش، جایگاه InstaShop و انتخاب‌های پکیج/محصول با «ذخیره تنظیمات» اعمال می‌شوند.
                     </div>
 
                     {{-- تنظیمات نمایش اسلایدر (Task 73) — بخشی از فرم اصلی --}}
@@ -198,7 +200,7 @@
                     <x-card title="پیش‌فرض‌ها (وقتی اسلاید دستی فعال ندارید)" subtitle="بنر خودکار پکیج‌ها: از تصویر/عنوان/متن هر پکیج فعال. بنر ویژهٔ InstaShop: تصویر اختصاصی با متن قابل ویرایش.">
                         <div class="space-y-5">
                             <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
-                                <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">بنر خودکار از پکیج‌های فعال (حداکثر ۶ عدد، جدیدترین‌ها)</span>
+                                <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">اسلایدهای خودکار از پکیج/محصول (انتخابی از کارت پایین، یا ۶ پکیج آخر)</span>
                                 <x-toggle wire:model="form.home_showcase_packages_enabled" id="home_showcase_packages_enabled" />
                             </div>
 
@@ -206,6 +208,10 @@
                                 <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">بنر ویژهٔ InstaShop (پیج اینستاگرام ← فروشگاه آنلاین)</span>
                                 <x-toggle wire:model="form.home_showcase_instashop_enabled" id="home_showcase_instashop_enabled" />
                             </div>
+
+                            <x-field label="جایگاه بنر InstaShop" for="showcase_insta_position" hint="پیش‌فرض «اول» است — بالای اسلایدهای پکیج/محصول">
+                                <x-select id="showcase_insta_position" wire:model="form.home_showcase_instashop_position" :options="\App\Support\HomePage::INSTA_POSITIONS" />
+                            </x-field>
 
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <x-field label="نشان بنر InstaShop" for="showcase_insta_badge">
@@ -224,6 +230,85 @@
                                     <x-input id="showcase_insta_link" wire:model="form.home_showcase_instashop_link" dir="ltr" placeholder="https://insta-shop.opashop.ir" icon="link" />
                                 </x-field>
                             </div>
+                        </div>
+                    </x-card>
+
+                    {{-- انتخاب پکیج/محصول اسلایدهای خودکار (Task 74) — بخشی از فرم اصلی --}}
+                    <x-card title="انتخاب پکیج‌ها و محصولات اسلایدهای خودکار" subtitle="هر پکیج/محصولی که اینجا اضافه کنید، با تصویر/عنوان/لینک خودش اسلاید می‌شود — به همان ترتیبی که می‌چینید. اگر خالی بماند، ۶ پکیج فعالِ آخر خودکار نمایش داده می‌شود.">
+                        <div class="space-y-4">
+                            {{-- پیکر --}}
+                            <div class="grid gap-3 sm:grid-cols-[150px_1fr_auto]">
+                                <x-field label="نوع" for="auto_picker_type">
+                                    <x-select id="auto_picker_type" wire:model.live="pickerType" :options="['package' => 'پکیج', 'product' => 'محصول (پروژه آماده)']" />
+                                </x-field>
+                                <x-field label="آیتم" for="auto_picker_item" :error="'pickerId'">
+                                    <x-select id="auto_picker_item" wire:model="pickerId" :options="$this->pickerOptions" placeholder="انتخاب کنید…" />
+                                </x-field>
+                                <div class="flex items-end">
+                                    <x-btn type="button" wire:click="addAutoSlide" icon="plus" variant="secondary" wire:loading.attr="disabled">
+                                        افزودن
+                                    </x-btn>
+                                </div>
+                            </div>
+
+                            {{-- فهرست انتخاب‌شده‌ها --}}
+                            @if(count($this->autoSlideRows))
+                                <div class="space-y-2">
+                                    @foreach($this->autoSlideRows as $i => $row)
+                                        <div class="flex flex-wrap items-center gap-3 rounded-xl bg-zinc-50 p-3 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60"
+                                             wire:key="auto-slide-row-{{ $row['type'] }}-{{ $row['id'] }}">
+                                            <span class="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand-600/10 text-[11px] font-black text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">{{ fa_num($i + 1) }}</span>
+
+                                            @if($row['thumb'])
+                                                <img src="{{ $row['thumb'] }}" alt="{{ $row['label'] }}"
+                                                     class="size-11 shrink-0 rounded-lg object-cover ring-1 ring-zinc-200 dark:ring-zinc-700" />
+                                            @else
+                                                <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-gradient-to-bl from-brand-600 to-teal-700 text-white/80">
+                                                    <x-icon name="{{ $row['type'] === 'package' ? 'package' : 'rocket' }}" class="size-4.5" />
+                                                </span>
+                                            @endif
+
+                                            <div class="min-w-0 flex-1">
+                                                <p class="truncate text-sm font-black text-zinc-900 dark:text-zinc-50">{{ $row['label'] }}</p>
+                                                <p class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                                    <span class="rounded-full bg-zinc-200/70 px-2 py-0.5 dark:bg-zinc-700/70">{{ $row['type'] === 'package' ? 'پکیج' : 'محصول' }}</span>
+                                                    @if($row['sub'])
+                                                        <span>{{ $row['sub'] }}</span>
+                                                    @endif
+                                                    <span class="{{ $row['active'] ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400' }}">
+                                                        {{ $row['active'] ? 'فعال' : 'غیرفعال — در صفحهٔ اصلی نمایش داده نمی‌شود' }}
+                                                    </span>
+                                                </p>
+                                            </div>
+
+                                            <span class="flex items-center gap-1">
+                                                <button type="button" wire:click="moveAutoSlide({{ $i }}, 'up')" {{ $i === 0 ? 'disabled' : '' }}
+                                                        class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:opacity-40 disabled:hover:bg-white dark:bg-zinc-900 dark:ring-zinc-700/60 dark:disabled:hover:bg-zinc-900"
+                                                        title="انتقال به بالا" aria-label="انتقال آیتم به بالا">
+                                                    <x-icon name="chevron-up" class="size-4" />
+                                                </button>
+                                                <button type="button" wire:click="moveAutoSlide({{ $i }}, 'down')" {{ $i === count($this->autoSlideRows) - 1 ? 'disabled' : '' }}
+                                                        class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:opacity-40 disabled:hover:bg-white dark:bg-zinc-900 dark:ring-zinc-700/60 dark:disabled:hover:bg-zinc-900"
+                                                        title="انتقال به پایین" aria-label="انتقال آیتم به پایین">
+                                                    <x-icon name="chevron-down" class="size-4" />
+                                                </button>
+                                                <button type="button" wire:click="removeAutoSlide({{ $i }})"
+                                                        wire:confirm="این آیتم از اسلایدهای خودکار حذف شود؟"
+                                                        class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:bg-zinc-900 dark:ring-zinc-700/60"
+                                                        title="حذف" aria-label="حذف آیتم از اسلایدهای خودکار">
+                                                    <x-icon name="trash-2" class="size-4" />
+                                                </button>
+                                            </span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="rounded-xl bg-zinc-50 p-4 text-center text-xs font-bold text-zinc-500 dark:bg-zinc-800/40 dark:text-zinc-400">
+                                    هنوز چیزی انتخاب نکرده‌اید — ۶ پکیج فعالِ آخر خودکار نمایش داده می‌شوند و بنر InstaShop اول است.
+                                </p>
+                            @endif
+
+                            <p class="text-[11px] leading-5 text-zinc-400">تغییرات این بخش با دکمهٔ «ذخیره تنظیمات» پایین صفحه اعمال می‌شود.</p>
                         </div>
                     </x-card>
 

@@ -80,10 +80,10 @@ class HomeShowcaseTest extends TestCase
             ->assertSee('packages/'.$package->slug, false) // دکمهٔ مشاهده و خرید
             ->assertSee('مشاهده و خرید');
 
-        // InstaShop هم بعد از بنر پکیج‌ها می‌آید
+        // InstaShop اول است (خواستهٔ کاربر — Task 74)
         $this->assertLessThan(
-            mb_strpos($response->getContent(), 'insta-shop.webp'),
-            mb_strpos($response->getContent(), 'پکیج ویترین')
+            mb_strpos($response->getContent(), 'پکیج ویترین'),
+            mb_strpos($response->getContent(), 'insta-shop.webp')
         );
     }
 
@@ -202,8 +202,9 @@ class HomeShowcaseTest extends TestCase
             $this->assertArrayHasKey('link_text', $slide);
         }
 
-        // آخرین اسلاید پیش‌فرض = InstaShop
-        $this->assertSame('https://insta-shop.opashop.ir', end($slides)['link']);
+        // اولین اسلاید پیش‌فرض = InstaShop (خواستهٔ کاربر — Task 74)
+        $this->assertSame('https://insta-shop.opashop.ir', $slides[0]['link']);
+        $this->assertGreaterThan(1, count($slides));
 
         // اسلاید پکیج به صفحهٔ خودش لینک است
         $packageSlide = collect($slides)->first(fn ($s) => str_contains($s['link'], '/packages/'.$package->slug));
@@ -431,12 +432,185 @@ class HomeShowcaseTest extends TestCase
             ->assertOk()
             ->assertSee('اسلایدر معرفی')
             ->assertSee('افزودن اسلاید جدید')
-            ->assertSee('بنر خودکار از پکیج‌های فعال');
+            ->assertSee('اسلایدهای خودکار از پکیج/محصول')
+            ->assertSee('انتخاب پکیج‌ها و محصولات اسلایدهای خودکار');
     }
 
     public function test_guest_cannot_manage_slides(): void
     {
         // صفحهٔ پنل اصلاً باز نمی‌شود (گوارش توسط route/middleware)
         $this->get(route('admin.settings.home'))->assertRedirect();
+    }
+
+    /* -------------------------------------------------------------- */
+    /*  Task 74 — اینستاگرام اول + انتخاب پکیج/محصول */
+    /* -------------------------------------------------------------- */
+
+    public function test_instashop_banner_is_first_by_default(): void
+    {
+        $this->makePackage(['name' => 'پکیج قدیمی‌تر']);
+        $this->makePackage(['name' => 'پکیج تازه‌تر']);
+
+        $slides = Showcase::slides();
+
+        $this->assertSame('https://insta-shop.opashop.ir', $slides[0]['link']);
+        $this->assertSame('پکیج تازه‌تر', $slides[1]['title']);
+        $this->assertSame('پکیج قدیمی‌تر', $slides[2]['title']);
+
+        $html = $this->get(route('shop.home'))->getContent();
+        $this->assertLessThan(
+            mb_strpos($html, 'پکیج قدیمی‌تر'),
+            mb_strpos($html, 'insta-shop.webp')
+        );
+    }
+
+    public function test_instashop_position_can_be_moved_last_via_panel(): void
+    {
+        $this->actingAs($this->admin);
+        $this->makePackage(['name' => 'پکیج جایگاه آخر']);
+
+        Livewire::test(SettingsHomePage::class)
+            ->assertSet('form.home_showcase_instashop_position', 'first') // پیش‌فرض = اول
+            ->set('form.home_showcase_instashop_position', 'last')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $slides = Showcase::slides();
+        $this->assertNotSame('https://insta-shop.opashop.ir', $slides[0]['link']);
+        $this->assertSame('https://insta-shop.opashop.ir', end($slides)['link']);
+
+        $html = $this->get(route('shop.home'))->getContent();
+        $this->assertGreaterThan(
+            mb_strpos($html, 'پکیج جایگاه آخر'),
+            mb_strpos($html, 'insta-shop.webp')
+        );
+    }
+
+    public function test_instashop_position_validates(): void
+    {
+        $this->actingAs($this->admin);
+
+        Livewire::test(SettingsHomePage::class)
+            ->set('form.home_showcase_instashop_position', 'middle')
+            ->call('save')
+            ->assertHasErrors(['form.home_showcase_instashop_position']);
+    }
+
+    public function test_auto_slides_picker_saves_selection_and_order(): void
+    {
+        $this->actingAs($this->admin);
+
+        $package = $this->makePackage(['name' => 'پکیج انتخابی اسلایدر']);
+        $other = $this->makePackage(['name' => 'پکیج انتخاب‌نشده']);
+        $product = $this->makeProduct(['name' => 'محصول انتخابی اسلایدر']);
+
+        $component = Livewire::test(SettingsHomePage::class)
+            // پکیج
+            ->set('pickerType', 'package')
+            ->set('pickerId', $package->id)
+            ->call('addAutoSlide')
+            ->assertHasNoErrors()
+            // جلوگیری از تکرار
+            ->set('pickerId', $package->id)
+            ->call('addAutoSlide')
+            ->assertHasErrors(['pickerId'])
+            // تلاش مجدد — خطای قبلی نباید بماند
+            ->set('pickerType', 'product')
+            ->set('pickerId', $product->id)
+            ->call('addAutoSlide')
+            ->assertHasNoErrors();
+
+        // ترتیب فرم: پکیج، محصول — محصول یک ردیف بالا می‌رود
+        $component->call('moveAutoSlide', 1, 'up')->assertHasNoErrors();
+
+        $component->call('save')->assertHasNoErrors();
+
+        $this->assertSame(
+            [['type' => 'product', 'id' => $product->id], ['type' => 'package', 'id' => $package->id]],
+            Showcase::storedRefs()
+        );
+
+        // صفحهٔ اصلی: ترتیب در HTML (اینستا ← محصول ← پکیج)
+        $html = $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertSee('محصول انتخابی اسلایدر')
+            ->assertSee('پکیج انتخابی اسلایدر')
+            ->getContent();
+
+        $this->assertLessThan(
+            mb_strpos($html, 'پکیج انتخابی اسلایدر'),
+            mb_strpos($html, 'محصول انتخابی اسلایدر')
+        );
+        $this->assertLessThan(
+            mb_strpos($html, 'محصول انتخابی اسلایدر'),
+            mb_strpos($html, 'insta-shop.webp')
+        );
+
+        // اسلایدر دقیقاً فقط انتخاب‌شده‌ها را دارد — پکیجِ انتخاب‌نشده اسلاید نیست
+        $this->assertSame(
+            ['پیج اینستاگرامت را به یک فروشگاه آنلاین تبدیل کن', 'محصول انتخابی اسلایدر', 'پکیج انتخابی اسلایدر'],
+            array_column(Showcase::slides(), 'title')
+        );
+    }
+
+    public function test_auto_slide_can_be_removed_from_panel(): void
+    {
+        $this->actingAs($this->admin);
+        $package = $this->makePackage(['name' => 'پکیج حذف‌شدنی']);
+
+        Livewire::test(SettingsHomePage::class)
+            ->set('pickerType', 'package')
+            ->set('pickerId', $package->id)
+            ->call('addAutoSlide')
+            ->assertSee('پکیج حذف‌شدنی')
+            ->call('removeAutoSlide', 0)
+            // ردیف از لیست حذف شده (نامش فقط در گزینه‌های پیکر برمی‌گردد که طبیعی است)
+            ->assertDontSee('auto-slide-row-package-'.$package->id, false)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame([], Showcase::storedRefs());
+    }
+
+    public function test_auto_slides_invalid_refs_fall_back_to_defaults(): void
+    {
+        $this->makePackage(['name' => 'پکیج فال‌بک اسلایدر']);
+
+        // JSON نامعتبر و ردیف‌های ناآشنا بی‌صدا نادیده گرفته می‌شوند
+        $this->setSetting('home_showcase_auto_slides', '{{{bad json');
+        $this->assertSame([], Showcase::storedRefs());
+
+        $this->setSetting('home_showcase_auto_slides', '[{"type":"category","id":5},{"type":"package","id":-3}]');
+        $this->assertSame([], Showcase::storedRefs());
+
+        // آیتمِ شکل-معتبر ولی ناموجود → فال‌بک نمی‌شود؛ فقط اینستاگرام می‌ماند
+        $this->setSetting('home_showcase_auto_slides', '[{"type":"package","id":999999}]');
+        $slides = Showcase::slides();
+        $this->assertCount(1, $slides);
+        $this->assertSame('https://insta-shop.opashop.ir', $slides[0]['link']);
+
+        // فال‌بک: ۶ پکیج فعالِ آخر + اینستاگرام اول
+        $this->setSetting('home_showcase_auto_slides', '');
+        $this->get(route('shop.home'))
+            ->assertOk()
+            ->assertSee('پکیج فال‌بک اسلایدر')
+            ->assertSee('insta-shop.webp');
+    }
+
+    public function test_inactive_selected_package_is_skipped_in_auto_slides(): void
+    {
+        $active = $this->makePackage(['name' => 'پکیج فعالِ انتخاب']);
+        $draft = $this->makePackage(['name' => 'پکیج پیش‌نویسِ انتخاب', 'status' => Package::STATUS_DRAFT]);
+
+        $this->setSetting('home_showcase_auto_slides', Showcase::encodeRefs([
+            ['type' => 'package', 'id' => $draft->id],
+            ['type' => 'package', 'id' => $active->id],
+        ]));
+
+        $slides = Showcase::slides();
+
+        $this->assertSame('https://insta-shop.opashop.ir', $slides[0]['link']); // اینستا اول
+        $this->assertSame('پکیج فعالِ انتخاب', $slides[1]['title']);
+        $this->assertCount(2, $slides); // پیش‌نویس نادیده گرفته شد
     }
 }

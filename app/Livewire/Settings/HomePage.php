@@ -4,10 +4,13 @@ namespace App\Livewire\Settings;
 
 use App\Livewire\Concerns\WithToasts;
 use App\Models\HomeSlide;
+use App\Models\Package;
+use App\Models\Product;
 use App\Models\Setting;
 use App\Services\ImageUploadService;
 use App\Support\HomePage as HomeSettings;
 use App\Support\ShopMenu;
+use App\Support\Showcase as ShowcaseSupport;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -266,6 +269,150 @@ class HomePage extends Component
 
         // آموزهٔ Task 60: کش computed باید پاک شود وگرنه رندر ترتیب کهنه را نشان می‌دهد
         unset($this->menuRows);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  اسلایدهای خودکار از پکیج/محصول — انتخاب مدیر (Task 74) */
+    /*  مقدار در فرم (home_showcase_auto_slides) است و با «ذخیره تنظیمات» */
+    /*  اعمال می‌شود — مثل بقیهٔ کلیدهای پیش‌فرض. */
+    /* ------------------------------------------------------------------ */
+
+    /** نوع آیتم پیکر (package | product) */
+    public string $pickerType = 'package';
+
+    /** شناسهٔ آیتم انتخاب‌شده در پیکر */
+    public $pickerId = null;
+
+    /** گزینه‌های پیکر — فعال‌های هر نوع که هنوز انتخاب نشده‌اند (برچسبِ پکیج = نام پروژه — نام) */
+    #[Computed]
+    public function pickerOptions(): array
+    {
+        $selected = ShowcaseSupport::parseRefs($this->form['home_showcase_auto_slides'] ?? '');
+        $takenIds = array_map(fn (array $r) => $r['id'], array_filter($selected, fn (array $r) => $r['type'] === $this->pickerType));
+
+        if ($this->pickerType === 'product') {
+            return Product::query()
+                ->where('status', Product::STATUS_ACTIVE)
+                ->whereNotIn('id', $takenIds ?: [0])
+                ->orderByDesc('id')
+                ->limit(200)
+                ->get()
+                ->mapWithKeys(fn (Product $p) => [$p->id => $p->name])
+                ->all();
+        }
+
+        return Package::query()
+            ->with('project:id,name')
+            ->where('status', Package::STATUS_ACTIVE)
+            ->whereNotIn('id', $takenIds ?: [0])
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get()
+            ->mapWithKeys(fn (Package $p) => [$p->id => trim(($p->project?->name ? $p->project->name.' — ' : '').$p->name)])
+            ->all();
+    }
+
+    /** ردیف‌های انتخاب‌شدهٔ فعلی فرم (به ترتیب فرم) با اطلاعات نمایشی */
+    #[Computed]
+    public function autoSlideRows(): array
+    {
+        $refs = ShowcaseSupport::parseRefs($this->form['home_showcase_auto_slides'] ?? '');
+
+        if ($refs === []) {
+            return [];
+        }
+
+        $packageIds = array_map(fn (array $r) => $r['id'], array_filter($refs, fn (array $r) => $r['type'] === 'package'));
+        $productIds = array_map(fn (array $r) => $r['id'], array_filter($refs, fn (array $r) => $r['type'] === 'product'));
+
+        // همهٔ وضعیت‌ها — مدیر باید ببیند اگر آیتمِ انتخابی‌اش غیرفعال شده
+        $packages = $packageIds === [] ? collect() : Package::query()->with('project:id,name')->whereIn('id', $packageIds)->get()->keyBy('id');
+        $products = $productIds === [] ? collect() : Product::query()->with('category:id,name')->whereIn('id', $productIds)->get()->keyBy('id');
+
+        $rows = [];
+
+        foreach ($refs as $i => $ref) {
+            $model = $ref['type'] === 'package' ? $packages->get($ref['id']) : $products->get($ref['id']);
+
+            if ($model === null) {
+                $rows[] = ['type' => $ref['type'], 'id' => $ref['id'], 'label' => 'حذف‌شده (#'.$ref['id'].')', 'sub' => '', 'thumb' => null, 'active' => false];
+
+                continue;
+            }
+
+            $rows[] = [
+                'type' => $ref['type'],
+                'id' => $ref['id'],
+                'label' => (string) $model->name,
+                'sub' => $ref['type'] === 'package'
+                    ? (string) ($model->project?->name ?: '')
+                    : (string) ($model->category?->name ?: ''),
+                'thumb' => $model->thumbnail_url,
+                'active' => $ref['type'] === 'package'
+                    ? $model->status === Package::STATUS_ACTIVE
+                    : $model->status === Product::STATUS_ACTIVE,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** افزودن آیتم پیکر به انتهای فهرست (فرم — با «ذخیره تنظیمات» اعمال می‌شود) */
+    public function addAutoSlide(): void
+    {
+        // خطای تلاش قبلی (مثلاً تکراری) نباید در تلاش جدید بماند
+        $this->resetErrorBag('pickerId');
+
+        if (! in_array($this->pickerType, ['package', 'product'], true) || ! $this->pickerId) {
+            $this->addError('pickerId', 'ابتدا یک پکیج یا محصول انتخاب کنید.');
+
+            return;
+        }
+
+        $refs = ShowcaseSupport::parseRefs($this->form['home_showcase_auto_slides'] ?? '');
+
+        foreach ($refs as $r) {
+            if ($r['type'] === $this->pickerType && $r['id'] === (int) $this->pickerId) {
+                $this->addError('pickerId', 'این آیتم قبلاً اضافه شده است.');
+
+                return;
+            }
+        }
+
+        $refs[] = ['type' => $this->pickerType, 'id' => (int) $this->pickerId];
+        $this->form['home_showcase_auto_slides'] = ShowcaseSupport::encodeRefs($refs);
+        $this->pickerId = null;
+        unset($this->autoSlideRows, $this->pickerOptions);
+        $this->toast('به اسلایدهای خودکار اضافه شد — با «ذخیره تنظیمات» اعمال می‌شود.');
+    }
+
+    /** حذف یک ردیف از فهرست */
+    public function removeAutoSlide(int $index): void
+    {
+        $refs = ShowcaseSupport::parseRefs($this->form['home_showcase_auto_slides'] ?? '');
+
+        if (! isset($refs[$index])) {
+            return;
+        }
+
+        array_splice($refs, $index, 1);
+        $this->form['home_showcase_auto_slides'] = ShowcaseSupport::encodeRefs($refs);
+        unset($this->autoSlideRows, $this->pickerOptions);
+    }
+
+    /** جابه‌جایی یک ردیف به بالا/پایین */
+    public function moveAutoSlide(int $index, string $direction): void
+    {
+        $refs = ShowcaseSupport::parseRefs($this->form['home_showcase_auto_slides'] ?? '');
+        $neighbor = $direction === 'up' ? $index - 1 : $index + 1;
+
+        if (! isset($refs[$index]) || ! isset($refs[$neighbor])) {
+            return;
+        }
+
+        [$refs[$index], $refs[$neighbor]] = [$refs[$neighbor], $refs[$index]];
+        $this->form['home_showcase_auto_slides'] = ShowcaseSupport::encodeRefs($refs);
+        unset($this->autoSlideRows);
     }
 
     /* ------------------------------------------------------------------ */
@@ -598,6 +745,10 @@ class HomePage extends Component
             'form.home_showcase_heading' => $max(120),
             'form.home_showcase_autoplay_speed' => ['required', 'integer', 'min:3', 'max:15'],
 
+            // اسلایدر معرفی — انتخاب‌های مدیر (Task 74)
+            'form.home_showcase_instashop_position' => ['required', 'in:'.implode(',', array_keys(HomeSettings::INSTA_POSITIONS))],
+            'form.home_showcase_auto_slides' => ['nullable', 'string', 'max:4000'],
+
             // فوتر — اینماد
             'form.footer_enamad_code' => ['nullable', 'string', 'max:5000'],
         ];
@@ -636,6 +787,9 @@ class HomePage extends Component
             'form.home_showcase_autoplay_speed.integer' => 'سرعت پخش خودکار باید عدد باشد.',
             'form.home_showcase_autoplay_speed.min' => 'سرعت پخش خودکار حداقل ۳ ثانیه است.',
             'form.home_showcase_autoplay_speed.max' => 'سرعت پخش خودکار حداکثر ۱۵ ثانیه است.',
+            'form.home_showcase_instashop_position.required' => 'جایگاه بنر InstaShop الزامی است.',
+            'form.home_showcase_instashop_position.in' => 'جایگاه بنر InstaShop معتبر نیست.',
+            'form.home_showcase_auto_slides.max' => 'فهرست اسلایدهای خودکار بیش از حد طولانی است.',
         ];
     }
 }
