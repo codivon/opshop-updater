@@ -53,6 +53,7 @@
                 ['route' => 'admin.settings.index', 'title' => 'تنظیمات', 'icon' => 'settings', 'match' => ['admin.settings.index', 'admin.settings.gateways']],
                 ['route' => 'admin.settings.home', 'title' => 'صفحهٔ اصلی فروشگاه', 'icon' => 'panel-top', 'match' => ['admin.settings.home']],
                 ['route' => 'admin.settings.security', 'title' => 'امنیت و امکانات', 'icon' => 'shield', 'match' => ['admin.settings.security']],
+                ['route' => 'admin.settings.developer', 'title' => 'تنظیمات برنامه‌نویس', 'icon' => 'wrench', 'match' => ['admin.settings.developer']],
                 ['route' => 'admin.users.index', 'title' => 'کاربران', 'icon' => 'shield-check', 'match' => ['admin.users*']],
                 ['route' => 'admin.profile', 'title' => 'پروفایل مدیر', 'icon' => 'user-check', 'match' => ['admin.profile']],
             ],

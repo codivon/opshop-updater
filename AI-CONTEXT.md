@@ -103,7 +103,7 @@ POST /payment/callback              → WebPaymentController (POST بانک، CS
 GET  /payment/result/{purchase}     → Shop\PaymentResult   (صفحه نتیجه)
 GET  /get-update/{code}             → UpdateDownloadController (دانلود مستقیم آپدیت)
      + Auth::routes() (laravel/ui)
-GET  /admin/...                     → ۱۳ صفحه Livewire پنل (auth middleware)
+GET  /admin/...                     → ۱۴ صفحه Livewire پنل (auth middleware)
 ```
 
 ### API v1 (`routes/api/v1.php`)
@@ -241,6 +241,13 @@ checkout در `Shop\PackageShow::buy()`: کد آپدیت → Customer → گار
 - **صفحهٔ عمومی تغییرات (changelog):** `/changelog` (`Shop\Changelog` + view) — merge نسخه‌های active پکیج/محصول/قالب (هرکدام ≤۱۵۰ ردیف) مرتب‌شده با فیلتر نوع + صفحه‌بندی دستی LengthAwarePaginator. خاموش → 404 + لینک منوی فروشگاه هم مخفی.
 - **شخصی‌سازی فروشگاه:** `site_name` (از قبل موجود) حالا در لایوت فروشگاه واقعاً اعمال می‌شود (title + برند هدر + فوتر)؛ فوتر: `feat_footer_text`/`feat_footer_description` (خالی = پیش‌فرض) + شبکه‌های اجتماعی `feat_social_telegram/instagram/whatsapp/email` (فقط http(s)/mailto؛ آیکون‌های instagram/youtube/wrench/megaphone/shield/user-check به Icon.php اضافه شدند).
 - **اعلان پیامکی فروش per-area:** `SmsManager::notifyAdminSale($area, $templateKey, ...)` با کلیدهای `notify_sale_package|product|template|subscription` (پیش‌فرض روشن = رفتار قبلی) — همهٔ ۷ نقطهٔ فراخوانی (WebPaymentController ×۴، ApiPaymentCallbackController، ApiPackageController، ApiSubscriptionController) استفاده می‌کنند.
+
+## ۶.۸ تنظیمات برنامه‌نویس (Task 72 — ابزارهای محیط/کش/مایگریشن از پنل)
+- **صفحه:** `/admin/settings/developer` (`Livewire\Settings\Developer` + ویو `livewire/settings/developer.blade.php`، سایدبار «سیستم»). دسترسی: علاوه بر میان‌افزار پنل، هر اکشن با `authorizeDeveloper()` فقط برای role=admin (حتی وقتی `sec_roles_enabled` خاموش است) — operator → 403.
+- **محیط/دیباگ → نوشتن مستقیم در `.env`:** سرویس `App\Support\EnvEditor` (مسیر تزریق‌شدنی — در تست با `$this->app->instance(EnvEditor::class, new EnvEditor($tmp))` تا `.env` واقعی لمس نشود). بعد از نوشتن: `config([...])` فوری + `refreshConfigCache()` — اگر `bootstrap/cache/config.php` موجود بود `config:clear`+`config:cache` (در محیط testing این تابع return می‌کند تا مقادیر phpunit در کش واقعی پروژه نوشته نشود!).
+- **مایگریشن‌های در انتظار:** پراپرتی محاسبه‌شده `getPendingMigrationsProperty()` — تفاوت فایل‌های `database/migrations` با جدول `migrations` (اگر جدول نبود، همه pending). **بخش فقط وقتی رندر می‌شود که حداقل یک مایگریشن pending باشد** (شرط `count($pendingMigrations) > 0` در ویو). دکمهٔ «اجرای مایگریشن (php artisan migrate)» → `Artisan::call('migrate', ['--force' => true])` + در صورت toggle روشن `db:seed --force`. خروجی در `$migrateOutput` (public) و کد-باکس زیر کارت نمایش داده می‌شود (حتی بعد از مخفی‌شدن بخش).
+- ⚠️ **گاتچا حیاتی:** پراپرتی محاسبه‌شدهٔ Livewire درون‌درخواستی کش می‌شود (`requestCachedValue ??=`) — چون `runMigrations()` قبل از اجرا `$this->pendingMigrations` را می‌خواند، رندر بعدی مقدار کهنه برمی‌گرداند و بخش مخفی نمی‌شد؛ راه‌حل: `unset($this->pendingMigrations);` بعد از اجرا (handleMagicUnset کش را می‌ریزد).
+- **کش‌ها:** `clearCache('app'|'config'|'route'|'view'|'all')` — یک اکشن با پارامتر (map ثابت CACHE_TARGETS). بهینه‌سازی: `optimize()` = config/route/view:cache (در testing فقط view:cache). دکمه‌های کش = دکمه‌های سفارشی با `wire:target` دقیق هر پارامتر.
 
 ## ۷. گاتچاهای حیاتی (خلاصه تجربه — حتماً رعایت شود)
 
@@ -405,3 +412,5 @@ admin-panel/
 - (۵۸) pagination پکیج‌ها ۱۲→۲۴: `Packages\Index` (پنل) و `Shop\PackagesIndex` (فروشگاه) — inline `paginate(24)`.
 - (۵۹) ⚠️ دو گودال تستی این تسک: (۱) `assertDontSee` روی کلمات مشترکِ بین بخش‌ها فال‌پوزیتیو می‌دهد — سربرگ بخش جدید را طوری نامگذاری کنید که با متن بخش‌های دیگر تلاقی نداشته باشد («معرفی» در aria-label هم به HTML می‌رود!) و برای ادعای «نبودن در یک بخش خاص»، substring همان section را جدا و بررسی کنید؛ (۲) افزودن بخش جدید به `SECTION_KEYS`/`SECTION_META`، تست‌های reorder پنل را که فرض «همسایگی ثابت» دارند می‌شکند — با اضافه‌شدن showcase در sort=15، هیرو دیگر همسایهٔ مستقیم آمار نیست.
 - (۶۰) ⚠️ `#[Computed]` در فایلی که فقط از الگوی `getXxxProperty` استفاده می‌کرده، بدون `use Livewire\Attributes\Computed;` بی‌صدا نادیده گرفته می‌شود → `Property [$x] not found` در رندر — import را چک کنید.
+- (۶۱) 🆕 **تنظیمات برنامه‌نویس** `/admin/settings/developer` (§۶.۸): نوشتن APP_ENV/APP_DEBUG در `.env` با `EnvEditor` (مسیر تزریق‌شدنی برای تست) + بخش مایگریشن‌های در انتظار (فقط وقتی pending وجود دارد) با دکمهٔ migrate+seed. ⚠️ پراپرتی محاسبه‌شدهٔ Livewire (`getXxxProperty`) درون یک درخواست کش می‌شود — اگر اکشنی آن را قبل از تغییر وضعیت بخواند، با `unset($this->xxx)` کش را بریزید وگرنه رندر بعدی مقدار کهنه نشان می‌دهد.
+- (۶۲) ⚠️ کامپوننت `x-select` این پروژه گزینه‌ها را از prop `:options="['value' => 'label']"` می‌گیرد؛ `<option>` داخل slot بی‌صدا حذف می‌شود.
