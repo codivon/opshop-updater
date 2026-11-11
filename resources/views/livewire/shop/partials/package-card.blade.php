@@ -1,5 +1,6 @@
-{{-- کارت پکیج فروشگاه — متغیرها: $package، $isCovered (اختیاری) --}}
+{{-- کارت پکیج فروشگاه — متغیرها: $package، $isCovered (اختیاری)، $showProject (اختیاری — نشان نام پروژه، صفحهٔ اصلی) --}}
 @php($isCovered = $isCovered ?? false)
+@php($showProject = $showProject ?? false)
 @php($minPrice = $package->activePricingPlans->count() ? $package->activePricingPlans->min('final_price') : $package->default_price)
 <a href="{{ route('shop.package', $package->slug) }}" wire:key="pkg-{{ $package->id }}" wire:navigate
    class="group flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-zinc-200/80 transition-all duration-200 hover:-translate-y-1 hover:shadow-card-lg dark:bg-zinc-900 dark:ring-zinc-700/60">
@@ -13,6 +14,15 @@
             <div class="shop-thumb flex size-full items-center justify-center transition-transform duration-300 group-hover:scale-110">
                 <x-icon name="package" class="size-12 text-white/80" />
             </div>
+        @endif
+
+        {{-- نام پروژهٔ هدف پکیج (صفحهٔ اصلی — Task 71) --}}
+        @if($showProject && $package->project)
+            <span class="absolute top-2 start-2 inline-flex max-w-[70%] items-center gap-1 rounded-lg bg-white/90 px-2 py-1 text-[10px] font-black text-brand-700 shadow-sm backdrop-blur dark:bg-zinc-950/80 dark:text-brand-400"
+                  title="مخصوص پروژهٔ {{ $package->project->name }}">
+                <x-icon name="rocket" class="size-3 shrink-0" />
+                <span class="truncate">{{ $package->project->name }}</span>
+            </span>
         @endif
 
         {{-- version badge --}}

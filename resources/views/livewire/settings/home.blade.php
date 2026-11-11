@@ -22,6 +22,7 @@
             ['id' => 'sections', 'label' => 'بخش‌ها', 'icon' => 'layout-grid'],
             ['id' => 'menu',     'label' => 'منوی هدر', 'icon' => 'menu'],
             ['id' => 'hero',     'label' => 'هیرو', 'icon' => 'sparkles'],
+            ['id' => 'showcase', 'label' => 'اسلایدر معرفی', 'icon' => 'image'],
             ['id' => 'about',    'label' => 'معرفی', 'icon' => 'users'],
             ['id' => 'trust',    'label' => 'اعتماد', 'icon' => 'badge-check'],
             ['id' => 'contact',  'label' => 'تماس با ما', 'icon' => 'message-circle'],
@@ -141,6 +142,182 @@
                     </x-card>
                 </div>
             </x-slot:hero>
+
+            {{-- ==================== اسلایدر معرفی (Task 71) ==================== --}}
+            <x-slot:showcase>
+                <div class="space-y-6">
+                    {{-- راهنمای قاعدهٔ نمایش --}}
+                    <div class="rounded-xl bg-sky-50 p-4 text-xs leading-6 text-sky-800 ring-1 ring-sky-600/20 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-400/20">
+                        <strong class="font-black">قاعدهٔ نمایش:</strong>
+                        تا وقتی هیچ اسلاید دستیِ فعالی نداشته باشید، اسلایدر به‌صورت خودکار از «پکیج‌های فعال» + «بنر ویژهٔ InstaShop» ساخته می‌شود.
+                        با افزودن اولین اسلاید دستی، فقط اسلایدهای دستی نمایش داده می‌شوند (برای بازگشت به پیش‌فرض، همهٔ اسلایدهای دستی را حذف یا غیرفعال کنید).
+                        اکشن‌های اسلاید (افزودن/ویرایش/حذف/ترتیب) بلافاصله ذخیره می‌شوند؛ کلیدهای روشن/خاموش و متن‌های بنر InstaShop با «ذخیره تنظیمات» اعمال می‌شوند.
+                    </div>
+
+                    {{-- پیش‌فرض‌ها — بخشی از فرم اصلی (ذخیره با دکمهٔ «ذخیره تنظیمات») --}}
+                    <x-card title="پیش‌فرض‌ها (وقتی اسلاید دستی فعال ندارید)" subtitle="بنر خودکار پکیج‌ها: از تصویر/عنوان/متن هر پکیج فعال. بنر ویژهٔ InstaShop: تصویر اختصاصی با متن قابل ویرایش.">
+                        <div class="space-y-5">
+                            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">بنر خودکار از پکیج‌های فعال (حداکثر ۶ عدد، جدیدترین‌ها)</span>
+                                <x-toggle wire:model="form.home_showcase_packages_enabled" id="home_showcase_packages_enabled" />
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">بنر ویژهٔ InstaShop (پیج اینستاگرام ← فروشگاه آنلاین)</span>
+                                <x-toggle wire:model="form.home_showcase_instashop_enabled" id="home_showcase_instashop_enabled" />
+                            </div>
+
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <x-field label="نشان بنر InstaShop" for="showcase_insta_badge">
+                                    <x-input id="showcase_insta_badge" wire:model="form.home_showcase_instashop_badge" placeholder="بیزینس آماده" />
+                                </x-field>
+                                <x-field label="متن دکمه" for="showcase_insta_link_text">
+                                    <x-input id="showcase_insta_link_text" wire:model="form.home_showcase_instashop_link_text" placeholder="مشاهدهٔ دمو" />
+                                </x-field>
+                                <x-field label="عنوان" for="showcase_insta_title" hint="پیش‌فرض: پیج اینستاگرامت را به یک فروشگاه آنلاین تبدیل کن" class="sm:col-span-2">
+                                    <x-input id="showcase_insta_title" wire:model="form.home_showcase_instashop_title" />
+                                </x-field>
+                                <x-field label="متن توضیح" for="showcase_insta_text" class="sm:col-span-2">
+                                    <x-textarea id="showcase_insta_text" wire:model="form.home_showcase_instashop_text" rows="3" />
+                                </x-field>
+                                <x-field label="لینک دکمه" for="showcase_insta_link" class="sm:col-span-2">
+                                    <x-input id="showcase_insta_link" wire:model="form.home_showcase_instashop_link" dir="ltr" placeholder="https://insta-shop.opashop.ir" icon="link" />
+                                </x-field>
+                            </div>
+                        </div>
+                    </x-card>
+
+                    {{-- اسلایدهای دستی — ذخیرهٔ لحظه‌ای --}}
+                    <x-card title="اسلایدهای دستی ({{ $this->slides->count() }} عدد)" subtitle="این اسلایدها بلافاصله ذخیره می‌شوند و اولویت نمایش دارند.">
+                        <div class="space-y-3">
+                            @foreach($this->slides as $s)
+                                <div class="flex flex-wrap items-center gap-3 rounded-xl bg-zinc-50 p-3 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60"
+                                     wire:key="slide-row-{{ $s->id }}">
+                                    {{-- بندانگشتی --}}
+                                    @if($s->image)
+                                        <img src="{{ template_asset_url($s->image) }}" alt="{{ $s->title }}"
+                                             class="size-14 shrink-0 rounded-lg object-cover ring-1 ring-zinc-200 dark:ring-zinc-700" />
+                                    @else
+                                        <span class="flex size-14 shrink-0 items-center justify-center rounded-lg bg-gradient-to-bl from-brand-600 to-teal-700 text-white/80">
+                                            <x-icon name="image" class="size-5" />
+                                        </span>
+                                    @endif
+
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-sm font-black text-zinc-900 dark:text-zinc-50">{{ $s->title }}</p>
+                                        <p class="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                            @if($s->badge)
+                                                <span class="rounded-full bg-zinc-200/70 px-2 py-0.5 dark:bg-zinc-700/70">{{ $s->badge }}</span>
+                                            @endif
+                                            @if($s->link)
+                                                <span class="inline-flex items-center gap-1"><x-icon name="link" class="size-3" /> دکمه دارد</span>
+                                            @endif
+                                            <span class="{{ $s->is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400' }}">
+                                                {{ $s->is_active ? 'فعال' : 'غیرفعال' }}
+                                            </span>
+                                        </p>
+                                    </div>
+
+                                    <span class="flex items-center gap-1">
+                                        <button type="button" wire:click="moveSlide({{ $s->id }}, 'up')"
+                                                class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-900 dark:ring-zinc-700/60"
+                                                title="انتقال به بالا" aria-label="انتقال اسلاید به بالا">
+                                            <x-icon name="chevron-up" class="size-4" />
+                                        </button>
+                                        <button type="button" wire:click="moveSlide({{ $s->id }}, 'down')"
+                                                class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:bg-zinc-900 dark:ring-zinc-700/60"
+                                                title="انتقال به پایین" aria-label="انتقال اسلاید به پایین">
+                                            <x-icon name="chevron-down" class="size-4" />
+                                        </button>
+                                        <button type="button" wire:click="editSlide({{ $s->id }})"
+                                                class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-sky-50 hover:text-sky-600 dark:bg-zinc-900 dark:ring-zinc-700/60"
+                                                title="ویرایش" aria-label="ویرایش اسلاید">
+                                            <x-icon name="pencil" class="size-4" />
+                                        </button>
+                                        <button type="button" wire:click="deleteSlide({{ $s->id }})"
+                                                wire:confirm="این اسلاید حذف شود؟"
+                                                class="rounded-lg bg-white p-1.5 text-zinc-500 ring-1 ring-zinc-200/70 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:bg-zinc-900 dark:ring-zinc-700/60"
+                                                title="حذف" aria-label="حذف اسلاید">
+                                            <x-icon name="trash-2" class="size-4" />
+                                        </button>
+                                        <span class="ms-1 scale-90" title="{{ $s->is_active ? 'فعال — کلیک برای غیرفعال‌کردن' : 'غیرفعال — کلیک برای فعال‌کردن' }}">
+                                            <button type="button" wire:click="toggleSlide({{ $s->id }})"
+                                                    class="relative h-5 w-9 rounded-full transition-colors {{ $s->is_active ? 'bg-brand-600' : 'bg-zinc-300 dark:bg-zinc-600' }}"
+                                                    aria-label="تغییر وضعیت نمایش اسلاید">
+                                                <span class="absolute top-0.5 {{ $s->is_active ? 'start-0.5' : 'end-0.5' }} size-4 rounded-full bg-white shadow"></span>
+                                            </button>
+                                        </span>
+                                    </span>
+                                </div>
+                            @endforeach
+
+                            @if($this->slides->isEmpty())
+                                <p class="rounded-xl bg-zinc-50 p-4 text-center text-xs font-bold text-zinc-500 dark:bg-zinc-800/40 dark:text-zinc-400">
+                                    هنوز اسلاید دستی ندارید — اسلایدر از پیش‌فرض‌ها (پکیج‌ها + InstaShop) ساخته می‌شود.
+                                </p>
+                            @endif
+
+                            {{-- دکمهٔ افزودن / فرم --}}
+                            @if(!$showSlideForm)
+                                <button type="button" wire:click="newSlide"
+                                        class="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-300 py-3.5 text-sm font-black text-zinc-500 transition-colors hover:border-brand-400 hover:bg-brand-50/50 hover:text-brand-600 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-brand-500/50 dark:hover:bg-brand-500/5 dark:hover:text-brand-400">
+                                    <x-icon name="plus" class="size-4.5" />
+                                    افزودن اسلاید جدید
+                                </button>
+                            @else
+                                <div class="space-y-4 rounded-xl bg-white p-4 ring-1 ring-brand-500/30 dark:bg-zinc-900 dark:ring-brand-500/25">
+                                    <p class="flex items-center gap-2 text-sm font-black text-zinc-800 dark:text-zinc-100">
+                                        <x-icon name="{{ $editingSlideId ? 'pencil' : 'plus' }}" class="size-4 text-brand-600 dark:text-brand-400" />
+                                        {{ $editingSlideId ? 'ویرایش اسلاید' : 'اسلاید جدید' }}
+                                        <span class="ms-auto text-[11px] font-bold text-zinc-400">ذخیرهٔ لحظه‌ای — بدون نیاز به «ذخیره تنظیمات»</span>
+                                    </p>
+
+                                    <div class="grid gap-4 sm:grid-cols-2">
+                                        <x-field label="نشان (اختیاری)" for="slide_badge">
+                                            <x-input id="slide_badge" wire:model="slide.badge" placeholder="مثلاً: پکیج ویژه" />
+                                        </x-field>
+                                        <x-field label="متن دکمه (اختیاری)" for="slide_link_text">
+                                            <x-input id="slide_link_text" wire:model="slide.link_text" placeholder="مشاهده" />
+                                        </x-field>
+                                        <x-field label="عنوان" for="slide_title" required class="sm:col-span-2" :error="'slide.title'">
+                                            <x-input id="slide_title" wire:model="slide.title" wire:keydown.enter.prevent="saveSlide" />
+                                        </x-field>
+                                        <x-field label="متن توضیح (اختیاری)" for="slide_text" class="sm:col-span-2" :error="'slide.text'">
+                                            <x-textarea id="slide_text" wire:model="slide.text" rows="3" />
+                                        </x-field>
+                                        <x-field label="لینک دکمه (اختیاری)" for="slide_link" class="sm:col-span-2" :error="'slide.link'">
+                                            <x-input id="slide_link" wire:model="slide.link" wire:keydown.enter.prevent="saveSlide" dir="ltr" placeholder="https:// یا /packages/…" />
+                                        </x-field>
+                                        <x-field label="تصویر اسلاید (اختیاری — JPG/PNG/WEBP تا ۳MB)" for="slide_image" class="sm:col-span-2" :error="'slideImage'">
+                                            <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" wire:model="slideImage" id="slide_image" class="input" />
+                                            <x-upload-progress target="slideImage" label="در حال آپلود تصویر اسلاید" />
+                                            @if($editingSlideId && !$slideImage && ($this->slides->firstWhere('id', $editingSlideId)->image ?? null))
+                                                <p class="mt-1 text-[11px] text-zinc-400">تصویر فعلی حفظ می‌شود؛ با انتخاب فایل جدید جایگزین می‌شود.</p>
+                                            @endif
+                                        </x-field>
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <label class="flex cursor-pointer items-center gap-2 text-sm font-bold text-zinc-700 dark:text-zinc-200">
+                                            <input type="checkbox" wire:model="slide.is_active" class="checkbox" />
+                                            فعال (نمایش در صفحهٔ اصلی)
+                                        </label>
+                                        <span class="flex items-center gap-2">
+                                            <button type="button" wire:click="closeSlideForm"
+                                                    class="rounded-xl px-4 py-2 text-sm font-bold text-zinc-500 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                                                انصراف
+                                            </button>
+                                            <x-btn type="button" wire:click="saveSlide" icon="save" wire:loading.attr="disabled">
+                                                {{ $editingSlideId ? 'اعمال ویرایش' : 'ذخیرهٔ اسلاید' }}
+                                            </x-btn>
+                                        </span>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </x-card>
+                </div>
+            </x-slot:showcase>
 
             {{-- ==================== معرفی ==================== --}}
             <x-slot:about>

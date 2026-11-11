@@ -6,7 +6,14 @@ use App\Livewire\Concerns\WithToasts;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Package;
+use App\Models\PackageVersion;
+use App\Models\Product;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
+use App\Models\Template;
+use App\Support\HomePage;
+use App\Support\Showcase;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -71,6 +78,7 @@ class Home extends Component
         if (auth('customer')->check()) {
             $this->reset('updateCode');
             $this->toast('شما وارد حساب خود شده‌اید؛ اشتراک فعال شما در همین صفحه نمایش داده می‌شود.');
+
             return;
         }
 
@@ -78,25 +86,29 @@ class Home extends Component
 
         if ($code === '') {
             $this->toast('کد آپدیت الزامی است.', 'error');
+
             return;
         }
 
         $customer = Customer::query()->where('update_code', $code)->first();
 
-        if (!$customer) {
+        if (! $customer) {
             $this->toast('کد آپدیت نامعتبر است.', 'error');
+
             return;
         }
 
         if ($customer->status !== 'active') {
             $this->toast('حساب این مشتری غیرفعال است.', 'error');
+
             return;
         }
 
         $subscription = $customer->activePlanSubscription();
 
-        if (!$subscription?->plan) {
+        if (! $subscription?->plan) {
             $this->toast('هیچ اشتراک فعالی برای این کد یافت نشد.', 'error');
+
             return;
         }
 
@@ -104,7 +116,7 @@ class Home extends Component
 
         unset($this->currentCustomer, $this->myActiveSubscription, $this->coveredPackageIds);
 
-        $this->toast('اشتراک فعال شما پیدا شد؛ پکیج‌های طرح «' . $subscription->plan->name . '» برای شما رایگان‌اند.');
+        $this->toast('اشتراک فعال شما پیدا شد؛ پکیج‌های طرح «'.$subscription->plan->name.'» برای شما رایگان‌اند.');
     }
 
     public function forgetMySubscription(): void
@@ -128,7 +140,7 @@ class Home extends Component
     {
         $plan = $this->myActiveSubscription?->plan;
 
-        if (!$plan) {
+        if (! $plan) {
             return [];
         }
 
@@ -143,7 +155,7 @@ class Home extends Component
     public function packages()
     {
         return Package::query()
-            ->with(['latestVersion:id,package_id,version', 'activePricingPlans', 'categoryModel:id,name'])
+            ->with(['project:id,name', 'latestVersion:id,package_id,version', 'activePricingPlans', 'categoryModel:id,name'])
             ->where('status', Package::STATUS_ACTIVE)
             ->orderByDesc('id')
             ->limit(self::PREVIEW_LIMIT)
@@ -153,10 +165,10 @@ class Home extends Component
     #[Computed]
     public function products()
     {
-        return \App\Models\Product::query()
+        return Product::query()
             ->with(['category:id,name', 'latestVersion:id,product_id,version'])
             ->withCount(['comments' => fn ($q) => $q->where('status', 'approved')])
-            ->where('status', \App\Models\Product::STATUS_ACTIVE)
+            ->where('status', Product::STATUS_ACTIVE)
             ->orderBy('sort_order')
             ->orderByDesc('id')
             ->limit(self::PREVIEW_LIMIT)
@@ -166,10 +178,10 @@ class Home extends Component
     #[Computed]
     public function templates()
     {
-        return \App\Models\Template::query()
+        return Template::query()
             ->with(['category:id,name', 'latestVersion:id,template_id,version'])
             ->withCount(['comments' => fn ($q) => $q->where('status', 'approved')])
-            ->where('status', \App\Models\Template::STATUS_ACTIVE)
+            ->where('status', Template::STATUS_ACTIVE)
             // قالب‌های واگذارشده (خرید اختصاصی) در صفحه اصلی نمایش داده نمی‌شوند
             ->where('is_sold_exclusively', false)
             ->orderBy('sort_order')
@@ -181,7 +193,7 @@ class Home extends Component
     #[Computed]
     public function featuredPlans()
     {
-        return \App\Models\SubscriptionPlan::query()
+        return SubscriptionPlan::query()
             ->active()
             ->with(['packages:id,name,slug'])
             ->orderBy('sort_order')
@@ -196,24 +208,24 @@ class Home extends Component
      * هر گره shop_count (تعداد تجمیعی خود + زیردرخت) دارد.
      */
     #[Computed]
-    public function packageCategoryTree(): \Illuminate\Support\Collection
+    public function packageCategoryTree(): Collection
     {
         return $this->homeCategoryTree(Category::TYPE_PACKAGE);
     }
 
     #[Computed]
-    public function productCategoryTree(): \Illuminate\Support\Collection
+    public function productCategoryTree(): Collection
     {
         return $this->homeCategoryTree(Category::TYPE_PRODUCT);
     }
 
     #[Computed]
-    public function templateCategoryTree(): \Illuminate\Support\Collection
+    public function templateCategoryTree(): Collection
     {
         return $this->homeCategoryTree(Category::TYPE_TEMPLATE);
     }
 
-    private function homeCategoryTree(string $type): \Illuminate\Support\Collection
+    private function homeCategoryTree(string $type): Collection
     {
         $flat = Category::shopTree($type);
 
@@ -227,7 +239,7 @@ class Home extends Component
             ->filter(fn ($cat) => $cat->parent_id === null || ! $ids->contains($cat->parent_id))
             ->values()
             ->map(fn ($root) => [
-                'model'    => $root,
+                'model' => $root,
                 'children' => $flat->where('parent_id', (int) $root->id)->values(),
             ]);
     }
@@ -236,11 +248,11 @@ class Home extends Component
     public function stats(): array
     {
         return [
-            'products'  => \App\Models\Product::where('status', \App\Models\Product::STATUS_ACTIVE)->count(),
-            'templates' => \App\Models\Template::where('status', \App\Models\Template::STATUS_ACTIVE)->count(),
-            'packages'  => Package::where('status', Package::STATUS_ACTIVE)->count(),
-            'versions'  => \App\Models\PackageVersion::where('status', \App\Models\PackageVersion::STATUS_ACTIVE)->count(),
-            'plans'     => \App\Models\SubscriptionPlan::where('is_active', true)->count(),
+            'products' => Product::where('status', Product::STATUS_ACTIVE)->count(),
+            'templates' => Template::where('status', Template::STATUS_ACTIVE)->count(),
+            'packages' => Package::where('status', Package::STATUS_ACTIVE)->count(),
+            'versions' => PackageVersion::where('status', PackageVersion::STATUS_ACTIVE)->count(),
+            'plans' => SubscriptionPlan::where('is_active', true)->count(),
         ];
     }
 
@@ -251,7 +263,7 @@ class Home extends Component
      */
     private function homeSettingsPayload(): array
     {
-        $home = \App\Support\HomePage::class;
+        $home = HomePage::class;
 
         return [
             // متن‌ها (کلید => مقدار trim‌شده با پیش‌فرض)
@@ -266,9 +278,12 @@ class Home extends Component
                 array_map(fn ($key) => $home::on($key), $home::BOOL_KEYS)
             ),
 
-            'whyItems'     => $home::whyItems(),
-            'trustStats'   => $home::stats(),
+            'whyItems' => $home::whyItems(),
+            'trustStats' => $home::stats(),
             'testimonials' => $home::testimonials(),
+
+            // اسلایدهای «اسلایدر معرفی» — دستی اولویت دارد، وگرنه پیش‌فرض (پکیج‌ها + InstaShop) — Task 71
+            'showcaseSlides' => Showcase::slides(),
 
             // ترتیب رندر بخش‌ها از کلیدهای home_sort_* (پنل ← تب بخش‌ها) — Task 59
             'sections' => $home::orderedSections(),

@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Package;
 use App\Models\PackageImage;
+use App\Models\Template;
+use App\Models\TemplateImage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,13 +32,15 @@ use RuntimeException;
 class ImageUploadService
 {
     private const THUMBNAIL_DIR = 'uploads/packages/thumbnails';
-    private const GALLERY_DIR   = 'uploads/packages/gallery';
+
+    private const GALLERY_DIR = 'uploads/packages/gallery';
 
     /** ریشه‌ی جایگزین داخل storage/app */
     private const FALLBACK_ROOT = 'public'; // → storage/app/public/uploads/…
 
     private const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    private const MAX_SIZE_KB   = 3072; // 3MB
+
+    private const MAX_SIZE_KB = 3072; // 3MB
 
     /* ===================================================================
      *  آپلود تصویر شاخص
@@ -47,7 +51,7 @@ class ImageUploadService
         $this->validateImage($file);
 
         $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-        $filename  = $slug . '_thumb_' . time() . '_' . Str::random(6) . '.' . $extension;
+        $filename = $slug.'_thumb_'.time().'_'.Str::random(6).'.'.$extension;
 
         return $this->storeFile($file, self::THUMBNAIL_DIR, $filename);
     }
@@ -61,7 +65,7 @@ class ImageUploadService
         $this->validateImage($file);
 
         $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-        $filename  = 'product_' . \Illuminate\Support\Str::slug($slug) . '_thumb_' . time() . '_' . Str::random(6) . '.' . $extension;
+        $filename = 'product_'.Str::slug($slug).'_thumb_'.time().'_'.Str::random(6).'.'.$extension;
 
         return $this->storeFile($file, 'uploads/products/thumbnails', $filename);
     }
@@ -75,7 +79,7 @@ class ImageUploadService
         $this->validateImage($file);
 
         $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-        $filename  = 'template_' . \Illuminate\Support\Str::slug($slug) . '_thumb_' . time() . '_' . Str::random(6) . '.' . $extension;
+        $filename = 'template_'.Str::slug($slug).'_thumb_'.time().'_'.Str::random(6).'.'.$extension;
 
         return $this->storeFile($file, 'uploads/templates/thumbnails', $filename);
     }
@@ -92,30 +96,30 @@ class ImageUploadService
             $nextOrder = $package->images()->max('sort_order') ?: 0;
 
             foreach ($files as $file) {
-                if (!$file instanceof UploadedFile || !$file->isValid()) {
+                if (! $file instanceof UploadedFile || ! $file->isValid()) {
                     continue;
                 }
 
                 $this->validateImage($file);
 
                 $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-                $filename  = $package->slug . '_gallery_' . time() . '_' . Str::random(6) . '.' . $extension;
+                $filename = $package->slug.'_gallery_'.time().'_'.Str::random(6).'.'.$extension;
 
                 // ذخیره اطلاعات قبل از انتقال
                 $originalName = $file->getClientOriginalName();
-                $fileSize     = $file->getSize();
+                $fileSize = $file->getSize();
 
                 $path = $this->storeFile($file, self::GALLERY_DIR, $filename);
 
                 $nextOrder++;
 
                 $image = PackageImage::create([
-                    'package_id'    => $package->id,
-                    'path'          => $path,
+                    'package_id' => $package->id,
+                    'path' => $path,
                     'original_name' => $originalName,
-                    'size'          => $fileSize,
-                    'sort_order'    => $nextOrder,
-                    'is_active'     => true,
+                    'size' => $fileSize,
+                    'sort_order' => $nextOrder,
+                    'is_active' => true,
                 ]);
 
                 $uploaded[] = $image;
@@ -129,7 +133,7 @@ class ImageUploadService
      *  آپلود چندین تصویر گالری قالب (Template)
      *  Returns: array of TemplateImage
      * =================================================================== */
-    public function uploadTemplateGalleryImages(array $files, \App\Models\Template $template): array
+    public function uploadTemplateGalleryImages(array $files, Template $template): array
     {
         $uploaded = [];
 
@@ -137,30 +141,30 @@ class ImageUploadService
             $nextOrder = $template->images()->max('sort_order') ?: 0;
 
             foreach ($files as $file) {
-                if (!$file instanceof UploadedFile || !$file->isValid()) {
+                if (! $file instanceof UploadedFile || ! $file->isValid()) {
                     continue;
                 }
 
                 $this->validateImage($file);
 
                 $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
-                $filename  = $template->slug . '_gallery_' . time() . '_' . Str::random(6) . '.' . $extension;
+                $filename = $template->slug.'_gallery_'.time().'_'.Str::random(6).'.'.$extension;
 
                 // ذخیره اطلاعات قبل از انتقال
                 $originalName = $file->getClientOriginalName();
-                $fileSize     = $file->getSize();
+                $fileSize = $file->getSize();
 
                 $path = $this->storeFile($file, 'uploads/templates/gallery', $filename);
 
                 $nextOrder++;
 
-                $image = \App\Models\TemplateImage::create([
-                    'template_id'   => $template->id,
-                    'path'          => $path,
+                $image = TemplateImage::create([
+                    'template_id' => $template->id,
+                    'path' => $path,
                     'original_name' => $originalName,
-                    'size'          => $fileSize,
-                    'sort_order'    => $nextOrder,
-                    'is_active'     => true,
+                    'size' => $fileSize,
+                    'sort_order' => $nextOrder,
+                    'is_active' => true,
                 ]);
 
                 $uploaded[] = $image;
@@ -170,13 +174,13 @@ class ImageUploadService
         return $uploaded;
     }
 
-    public function deleteTemplateGalleryImage(\App\Models\TemplateImage $image): void
+    public function deleteTemplateGalleryImage(TemplateImage $image): void
     {
         $this->deleteFile($image->path);
         $image->delete();
     }
 
-    public function deleteAllTemplateGalleryImages(\App\Models\Template $template): int
+    public function deleteAllTemplateGalleryImages(Template $template): int
     {
         $count = 0;
 
@@ -194,7 +198,7 @@ class ImageUploadService
     {
         DB::transaction(function () use ($orderedIds) {
             foreach ($orderedIds as $order => $id) {
-                \App\Models\TemplateImage::where('id', $id)->update(['sort_order' => $order + 1]);
+                TemplateImage::where('id', $id)->update(['sort_order' => $order + 1]);
             }
         });
     }
@@ -208,7 +212,7 @@ class ImageUploadService
         // مسیر tmp واقعی فایل (livewire-tmp یا php upload tmp)
         $source = $file->getRealPath();
 
-        if (!$source || !is_file($source)) {
+        if (! $source || ! is_file($source)) {
             throw new RuntimeException('فایل آپلودی روی سرور یافت نشد؛ لطفاً دوباره تلاش کنید.');
         }
 
@@ -218,28 +222,28 @@ class ImageUploadService
         $stored = $this->copyTo($source, $publicDir, $filename);
 
         if ($stored === true) {
-            return $relativeDir . '/' . $filename;
+            return $relativeDir.'/'.$filename;
         }
 
         Log::warning('Upload to public dir failed, falling back to storage', [
-            'dir'   => $relativeDir,
+            'dir' => $relativeDir,
             'error' => is_string($stored) ? $stored : 'unknown',
         ]);
 
         // ۲) مسیر جایگزین: storage/app/public/uploads/…
-        $fallbackDir = storage_path('app/' . self::FALLBACK_ROOT . '/' . $relativeDir);
+        $fallbackDir = storage_path('app/'.self::FALLBACK_ROOT.'/'.$relativeDir);
 
         $stored = $this->copyTo($source, $fallbackDir, $filename);
 
         if ($stored !== true) {
             $reason = is_string($stored) ? $stored : 'دلیل نامشخص';
             throw new RuntimeException(
-                'ذخیره تصویر ناموفق بود (' . $reason . '). ' .
+                'ذخیره تصویر ناموفق بود ('.$reason.'). '.
                 'لطفاً دسترسی (پرمیژن ۷۷۵) و مالکیت پوشه‌های «public/uploads» و «storage/app/public» را بررسی کنید.'
             );
         }
 
-        return $relativeDir . '/' . $filename;
+        return $relativeDir.'/'.$filename;
     }
 
     /**
@@ -252,19 +256,19 @@ class ImageUploadService
         // ۱) ساخت دایرکتوری (بازگشتی) — اگر شکست خورد علت را گزارش کن
         $dirOk = $this->ensureDirectory($targetDir);
 
-        if (!$dirOk) {
-            return 'ساخت/دسترسی پوشه «' . $targetDir . '» ممکن نیست (پرمیژن؟)';
+        if (! $dirOk) {
+            return 'ساخت/دسترسی پوشه «'.$targetDir.'» ممکن نیست (پرمیژن؟)';
         }
 
-        $target = $targetDir . '/' . $filename;
+        $target = $targetDir.'/'.$filename;
 
         // ۲) کپی (به‌جای rename) — بین دیسک‌ها/لایه‌های filesystem هم کار می‌کند
-        if (!@copy($source, $target)) {
+        if (! @copy($source, $target)) {
             $err = error_get_last()['message'] ?? 'copy failed';
 
             // تلاش دوم با rename (اگر copy به هر دلیل نشد)
-            if (!@rename($source, $target)) {
-                return 'کپی فایل به «' . $target . '» ناموفق بود: ' . $err;
+            if (! @rename($source, $target)) {
+                return 'کپی فایل به «'.$target.'» ناموفق بود: '.$err;
             }
         }
 
@@ -284,27 +288,27 @@ class ImageUploadService
      */
     private function ensureDirectory(string $path, int $mode = 0775): bool
     {
-        if (!is_dir($path)) {
+        if (! is_dir($path)) {
             // mkdir بازگشتی — سطح به سطح تا اگر والد‌ها مشکل داشتند هم بسازیم
-            if (!@mkdir($path, $mode, true) && !is_dir($path)) {
+            if (! @mkdir($path, $mode, true) && ! is_dir($path)) {
                 // والد را یک بار چک/اصلاح می‌کنیم و دوباره تلاش
                 @chmod(dirname($path), $mode);
 
-                if (!@mkdir($path, $mode, true) && !is_dir($path)) {
+                if (! @mkdir($path, $mode, true) && ! is_dir($path)) {
                     return false;
                 }
             }
         }
 
         // اگر وجود دارد ولی قابل نوشتن نیست → تلاش برای اصلاح دسترسی
-        if (is_dir($path) && !is_writable($path)) {
+        if (is_dir($path) && ! is_writable($path)) {
             @chmod($path, $mode);
             @chmod(dirname($path), $mode);
         }
 
         // تست واقعی نوشتن (is_writable روی بعضی NFS گمراه‌کننده است)
         if (is_dir($path) && is_writable($path)) {
-            $probe = $path . '/.write_test_' . bin2hex(random_bytes(3));
+            $probe = $path.'/.write_test_'.bin2hex(random_bytes(3));
             if (@file_put_contents($probe, 'ok') !== false) {
                 @unlink($probe);
 
@@ -340,14 +344,15 @@ class ImageUploadService
             $image->delete();
             $count++;
         }
+
         return $count;
     }
 
     /** حذف فایل از public و در صورت نبود، از storage fallback (عمومی — برای لوگو درگاه‌ها هم استفاده می‌شود) */
     public function deleteFile(string $relativePath): void
     {
-        $publicPath   = public_path($relativePath);
-        $fallbackPath = storage_path('app/' . self::FALLBACK_ROOT . '/' . $relativePath);
+        $publicPath = public_path($relativePath);
+        $fallbackPath = storage_path('app/'.self::FALLBACK_ROOT.'/'.$relativePath);
 
         foreach ([$publicPath, $fallbackPath] as $candidate) {
             if (is_file($candidate)) {
@@ -357,12 +362,35 @@ class ImageUploadService
     }
 
     /* ===================================================================
+     *  آپلود تصویر اسلاید «اسلایدر معرفی» صفحهٔ اصلی (Task 71)
+     *  Returns: مسیر نسبی (uploads/home-slides/xxx.png)
+     * =================================================================== */
+    public function uploadShowcaseImage(UploadedFile $file): string
+    {
+        if (! $file->isValid()) {
+            throw new RuntimeException('فایل تصویر معتبر نیست.');
+        }
+
+        $mime = $file->getMimeType();
+
+        if (! in_array($mime, self::ALLOWED_MIMES, true)) {
+            throw new RuntimeException('فرمت تصویر مجاز نیست؛ فقط JPG, PNG, WEBP, GIF.');
+        }
+
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+        $ext = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) ? ($ext === 'jpeg' ? 'jpg' : $ext) : 'png';
+        $filename = 'slide-'.time().'-'.Str::random(6).'.'.$ext;
+
+        return $this->storeFile($file, 'uploads/home-slides', $filename);
+    }
+
+    /* ===================================================================
      *  آپلود لوگوی درگاه (عمومی — در Gateways استفاده می‌شود)
      *  Returns: مسیر نسبی (uploads/gateways/logos/xxx.svg) یا null
      * =================================================================== */
     public function uploadGatewayLogo(UploadedFile $file, string $key): ?string
     {
-        if (!$file->isValid()) {
+        if (! $file->isValid()) {
             throw new RuntimeException('فایل لوگو معتبر نیست.');
         }
 
@@ -374,16 +402,16 @@ class ImageUploadService
             'application/octet-stream', // بعضی هاست‌ها svg را اینطور می‌شناسند
         ]);
 
-        if (!in_array($mime, $allowed, true)) {
+        if (! in_array($mime, $allowed, true)) {
             throw new RuntimeException('فرمت لوگو مجاز نیست؛ فقط JPG, PNG, WEBP, SVG.');
         }
 
         // برای SVG فقط پسوند .svg
-        $ext       = strtolower($file->getClientOriginalExtension() ?: 'png');
-        $ext       = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'], true) ? ($ext === 'jpeg' ? 'jpg' : $ext) : 'png';
-        $filename  = $key . '-' . time() . '-' . Str::random(4) . '.' . $ext;
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+        $ext = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'], true) ? ($ext === 'jpeg' ? 'jpg' : $ext) : 'png';
+        $filename = $key.'-'.time().'-'.Str::random(4).'.'.$ext;
 
-        $dir   = 'uploads/gateways/logos';
+        $dir = 'uploads/gateways/logos';
         $probe = $this->storeFile($file, $dir, $filename);
 
         return $probe;
@@ -406,7 +434,7 @@ class ImageUploadService
      * =================================================================== */
     private function validateImage(UploadedFile $file): void
     {
-        if (!in_array($file->getMimeType(), self::ALLOWED_MIMES)) {
+        if (! in_array($file->getMimeType(), self::ALLOWED_MIMES)) {
             throw new RuntimeException(
                 'فرمت فایل مجاز نیست. فقط JPG, PNG, WEBP, GIF مجاز است.'
             );
@@ -414,7 +442,7 @@ class ImageUploadService
 
         if ($file->getSize() > self::MAX_SIZE_KB * 1024) {
             throw new RuntimeException(
-                'حجم فایل نباید بیشتر از ' . (self::MAX_SIZE_KB / 1024) . ' مگابایت باشد.'
+                'حجم فایل نباید بیشتر از '.(self::MAX_SIZE_KB / 1024).' مگابایت باشد.'
             );
         }
     }

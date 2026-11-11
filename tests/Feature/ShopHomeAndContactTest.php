@@ -154,15 +154,18 @@ class ShopHomeAndContactTest extends TestCase
             ->assertSet('form.home_sort_hero', '10')
             ->call('moveSectionDown', 'contact')
             ->assertSet('form.home_sort_contact', '120')
-            // جابه‌جایی واقعی: هیرو یک ردیف پایین (تعویض با آمار اعتماد)
+            // جابه‌جایی واقعی: هیرو دو ردیف پایین (تعویض با اسلایدر معرفی و بعد آمار اعتماد — Task 71 بخش جدید بین این دو)
+            ->call('moveSectionDown', 'hero')
+            ->assertSet('form.home_sort_hero', '15')
+            ->assertSet('form.home_sort_showcase', '10')
             ->call('moveSectionDown', 'hero')
             ->assertSet('form.home_sort_hero', '20')
-            ->assertSet('form.home_sort_stats', '10')
+            ->assertSet('form.home_sort_stats', '15')
             ->call('save')
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('settings', ['key' => 'home_sort_hero',  'value' => '20', 'group' => 'home']);
-        $this->assertDatabaseHas('settings', ['key' => 'home_sort_stats', 'value' => '10', 'group' => 'home']);
+        $this->assertDatabaseHas('settings', ['key' => 'home_sort_stats', 'value' => '15', 'group' => 'home']);
 
         // روی صفحهٔ اصلی: آمار اعتماد («سال تجربه») بالاتر از هیرو رندر می‌شود
         $html = $this->get(route('shop.home'))->assertOk()->getContent();
@@ -178,13 +181,13 @@ class ShopHomeAndContactTest extends TestCase
         // فلش کش می‌شد و رندر بعدی ترتیب کهنه را نشان می‌داد — پس از move، خودِ HTML
         // رندرشدهٔ پنل باید بلافاصله ترتیب جدید را نشان دهد (قبل از هر ذخیره‌ای).
         $panel = Livewire::test(SettingsHomePage::class)
-            ->assertSeeInOrder(['هیرو (معرفی بالا)', 'آمار اعتماد'], false)
+            ->assertSeeInOrder(['هیرو (معرفی بالا)', 'اسلایدر معرفی', 'آمار اعتماد'], false)
             ->call('moveSectionDown', 'hero');
 
         $html = $panel->html();
         $this->assertLessThan(
             mb_strpos($html, 'هیرو (معرفی بالا)'),
-            mb_strpos($html, 'آمار اعتماد')
+            mb_strpos($html, 'اسلایدر معرفی')
         );
 
         // و برگشت به جای اولش
@@ -192,8 +195,8 @@ class ShopHomeAndContactTest extends TestCase
 
         $html = $panel->html();
         $this->assertLessThan(
-            mb_strpos($html, 'آمار اعتماد'),
-            mb_strpos($html, 'هیرو (معرفی بالا)')
+            mb_strpos($html, 'هیرو (معرفی بالا)'),
+            mb_strpos($html, 'اسلایدر معرفی')
         );
     }
 

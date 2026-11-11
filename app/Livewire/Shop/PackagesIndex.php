@@ -128,7 +128,7 @@ class PackagesIndex extends Component
             ->when($this->sort === 'cheap', fn ($q) => $q->orderByRaw("{$effective} ASC")->orderByDesc('id'))
             ->when($this->sort === 'expensive', fn ($q) => $q->orderByRaw("{$effective} DESC")->orderByDesc('id'))
             ->when($this->sort === 'popular', fn ($q) => $q->orderByDesc('purchases_count')->orderByDesc('id'))
-            ->paginate(12);
+            ->paginate(24);
     }
 
     /** دسته‌بندی‌های پکیج — درختی با تعداد تجمیعی (والد شامل زیردسته‌ها) */

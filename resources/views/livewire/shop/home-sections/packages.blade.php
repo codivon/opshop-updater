@@ -22,7 +22,7 @@
                     @if($this->packages->count())
                         <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach($this->packages as $package)
-                                @include('livewire.shop.partials.package-card', ['package' => $package, 'isCovered' => in_array($package->id, $this->coveredPackageIds)])
+                                @include('livewire.shop.partials.package-card', ['package' => $package, 'isCovered' => in_array($package->id, $this->coveredPackageIds), 'showProject' => true])
                             @endforeach
                         </div>
                     @else

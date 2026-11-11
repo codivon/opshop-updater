@@ -111,7 +111,7 @@ class Index extends Component
             ->when($this->sort === 'sales_desc', fn ($q) => $q
                 ->orderByDesc('paid_purchases_count')
                 ->orderByDesc('paid_revenue_sum'))
-            ->paginate(12);
+            ->paginate(24);
     }
 
     #[Computed]
