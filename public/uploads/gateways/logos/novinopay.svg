@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="96" viewBox="0 0 240 96" role="img" aria-label="نوین‌پی">
+  <defs>
+    <linearGradient id="bg-novinopay" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f4f5f7"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="238" height="94" rx="14" fill="url(#bg-novinopay)" stroke="#e2e4e9" stroke-width="2"/>
+  <rect x="14" y="18" width="60" height="60" rx="14" fill="#00A69C"/>
+  <circle cx="44" cy="38" r="10" fill="rgba(255,255,255,0.28)"/>
+  <path d="M47 28 L36 46 L44 46 L41 62 L53 43 L45 43 Z" fill="#ffffff"/>
+  <text x="88" y="46" font-family="Vazirmatn, Tahoma, sans-serif" font-size="21" font-weight="800" fill="#1f2430">نوین‌پی</text>
+  <text x="88" y="68" font-family="Vazirmatn, Tahoma, sans-serif" font-size="12.5" fill="#7a8194">درگاه پرداخت نوین</text>
+</svg>

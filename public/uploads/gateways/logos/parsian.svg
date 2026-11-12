@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="96" viewBox="0 0 240 96" role="img" aria-label="پارسیان">
+  <defs>
+    <linearGradient id="bg-parsian" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f4f5f7"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="238" height="94" rx="14" fill="url(#bg-parsian)" stroke="#e2e4e9" stroke-width="2"/>
+  <rect x="14" y="18" width="60" height="60" rx="14" fill="#EF7D22"/>
+  <circle cx="44" cy="38" r="10" fill="rgba(255,255,255,0.28)"/>
+  <path d="M44 27 L52 33 L52 44 C52 53 48 59 44 62 C40 59 36 53 36 44 L36 33 Z" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linejoin="round"/>
+  <circle cx="44" cy="44" r="4.5" fill="#ffffff"/>
+  <text x="88" y="46" font-family="Vazirmatn, Tahoma, sans-serif" font-size="21" font-weight="800" fill="#1f2430">پارسیان</text>
+  <text x="88" y="68" font-family="Vazirmatn, Tahoma, sans-serif" font-size="12.5" fill="#7a8194">درگاه بانک پارسیان</text>
+</svg>

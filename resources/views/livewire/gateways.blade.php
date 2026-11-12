@@ -61,107 +61,150 @@
 
     @if(count($gateways))
         <form wire:submit="save" class="space-y-6">
-            <div class="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {{-- فهرست عمودی درگاه‌ها — هر درگاه یک ردیف کامل با پنل بازشو --}}
+            <div class="space-y-3">
                 @foreach($gateways as $index => $gw)
                     @php
                         $meta = $schema[$gw['key']] ?? ['label' => $gw['name'], 'fields' => []];
                         $nameError = $errors->has("gateways.{$index}.name") ? 'input-error' : '';
                         $orderingError = $errors->has("gateways.{$index}.ordering") ? 'input-error' : '';
+                        $logoUrl = \App\Livewire\Gateways::logoUrl($gw);
                     @endphp
 
-                    <div wire:key="gw-{{ $gw['id'] }}" class="card flex flex-col">
-                        {{-- gateway header: ردیف ۱ هویت/کنترل‌ها، ردیف ۲ عنوان کامل در یک سطر زیر تصویر --}}
-                        <div class="border-b border-zinc-200/80 p-4 dark:border-zinc-800">
-                            <div class="flex items-center gap-3">
-                                <input type="checkbox" class="checkbox shrink-0" aria-label="انتخاب این درگاه"
-                                       wire:model.live="selectedIds" value="{{ $gw['id'] }}" />
-                                {{-- logo (اختصاصی یا پیش‌فرض) --}}
-                                @php($logoUrl = \App\Livewire\Gateways::logoUrl($gw))
-                                <div class="h-11 w-[110px] shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200/80 dark:ring-zinc-700/60">
-                                    @if($logoUrl)
-                                        <img src="{{ $logoUrl }}" alt="لوگوی {{ $meta['label'] ?? $gw['name'] }}" class="h-full w-full object-contain" />
-                                    @else
-                                        <div class="flex h-full w-full items-center justify-center text-zinc-400">
-                                            <x-icon name="credit-card" class="size-5.5" />
-                                        </div>
-                                    @endif
-                                </div>
-                                <div class="ms-auto flex shrink-0 items-center gap-1.5">
-                                    <x-toggle wire:model.live="gateways.{{ $index }}.is_active" id="gw-active-{{ $gw['id'] }}" />
-                                    <button type="button" wire:click="$set('deleteId', {{ $gw['id'] }})"
-                                            class="shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
-                                            title="حذف درگاه" aria-label="حذف {{ $meta['label'] ?? $gw['name'] }}">
-                                        <x-icon name="trash" class="size-4.5" />
-                                    </button>
-                                </div>
-                            </div>
-                            {{-- عنوان کامل درگاه — یک سطر تمام‌عرض زیر لوگو، بدون بریدگی --}}
-                            <p class="mt-3 text-base font-black leading-6 text-zinc-900 dark:text-zinc-50">
-                                {{ $meta['label'] ?? $gw['name'] }}
-                            </p>
-                            <div class="mt-1.5 flex flex-wrap items-center gap-2">
-                                <x-badge :variant="$gw['is_active'] ? 'success' : 'danger'">{{ $gw['is_active'] ? 'فعال' : 'غیرفعال' }}</x-badge>
-                                @if($gw['is_test'] ?? false)
-                                    <x-badge variant="warning" icon="flask">درگاه تست</x-badge>
+                    <div wire:key="gw-{{ $gw['id'] }}"
+                         x-data="{ open: false }"
+                         class="card overflow-hidden {{ ($gw['is_test'] ?? false) ? 'border-s-4 border-s-amber-400' : ($gw['is_active'] ? 'border-s-4 border-s-emerald-500' : 'border-s-4 border-s-zinc-200 dark:border-s-zinc-700') }}">
+                        {{-- ── سربرگ ردیف ─────────────────────────────── --}}
+                        <div class="flex items-center gap-3 p-4 transition-colors hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40">
+                            <input type="checkbox" class="checkbox shrink-0" aria-label="انتخاب این درگاه"
+                                   wire:model.live="selectedIds" value="{{ $gw['id'] }}" />
+
+                            {{-- لوگو --}}
+                            <div class="hidden h-11 w-[104px] shrink-0 overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200/80 sm:block dark:ring-zinc-700/60">
+                                @if($logoUrl)
+                                    <img src="{{ $logoUrl }}" alt="لوگوی {{ $meta['label'] ?? $gw['name'] }}" class="h-full w-full object-contain" />
+                                @else
+                                    <div class="flex h-full w-full items-center justify-center text-zinc-400">
+                                        <x-icon name="credit-card" class="size-5.5" />
+                                    </div>
                                 @endif
-                                <span class="font-mono text-[11px] text-zinc-400" dir="ltr">{{ $gw['key'] }}</span>
+                            </div>
+
+                            {{-- دکمهٔ باز/بسته کردن تنظیمات — روی عنوان --}}
+                            <button type="button" class="min-w-0 flex-1 text-start" @click="open = !open"
+                                    :aria-expanded="open ? 'true' : 'false'"
+                                    aria-label="تنظیمات {{ $meta['label'] ?? $gw['name'] }}">
+                                <span class="block truncate text-[15px] font-black leading-6 text-zinc-900 dark:text-zinc-50">
+                                    {{ $meta['label'] ?? $gw['name'] }}
+                                </span>
+                                <span class="mt-1 flex flex-wrap items-center gap-2">
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold {{ $gw['is_active'] ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' }}">
+                                        <span class="size-1.5 rounded-full {{ $gw['is_active'] ? 'bg-emerald-500' : 'bg-zinc-400' }}"></span>
+                                        {{ $gw['is_active'] ? 'فعال' : 'غیرفعال' }}
+                                    </span>
+                                    @if($gw['is_test'] ?? false)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                                            <x-icon name="flask" class="size-3" /> درگاه تست
+                                        </span>
+                                    @endif
+                                    <span class="font-mono text-[11px] text-zinc-400" dir="ltr">{{ $gw['key'] }}</span>
+                                    @if($gw['ordering'] !== null && $gw['ordering'] !== '')
+                                        <span class="text-[11px] text-zinc-400">ترتیب {{ fa_num($gw['ordering']) }}</span>
+                                    @endif
+                                </span>
+                            </button>
+
+                            {{-- کنترل‌ها --}}
+                            <div class="ms-auto flex shrink-0 items-center gap-1.5">
+                                <x-toggle wire:model.live="gateways.{{ $index }}.is_active" id="gw-active-{{ $gw['id'] }}" />
+                                <button type="button" wire:click="$set('deleteId', {{ $gw['id'] }})"
+                                        class="shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
+                                        title="حذف درگاه" aria-label="حذف {{ $meta['label'] ?? $gw['name'] }}">
+                                    <x-icon name="trash" class="size-4.5" />
+                                </button>
+                                <button type="button" class="shrink-0 rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                                        x-bind:aria-expanded="open ? 'true' : 'false'"
+                                        aria-label="باز/بسته کردن تنظیمات {{ $meta['label'] ?? $gw['name'] }}"
+                                        x-bind:title="open ? 'بستن تنظیمات' : 'باز کردن تنظیمات'"
+                                        @click="open = !open">
+                                    <x-icon name="chevron-down" class="size-4.5 transition-transform duration-200" x-bind:class="open ? 'rotate-180' : ''" />
+                                </button>
                             </div>
                         </div>
 
-                        {{-- gateway body --}}
-                        <div class="flex-1 space-y-4 p-4">
-                            <div class="grid grid-cols-3 gap-3">
-                                <div class="col-span-2">
-                                    <x-field label="عنوان" for="gw-name-{{ $gw['id'] }}" required>
-                                        <x-input id="gw-name-{{ $gw['id'] }}" wire:model="gateways.{{ $index }}.name" class="{{ $nameError }}" />
-                                    </x-field>
-                                </div>
-                                <x-field label="ترتیب" for="gw-order-{{ $gw['id'] }}">
-                                    <x-input id="gw-order-{{ $gw['id'] }}" wire:model="gateways.{{ $index }}.ordering" type="number" dir="ltr" class="{{ $orderingError }}" />
-                                </x-field>
-                            </div>
-
-                            @foreach($meta['fields'] as $field)
-                                @if(($field['type'] ?? 'text') === 'textarea')
-                                    <x-field wire:key="gw-{{ $gw['id'] }}-f-{{ $field['name'] }}" :label="$field['label']" required>
-                                        <x-textarea wire:model="gateways.{{ $index }}.configs.{{ $field['name'] }}" rows="3" dir="ltr" class="font-mono" />
-                                    </x-field>
-                                @else
-                                    <x-field wire:key="gw-{{ $gw['id'] }}-f-{{ $field['name'] }}" :label="$field['label']" required>
-                                        <x-input wire:model="gateways.{{ $index }}.configs.{{ $field['name'] }}" dir="ltr" class="font-mono" />
-                                    </x-field>
-                                @endif
-                            @endforeach
-
-                            {{-- لوگوی اختصاصی --}}
-                            <div class="rounded-xl border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
-                                <p class="mb-2 text-xs font-bold text-zinc-600 dark:text-zinc-300">لوگوی اختصاصی (اختیاری)</p>
-                                <div class="flex flex-wrap items-center gap-3">
-                                    <input type="file" wire:model="logoUploads.{{ $gw['id'] }}" accept="image/*,.svg"
-                                           class="block w-full text-xs text-zinc-500 file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-zinc-600 hover:file:bg-zinc-200 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-300"
-                                           aria-label="آپلود لوگوی درگاه {{ $gw['name'] }}" />
-                                    <x-upload-progress target="logoUploads.{{ $gw['id'] }}" label="در حال آپلود لوگو" class="w-full" />
-                                    @if($gw['logo'])
-                                        <button type="button" wire:click="removeLogo({{ $gw['id'] }})"
-                                                class="rounded-lg px-2.5 py-1.5 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">
-                                            حذف لوگوی فعلی
-                                        </button>
-                                    @endif
-                                    <div wire:loading wire:target="logoUploads.{{ $gw['id'] }}" class="flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400">
-                                        <x-icon name="loader" class="size-3.5 animate-spin" />
-                                        در حال آپلود موقت…
+                        {{-- ── پنل تنظیمات (بازشو) ────────────────────── --}}
+                        <div x-show="open" x-cloak
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="opacity-0 -translate-y-1"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="border-t border-zinc-200/80 bg-zinc-50/60 p-4 sm:p-5 dark:border-zinc-800 dark:bg-zinc-800/30">
+                            <div class="grid gap-4 lg:grid-cols-2">
+                                {{-- ستون اطلاعات پایه --}}
+                                <div class="space-y-4">
+                                    <div class="grid grid-cols-3 gap-3">
+                                        <div class="col-span-2">
+                                            <x-field label="عنوان" for="gw-name-{{ $gw['id'] }}" required>
+                                                <x-input id="gw-name-{{ $gw['id'] }}" wire:model="gateways.{{ $index }}.name" class="{{ $nameError }}" />
+                                            </x-field>
+                                        </div>
+                                        <x-field label="ترتیب نمایش" for="gw-order-{{ $gw['id'] }}">
+                                            <x-input id="gw-order-{{ $gw['id'] }}" wire:model="gateways.{{ $index }}.ordering" type="number" dir="ltr" class="{{ $orderingError }}" />
+                                        </x-field>
                                     </div>
-                                    @if(($logoUploads[$gw['id']] ?? null) && $logoUploads[$gw['id']]->isPreviewable())
-                                        <div class="flex items-center gap-2">
-                                            <img src="{{ $logoUploads[$gw['id']]->temporaryUrl() }}" alt="پیش‌نمایش" class="h-9 w-[90px] rounded-lg bg-white object-contain ring-1 ring-zinc-200 dark:ring-zinc-700" />
-                                            <span class="text-[11px] text-zinc-400">پس از «ذخیره» اعمال می‌شود</span>
+
+                                    {{-- لوگوی اختصاصی --}}
+                                    <div class="rounded-xl border border-dashed border-zinc-300 p-3 dark:border-zinc-700">
+                                        <p class="mb-2 text-xs font-bold text-zinc-600 dark:text-zinc-300">لوگوی اختصاصی (اختیاری)</p>
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <input type="file" wire:model="logoUploads.{{ $gw['id'] }}" accept="image/*,.svg"
+                                                   class="block w-full text-xs text-zinc-500 file:me-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-zinc-600 hover:file:bg-zinc-200 dark:text-zinc-400 dark:file:bg-zinc-800 dark:file:text-zinc-300"
+                                                   aria-label="آپلود لوگوی درگاه {{ $gw['name'] }}" />
+                                            <x-upload-progress target="logoUploads.{{ $gw['id'] }}" label="در حال آپلود لوگو" class="w-full" />
+                                            @if($gw['logo'])
+                                                <button type="button" wire:click="removeLogo({{ $gw['id'] }})"
+                                                        class="rounded-lg px-2.5 py-1.5 text-xs font-bold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">
+                                                    حذف لوگوی فعلی
+                                                </button>
+                                            @endif
+                                            <div wire:loading wire:target="logoUploads.{{ $gw['id'] }}" class="flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400">
+                                                <x-icon name="loader" class="size-3.5 animate-spin" />
+                                                در حال آپلود موقت…
+                                            </div>
+                                            @if(($logoUploads[$gw['id']] ?? null) && $logoUploads[$gw['id']]->isPreviewable())
+                                                <div class="flex items-center gap-2">
+                                                    <img src="{{ $logoUploads[$gw['id']]->temporaryUrl() }}" alt="پیش‌نمایش" class="h-9 w-[90px] rounded-lg bg-white object-contain ring-1 ring-zinc-200 dark:ring-zinc-700" />
+                                                    <span class="text-[11px] text-zinc-400">پس از «ذخیره» اعمال می‌شود</span>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- ستون پیکربندی درگاه --}}
+                                <div class="space-y-4">
+                                    @if(count($meta['fields']))
+                                        @foreach($meta['fields'] as $field)
+                                            @if(($field['type'] ?? 'text') === 'textarea')
+                                                <x-field wire:key="gw-{{ $gw['id'] }}-f-{{ $field['name'] }}" :label="$field['label']" required>
+                                                    <x-textarea wire:model="gateways.{{ $index }}.configs.{{ $field['name'] }}" rows="3" dir="ltr" class="font-mono" />
+                                                </x-field>
+                                            @else
+                                                <x-field wire:key="gw-{{ $gw['id'] }}-f-{{ $field['name'] }}" :label="$field['label']" required>
+                                                    <x-input wire:model="gateways.{{ $index }}.configs.{{ $field['name'] }}" dir="ltr" class="font-mono" />
+                                                </x-field>
+                                            @endif
+                                        @endforeach
+                                    @else
+                                        <div class="flex items-start gap-2 rounded-xl bg-zinc-100 p-3 text-xs leading-6 text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400">
+                                            <x-icon name="info" class="size-4 shrink-0" />
+                                            <p>این درگاه پیکربندی جداگانه ندارد؛ فقط کلید فعال‌سازی را روشن کنید.</p>
                                         </div>
                                     @endif
                                 </div>
                             </div>
 
                             @if($gw['is_test'] ?? false)
-                                <div class="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-800 ring-1 ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20">
+                                <div class="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-800 ring-1 ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20">
                                     <x-icon name="info" class="size-4 shrink-0" />
                                     <p>این درگاه فقط برای <b>تست جریان پرداخت</b> است و پول واقعی جابه‌جا نمی‌کند. با خاموش کردن کلید بالا، درگاه آزمایشی از لیست انتخاب مشتریان حذف می‌شود.</p>
                                 </div>
@@ -175,7 +218,7 @@
             <div class="card sticky bottom-4 flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
                 <p class="flex items-center gap-2 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
                     <x-icon name="info" class="size-4 shrink-0" />
-                    برای فعال نمودن هر یک از درگاه‌ها، پس از انتخاب درگاه اطلاعات مربوط به آن را پر کنید.
+                    برای فعال نمودن هر درگاه، کلید آن را روشن کنید، با کلیک روی عنوان ردیف تنظیمات را باز کنید و مقادیر را پر کنید.
                 </p>
                 <x-btn type="submit" icon="save" :loading="true">ذخیره تغییرات</x-btn>
             </div>

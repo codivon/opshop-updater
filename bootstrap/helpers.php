@@ -1,5 +1,11 @@
 <?php
 
+use App\Models\Gateway;
+use App\Models\Setting;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Morilog\Jalali\Jalalian;
+
 if (! function_exists('setting')) {
     /**
      * خواندن تنظیمات از جدول settings (با کش ۶۰ ثانیه‌ای).
@@ -7,12 +13,12 @@ if (! function_exists('setting')) {
     function setting(string $key, mixed $default = null): mixed
     {
         try {
-            return \Illuminate\Support\Facades\Cache::remember(
-                'setting:' . $key,
+            return Cache::remember(
+                'setting:'.$key,
                 60,
-                fn () => \App\Models\Setting::query()->where('key', $key)->value('value')
+                fn () => Setting::query()->where('key', $key)->value('value')
             ) ?? $default;
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return $default;
         }
     }
@@ -35,7 +41,7 @@ if (! function_exists('shaparak_proxy')) {
         }
 
         // اعتبارسنجی ساده
-        if (!preg_match('#^(https?|socks5h?|tcp)://[^\s]+$#i', $proxy)) {
+        if (! preg_match('#^(https?|socks5h?|tcp)://[^\s]+$#i', $proxy)) {
             return null;
         }
 
@@ -54,7 +60,7 @@ if (! function_exists('exception_status')) {
      * به response()->json() می‌رسید و TypeError می‌داد. این هِلپر فقط کدهای
      * صحیحِ ۱۰۰ تا ۵۹۹ را برمی‌گرداند و در غیر این صورت مقدار پیش‌فرض.
      */
-    function exception_status(\Throwable $e, int $fallback = 500): int
+    function exception_status(Throwable $e, int $fallback = 500): int
     {
         $code = $e->getCode();
 
@@ -87,14 +93,14 @@ if (! function_exists('gateway_logo_url')) {
         }
 
         // لوگوی اختصاصی (آپلودی) — از مسیر uploads/… سرو می‌شود
-        if (!blank($customPath)) {
+        if (! blank($customPath)) {
             return asset($customPath);
         }
 
         // لوگوی پیش‌فرض داخل پروژه
-        $default = public_path('uploads/gateways/logos/' . $key . '.svg');
+        $default = public_path('uploads/gateways/logos/'.$key.'.svg');
 
-        return is_file($default) ? asset('uploads/gateways/logos/' . $key . '.svg') : null;
+        return is_file($default) ? asset('uploads/gateways/logos/'.$key.'.svg') : null;
     }
 }
 
@@ -118,11 +124,11 @@ if (! function_exists('normalize_mobile')) {
 
         // +989xxxxxxxxx / 00989xxxxxxxxx / 989xxxxxxxxx → 09xxxxxxxxx
         if (str_starts_with($number, '0098')) {
-            $number = '0' . substr($number, 4);
+            $number = '0'.substr($number, 4);
         } elseif (str_starts_with($number, '98') && strlen($number) === 12) {
-            $number = '0' . substr($number, 2);
+            $number = '0'.substr($number, 2);
         } elseif (str_starts_with($number, '9') && strlen($number) === 10) {
-            $number = '0' . $number;
+            $number = '0'.$number;
         }
 
         // موبایل معتبر ایران: 09xxxxxxxxx
@@ -136,39 +142,39 @@ if (! function_exists('normalize_mobile')) {
 
 function get_gateway_configs($gateway)
 {
-    $gateway = \App\Models\Gateway::where('key', $gateway)->first();
+    $gateway = Gateway::where('key', $gateway)->first();
 
-    if (!$gateway) {
+    if (! $gateway) {
         return [];
     }
 
     $configs = [];
 
     switch ($gateway->key) {
-        case "local": {
+        case 'local':
             // درگاه آزمایشی — فقط برای تست جریان پرداخت (در شبیه‌ساز درگاه رندر می‌شود)
-            $configs['title']        = $gateway->config('title') ?? 'درگاه پرداخت آزمایشی';
-            $configs['description']  = $gateway->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود';
-            $configs['orderLabel']   = $gateway->config('orderLabel') ?? 'شماره سفارش';
-            $configs['amountLabel']  = $gateway->config('amountLabel') ?? 'مبلغ';
-            $configs['payButton']    = $gateway->config('payButton') ?? 'پرداخت (موفق)';
+            $configs['title'] = $gateway->config('title') ?? 'درگاه پرداخت آزمایشی';
+            $configs['description'] = $gateway->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود';
+            $configs['orderLabel'] = $gateway->config('orderLabel') ?? 'شماره سفارش';
+            $configs['amountLabel'] = $gateway->config('amountLabel') ?? 'مبلغ';
+            $configs['payButton'] = $gateway->config('payButton') ?? 'پرداخت (موفق)';
             $configs['cancelButton'] = $gateway->config('cancelButton') ?? 'لغو پرداخت';
             break;
-        }
-        case "zarinpal": {
+
+        case 'zarinpal':
             $configs['merchantId'] = $gateway->config('merchantId');
             break;
-        }
-        case "toman": {
+
+        case 'toman':
             $user = auth()->user();
-            $order =  $user->orders->last();
+            $order = $user->orders->last();
             $items = [];
             foreach ($order->items as $product) {
 
                 $data = [
                     'name' => $product->title,
-                    'price' => $product->price . 0,
-                    'quantity' => $product->quantity
+                    'price' => $product->price. 0,
+                    'quantity' => $product->quantity,
                 ];
                 array_push($items, $data);
                 $data = null;
@@ -177,8 +183,8 @@ function get_gateway_configs($gateway)
             if ($order->shipping_cost > 0) {
                 $shipping = [
                     'name' => $order->carrier->title,
-                    'price' => $order->shipping_cost . 0,
-                    'quantity' => 1
+                    'price' => $order->shipping_cost. 0,
+                    'quantity' => 1,
                 ];
                 array_push($items, $shipping);
             }
@@ -186,34 +192,34 @@ function get_gateway_configs($gateway)
             $data = [
                 'res_number' => $order->id,
                 'return_to' => route('front.orders.verify', ['gateway' => 'toman']),
-                'items' => $items
+                'items' => $items,
             ];
 
             $configs['shop_slug'] = $gateway->config('shop_slug');
             $configs['auth_code'] = $gateway->config('auth_code');
             $configs['data'] = $data;
             break;
-        }
-        case "payping": {
+
+        case 'payping':
             $configs['merchantId'] = $gateway->config('merchantId');
             break;
-        }
-        case "irankish": {
+
+        case 'irankish':
             $configs['terminalId'] = $gateway->config('terminalId');
-            $configs['password']   = $gateway->config('password');
+            $configs['password'] = $gateway->config('password');
             $configs['acceptorId'] = $gateway->config('acceptorId');
-            $configs['pubKey']     = $gateway->config('pubKey');
+            $configs['pubKey'] = $gateway->config('pubKey');
             break;
-        }
-        case "idpay": {
+
+        case 'idpay':
             $configs['merchantId'] = $gateway->config('merchantId');
             break;
-        }
-        case "saman": {
+
+        case 'saman':
             $configs['merchantId'] = $gateway->config('merchantId');
             break;
-        }
-        case "sep": {
+
+        case 'sep':
             // سامان SEP — ترمینال جدید (UUID) یا عددی
             $configs['terminalId'] = $gateway->config('terminalId') ?: $gateway->config('merchantId');
             $mode = trim((string) ($gateway->config('mode') ?? ''));
@@ -221,38 +227,64 @@ function get_gateway_configs($gateway)
                 $configs['mode'] = $mode; // خالی = خودکار (UUID → v1)
             }
             break;
-        }
-        case "behpardakht": {
+
+        case 'behpardakht':
             $configs['terminalId'] = $gateway->config('terminalId');
-            $configs['username']   = $gateway->config('username');
-            $configs['password']   = $gateway->config('password');
+            $configs['username'] = $gateway->config('username');
+            $configs['password'] = $gateway->config('password');
             break;
-        }
-        case "payir": {
+
+        case 'payir':
             $configs['merchantId'] = $gateway->config('merchantId');
             break;
-        }
-        case "sepehr": {
+
+        case 'sepehr':
             $configs['terminalId'] = $gateway->config('terminalId');
             break;
-        }
-        case "sadad": {
-            $configs['key']        = $gateway->config('key');
+
+        case 'sadad':
+            $configs['key'] = $gateway->config('key');
             $configs['merchantId'] = $gateway->config('merchantId');
             $configs['terminalId'] = $gateway->config('terminalId');
             break;
-        }
-        case "zibal": {
+
+        case 'zibal':
             $configs['merchantId'] = $gateway->config('merchantId');
             break;
-        }
+
+        case 'novinopay':
+            // نوین‌پی — API فاکتوری (هم‌ساختار سپرده)
+            $configs['merchantId'] = $gateway->config('merchantId');
+            $mode = trim((string) ($gateway->config('mode') ?? ''));
+            if (in_array($mode, ['direct'], true)) {
+                $configs['mode'] = $mode; // خالی = عادی (صفحهٔ فاکتور)
+            }
+            break;
+
+        case 'parsian':
+            $configs['merchantId'] = $gateway->config('merchantId');
+            break;
+
+        case 'pasargad':
+            // پاسارگاد — API نسخهٔ جدید REST (baseUrl از پیکربندی ثابت می‌آید)
+            $configs['terminalCode'] = $gateway->config('terminalCode');
+            $configs['userName'] = $gateway->config('userName');
+            $configs['password'] = $gateway->config('password');
+            break;
+
+        case 'asanpardakht':
+            $configs['username'] = $gateway->config('username');
+            $configs['password'] = $gateway->config('password');
+            $configs['merchantConfigID'] = $gateway->config('merchantConfigID');
+            break;
+
     }
 
     return $configs;
 }
 
 /* ------------------------------------------------------------------ */
-/*  Presentation helpers                                                */
+/*  Presentation helpers */
 /* ------------------------------------------------------------------ */
 
 if (! function_exists('verta_date')) {
@@ -266,8 +298,8 @@ if (! function_exists('verta_date')) {
         }
 
         try {
-            return \Morilog\Jalali\Jalalian::forge($date)->format($format);
-        } catch (\Throwable) {
+            return Jalalian::forge($date)->format($format);
+        } catch (Throwable) {
             return null;
         }
     }
@@ -284,8 +316,8 @@ if (! function_exists('verta_from_now')) {
         }
 
         try {
-            return \Morilog\Jalali\Jalalian::forge($date)->ago();
-        } catch (\Throwable) {
+            return Jalalian::forge($date)->ago();
+        } catch (Throwable) {
             return null;
         }
     }
@@ -319,7 +351,7 @@ if (! function_exists('money')) {
     {
         $formatted = number_format((float) en_num((string) $amount));
 
-        return $withUnit ? $formatted . ' تومان' : $formatted;
+        return $withUnit ? $formatted.' تومان' : $formatted;
     }
 }
 
@@ -342,7 +374,7 @@ if (! function_exists('bytes_human')) {
             $index++;
         }
 
-        return round($size, $precision) . ' ' . $units[$index];
+        return round($size, $precision).' '.$units[$index];
     }
 }
 
@@ -378,10 +410,10 @@ if (! function_exists('template_asset_url')) {
 
         // ۲) fallback داخل storage/app/public → همان URL اما با کش‌بریک تا
         //    مرورگر نسخه تازه را بگیرد (رفع «تصویر عوض نمی‌شود»)
-        $fallback = storage_path('app/public/' . $path);
+        $fallback = storage_path('app/public/'.$path);
 
         if (is_file($fallback)) {
-            return asset($path) . '?v=' . substr(md5($path . '|' . filemtime($fallback)), 0, 10);
+            return asset($path).'?v='.substr(md5($path.'|'.filemtime($fallback)), 0, 10);
         }
 
         // ۳) فایل فیزیکی یافت نشد → تصویر پیش‌فرض
@@ -396,9 +428,9 @@ if (! function_exists('jalali_to_carbon')) {
      * پشتیبانی از: ۱۴۰۴/۰۷/۰۱ , 1404-07-01 , 2025-09-23 , 2025/09/23 (با ارقام فارسی هم)
      * اگر سال بین ۱۳۰۰ تا ۱۵۰۰ باشد → شمسی؛ در غیر این صورت → میلادی.
      *
-     * @return \Carbon\Carbon|null تاریخ شروع/پایان (پایان = آخرِ روز)
+     * @return Carbon|null تاریخ شروع/پایان (پایان = آخرِ روز)
      */
-    function jalali_to_carbon(?string $input, bool $endOfDay = false): ?\Carbon\Carbon
+    function jalali_to_carbon(?string $input, bool $endOfDay = false): ?Carbon
     {
         $input = trim((string) en_num((string) $input));
 
@@ -412,18 +444,18 @@ if (! function_exists('jalali_to_carbon')) {
 
                 // سال شمسی → Jalalian
                 if ($year >= 1300 && $year <= 1500) {
-                    $jalali = \Morilog\Jalali\Jalalian::fromFormat('Y/n/j', "{$year}/" . (int) $m[2] . '/' . (int) $m[3]);
+                    $jalali = Jalalian::fromFormat('Y/n/j', "{$year}/".(int) $m[2].'/'.(int) $m[3]);
                     $carbon = $jalali->toCarbon();
                 } else {
-                    $carbon = \Carbon\Carbon::createFromDate($year, (int) $m[2], (int) $m[3]);
+                    $carbon = Carbon::createFromDate($year, (int) $m[2], (int) $m[3]);
                 }
             } else {
                 // فرمت‌های دیگر میلادی
-                $carbon = \Carbon\Carbon::parse($input);
+                $carbon = Carbon::parse($input);
             }
 
             return $endOfDay ? $carbon->copy()->endOfDay() : $carbon->copy()->startOfDay();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
     }

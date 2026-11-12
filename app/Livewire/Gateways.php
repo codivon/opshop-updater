@@ -6,7 +6,7 @@ use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Gateway;
 use App\Services\ImageUploadService;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -17,7 +17,7 @@ use Livewire\WithFileUploads;
 #[Title('درگاه‌های پرداخت')]
 class Gateways extends Component
 {
-    use WithToasts, WithBulkActions, WithFileUploads;
+    use WithBulkActions, WithFileUploads, WithToasts;
 
     /** @var array<int, array<string, mixed>> */
     public array $gateways = [];
@@ -43,7 +43,7 @@ class Gateways extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Actions (پورت‌شده از SettingController@updateGateways)           */
+    /*  Actions (پورت‌شده از SettingController@updateGateways) */
     /* ---------------------------------------------------------------- */
 
     public function save(): void
@@ -88,7 +88,7 @@ class Gateways extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  لوگوی درگاه                                                       */
+    /*  لوگوی درگاه */
     /* ---------------------------------------------------------------- */
 
     /** آپلود لوگوهای انتخاب‌شده برای هر درگاه */
@@ -101,13 +101,13 @@ class Gateways extends Component
         $service = app(ImageUploadService::class);
 
         foreach ($this->logoUploads as $gatewayId => $file) {
-            if (!$file) {
+            if (! $file) {
                 continue;
             }
 
             $gateway = Gateway::find((int) $gatewayId);
 
-            if (!$gateway) {
+            if (! $gateway) {
                 continue;
             }
 
@@ -121,7 +121,7 @@ class Gateways extends Component
                     'logo' => $service->uploadGatewayLogo($file, $gateway->key),
                 ]);
             } catch (\Throwable $e) {
-                $this->toast('خطا در آپلود لوگوی «' . ($gateway->name ?: $gateway->key) . '»: ' . $e->getMessage(), 'error');
+                $this->toast('خطا در آپلود لوگوی «'.($gateway->name ?: $gateway->key).'»: '.$e->getMessage(), 'error');
             }
         }
     }
@@ -148,7 +148,7 @@ class Gateways extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     /** آی‌دی همه‌ی درگاه‌های نمایش‌داده‌شده (صفحه‌بندی نداریم) */
@@ -171,7 +171,7 @@ class Gateways extends Component
 
         $this->loadGateways(ensure: false);
 
-        $this->toast(fa_num(count($gateways)) . ' درگاه حذف شد.');
+        $this->toast(fa_num(count($gateways)).' درگاه حذف شد.');
     }
 
     /** حذف تکی درگاه */
@@ -197,7 +197,7 @@ class Gateways extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Helpers                                                          */
+    /*  Helpers */
     /* ---------------------------------------------------------------- */
 
     /**
@@ -208,23 +208,24 @@ class Gateways extends Component
     public static function schema(): array
     {
         return [
-            'payir' => ['label' => 'درگاه pay.ir', 'fields' => [
-                ['name' => 'merchantId', 'label' => 'api کد', 'type' => 'text'],
-            ]],
-            'behpardakht' => ['label' => 'درگاه بانک ملت', 'fields' => [
+            // ── درگاه‌های بانکی ─────────────────────────────────
+            'behpardakht' => ['label' => 'درگاه به‌پرداخت (بانک ملت)', 'fields' => [
                 ['name' => 'username', 'label' => 'نام کاربری', 'type' => 'text'],
                 ['name' => 'password', 'label' => 'رمز عبور', 'type' => 'text'],
                 ['name' => 'terminalId', 'label' => 'کد پذیرنده', 'type' => 'text'],
             ]],
-            'zarinpal' => ['label' => 'درگاه زرین پال', 'fields' => [
-                ['name' => 'merchantId', 'label' => 'کد درگاه پرداخت', 'type' => 'text'],
+            'sadad' => ['label' => 'درگاه سداد (بانک ملی)', 'fields' => [
+                ['name' => 'terminalId', 'label' => 'شماره پذیرنده', 'type' => 'text'],
+                ['name' => 'merchantId', 'label' => 'کد پذیرنده', 'type' => 'text'],
+                ['name' => 'key', 'label' => 'کلید تراکنش', 'type' => 'text'],
             ]],
-            'toman' => ['label' => 'درگاه تومن', 'fields' => [
-                ['name' => 'shop_slug', 'label' => 'shop slug', 'type' => 'text'],
-                ['name' => 'auth_code', 'label' => 'auth code', 'type' => 'text'],
+            'parsian' => ['label' => 'درگاه بانک پارسیان', 'fields' => [
+                ['name' => 'merchantId', 'label' => 'کد پذیرنده (مرچنت)', 'type' => 'text'],
             ]],
-            'payping' => ['label' => 'درگاه پی پینگ', 'fields' => [
-                ['name' => 'merchantId', 'label' => 'کد درگاه پرداخت', 'type' => 'text'],
+            'pasargad' => ['label' => 'درگاه بانک پاسارگاد', 'fields' => [
+                ['name' => 'terminalCode', 'label' => 'کد پذیرنده (ترمینال)', 'type' => 'text'],
+                ['name' => 'userName', 'label' => 'نام کاربری', 'type' => 'text'],
+                ['name' => 'password', 'label' => 'رمز عبور', 'type' => 'text'],
             ]],
             'irankish' => ['label' => 'درگاه ایران کیش', 'fields' => [
                 ['name' => 'terminalId', 'label' => 'کد پایانه', 'type' => 'text'],
@@ -232,8 +233,10 @@ class Gateways extends Component
                 ['name' => 'password', 'label' => 'کلمه عبور', 'type' => 'text'],
                 ['name' => 'pubKey', 'label' => 'کلید عمومی', 'type' => 'textarea'],
             ]],
-            'idpay' => ['label' => 'درگاه idpay', 'fields' => [
-                ['name' => 'merchantId', 'label' => 'کد درگاه پرداخت', 'type' => 'text'],
+            'asanpardakht' => ['label' => 'درگاه آسان‌پرداخت', 'fields' => [
+                ['name' => 'username', 'label' => 'نام کاربری', 'type' => 'text'],
+                ['name' => 'password', 'label' => 'رمز عبور', 'type' => 'text'],
+                ['name' => 'merchantConfigID', 'label' => 'شناسهٔ پیکربندی پذیرنده', 'type' => 'text'],
             ]],
             'sepehr' => ['label' => 'درگاه سپهر (بانک صادرات)', 'fields' => [
                 ['name' => 'terminalId', 'label' => 'کد پذیرنده', 'type' => 'text'],
@@ -245,14 +248,33 @@ class Gateways extends Component
                 ['name' => 'terminalId', 'label' => 'کد پایانه/پذیرنده (UUID یا عددی)', 'type' => 'text'],
                 ['name' => 'mode', 'label' => 'مُد درایور (خالی=خودکار | v1 | onlinepg)', 'type' => 'text'],
             ]],
-            'sadad' => ['label' => 'درگاه بانک ملی', 'fields' => [
-                ['name' => 'terminalId', 'label' => 'شماره پذیرنده', 'type' => 'text'],
-                ['name' => 'merchantId', 'label' => 'کد پذیرنده', 'type' => 'text'],
-                ['name' => 'key', 'label' => 'کلید تراکنش', 'type' => 'text'],
+
+            // ── درگاه‌های واسط پرداخت ───────────────────────────
+            'novinopay' => ['label' => 'درگاه نوین پی', 'fields' => [
+                ['name' => 'merchantId', 'label' => 'کد مرچنت نوین‌پی', 'type' => 'text'],
+                ['name' => 'mode', 'label' => 'نحوهٔ پرداخت (خالی=عادی | direct=مستقیم)', 'type' => 'text'],
+            ]],
+            'payping' => ['label' => 'درگاه پی پینگ', 'fields' => [
+                ['name' => 'merchantId', 'label' => 'کد درگاه پرداخت', 'type' => 'text'],
+            ]],
+            'zarinpal' => ['label' => 'درگاه زرین پال', 'fields' => [
+                ['name' => 'merchantId', 'label' => 'کد درگاه پرداخت', 'type' => 'text'],
             ]],
             'zibal' => ['label' => 'درگاه زیبال', 'fields' => [
                 ['name' => 'merchantId', 'label' => 'کد پذیرنده', 'type' => 'text'],
             ]],
+            'idpay' => ['label' => 'درگاه idpay', 'fields' => [
+                ['name' => 'merchantId', 'label' => 'کد درگاه پرداخت', 'type' => 'text'],
+            ]],
+            'payir' => ['label' => 'درگاه pay.ir', 'fields' => [
+                ['name' => 'merchantId', 'label' => 'api کد', 'type' => 'text'],
+            ]],
+            'toman' => ['label' => 'درگاه تومن', 'fields' => [
+                ['name' => 'shop_slug', 'label' => 'shop slug', 'type' => 'text'],
+                ['name' => 'auth_code', 'label' => 'auth code', 'type' => 'text'],
+            ]],
+
+            // ── درگاه آزمایشی ───────────────────────────────────
             'local' => ['label' => 'درگاه آزمایشی (تست)', 'is_test' => true, 'fields' => [
                 ['name' => 'title', 'label' => 'عنوان صفحه درگاه', 'type' => 'text'],
                 ['name' => 'description', 'label' => 'توضیحات', 'type' => 'text'],
@@ -280,7 +302,7 @@ class Gateways extends Component
 
         // اگر migration لوگو اجرا نشده باشد (نصب‌های قدیمی) ستون را صدا نزنیم
         try {
-            $hasLogoColumn = \Illuminate\Support\Facades\Schema::hasColumn('gateways', 'logo');
+            $hasLogoColumn = Schema::hasColumn('gateways', 'logo');
         } catch (\Throwable) {
             $hasLogoColumn = false;
         }
