@@ -252,7 +252,6 @@ class Gateways extends Component
             // ── درگاه‌های واسط پرداخت ───────────────────────────
             'novinopay' => ['label' => 'درگاه نوین پی', 'fields' => [
                 ['name' => 'merchantId', 'label' => 'کد مرچنت نوین‌پی', 'type' => 'text'],
-                ['name' => 'mode', 'label' => 'نحوهٔ پرداخت (خالی=عادی | direct=مستقیم)', 'type' => 'text'],
             ]],
             'payping' => ['label' => 'درگاه پی پینگ', 'fields' => [
                 ['name' => 'merchantId', 'label' => 'کد درگاه پرداخت', 'type' => 'text'],

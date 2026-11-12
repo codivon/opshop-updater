@@ -3721,16 +3721,16 @@
         },
         {
             "name": "shetabit/multipay",
-            "version": "v2.10.1",
+            "version": "v2.11.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/shetabit/multipay.git",
-                "reference": "45cb39fc6ebf638f25fb35c1611e84b37067b5ce"
+                "reference": "b8502d16ee5d148aacf5ee88f0df96b2e3d18711"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/shetabit/multipay/zipball/45cb39fc6ebf638f25fb35c1611e84b37067b5ce",
-                "reference": "45cb39fc6ebf638f25fb35c1611e84b37067b5ce",
+                "url": "https://api.github.com/repos/shetabit/multipay/zipball/b8502d16ee5d148aacf5ee88f0df96b2e3d18711",
+                "reference": "b8502d16ee5d148aacf5ee88f0df96b2e3d18711",
                 "shasum": ""
             },
             "require": {
@@ -3842,9 +3842,10 @@
             ],
             "support": {
                 "issues": "https://github.com/shetabit/multipay/issues",
-                "source": "https://github.com/shetabit/multipay/tree/v2.10.1"
+                "source": "https://github.com/shetabit/multipay/tree/v2.11.0"
             },
-            "time": "2026-06-19T22:40:26+00:00"
+            "time": "2026-08-02T06:13:00+00:00",
+            "published-time": "2026-08-02T06:13:36+00:00"
         },
         {
             "name": "shetabit/payment",
@@ -8931,5 +8932,5 @@
         "php": "^8.3"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.11.0"
 }

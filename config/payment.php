@@ -1,6 +1,5 @@
 <?php
 
-use App\Services\Payments\Novinopay;
 use App\Services\Payments\SamanCached;
 use App\Services\Payments\SepRest;
 use Shetabit\Multipay\Drivers\Aqayepardakht\Aqayepardakht;
@@ -15,6 +14,7 @@ use Shetabit\Multipay\Drivers\Idpay\Idpay;
 use Shetabit\Multipay\Drivers\Irankish\Irankish;
 use Shetabit\Multipay\Drivers\Local\Local;
 use Shetabit\Multipay\Drivers\Nextpay\Nextpay;
+use Shetabit\Multipay\Drivers\Novinopay\Novinopay;
 use Shetabit\Multipay\Drivers\Omidpay\Omidpay;
 use Shetabit\Multipay\Drivers\Parsian\Parsian;
 use Shetabit\Multipay\Drivers\Pasargad\Pasargad;
@@ -101,16 +101,14 @@ return [
             'description' => 'payment using asanpardakht',
         ],
         'novinopay' => [
-            // API فاکتوری نوین‌پی — هم‌ساختار درگاه سپرده (App\Services\Payments\Novinopay)
+            // درایور رسمی نوین‌پی (پورت از shetabit/multipay v3.6.0 در packages/shetabit)
+            // درگاه آدرس صفحهٔ پرداخت (payment_url) را در پاسخ purchase برمی‌گرداند؛ URL اضافه لازم نیست
             'apiPurchaseUrl' => 'https://novinopay.com/merchant/invoices/add',
-            'apiPaymentUrl' => 'https://novinopay.com/merchant/invoices/pay/id:',
-            'apiDirectPaymentUrl' => 'https://novinopay.com/merchant/invoices/pay/automatic:true/id:',
             'apiVerificationUrl' => 'https://novinopay.com/merchant/invoices/verify',
             'merchantId' => '',
-            'mode' => 'normal', // can be normal, direct (direct = پرداخت مستقیم از درگاه)
             'callbackUrl' => 'http://yoursite.com/path/to',
             'description' => 'payment using novinopay',
-            'currency' => 'T', // Can be R, T (Rial, Toman)
+            'currency' => 'T', // واحد مبلغ Invoice: R, T (Rial, Toman) — همیشه ریال به درگاه ارسال می‌شود
         ],
         'behpardakht' => [
             'apiPurchaseUrl' => 'https://bpm.shaparak.ir/pgwchannel/services/pgw?wsdl',

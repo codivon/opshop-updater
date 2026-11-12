@@ -5,17 +5,19 @@ namespace Tests\Feature;
 use App\Livewire\Gateways;
 use App\Models\Gateway;
 use App\Models\User;
-use App\Services\Payments\Novinopay;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
-use Shetabit\Multipay\Drivers\Sepordeh\Sepordeh;
+use Shetabit\Multipay\Abstracts\Driver;
+use Shetabit\Multipay\Drivers\Novinopay\Novinopay;
+use Shetabit\Multipay\Exceptions\PreviouslyVerifiedException;
 use Tests\TestCase;
 
 /**
  * پنل درگاه‌های پرداخت (/admin/settings/gateways):
  * - همهٔ درگاه‌های پشتیبانی‌شده (۱۷ کلید) در صفحه ساخته و نمایش داده می‌شوند
  * - درگاه‌های جدید (novinopay / parsian / pasargad / asanpardakht) با فیلدهای پیکربندی درست
+ * - نوین‌پی از درایور رسمی پورت‌شدهٔ shetabit/multipay v3.6.0 استفاده می‌کند (نه هک سپرده)
  * - ذخیرهٔ فرم پنل مقادیر جدید را در gateway_configs می‌نویسد
  * - get_gateway_configs کلیدهای هر درگاه را به درایور پرداخت تزریق می‌کند
  * - فهرست عمودی (لیست زیر هم) — کارت‌های ردیفی به‌جای گرید چندستونه
@@ -72,7 +74,7 @@ class GatewaysPanelTest extends TestCase
         $schema = Gateways::schema();
 
         $this->assertSame(
-            ['merchantId', 'mode'],
+            ['merchantId'],
             array_column($schema['novinopay']['fields'], 'name')
         );
 
@@ -97,13 +99,11 @@ class GatewaysPanelTest extends TestCase
         // ساختار پنل باید بتواند بدون خطا برای همهٔ درگاه‌ها مقدار ذخیره کند
         $gateway = Gateway::firstOrCreate(['key' => 'novinopay'], ['name' => 'نوین پی']);
 
-        $gateway->configs()->createMany([
-            ['key' => 'merchantId', 'value' => 'NOVIN-123'],
-            ['key' => 'mode', 'value' => 'direct'],
+        $gateway->configs()->create([
+            'key' => 'merchantId', 'value' => 'NOVIN-123',
         ]);
 
         $this->assertSame('NOVIN-123', $gateway->config('merchantId'));
-        $this->assertSame('direct', $gateway->config('mode'));
     }
 
     /* -------------------------------------------------------------- */
@@ -113,7 +113,7 @@ class GatewaysPanelTest extends TestCase
     public function test_get_gateway_configs_maps_new_gateway_keys(): void
     {
         $rows = [
-            'novinopay' => ['merchantId' => 'N-1', 'mode' => 'direct'],
+            'novinopay' => ['merchantId' => 'N-1'],
             'parsian' => ['merchantId' => 'P-1'],
             'pasargad' => ['terminalCode' => '123456', 'userName' => 'user1', 'password' => 'pass1'],
             'asanpardakht' => ['username' => 'u2', 'password' => 'p2', 'merchantConfigID' => 'MC-9'],
@@ -128,7 +128,7 @@ class GatewaysPanelTest extends TestCase
         }
 
         $this->assertSame(
-            ['merchantId' => 'N-1', 'mode' => 'direct'],
+            ['merchantId' => 'N-1'],
             get_gateway_configs('novinopay')
         );
         $this->assertSame(
@@ -148,13 +148,20 @@ class GatewaysPanelTest extends TestCase
         $this->assertSame([], get_gateway_configs('idpay'));
     }
 
-    public function test_novinopay_driver_is_mapped_and_extends_sepordeh(): void
+    public function test_novinopay_driver_is_official_upstream_port(): void
     {
         $map = config('payment.map');
 
         $this->assertSame(Novinopay::class, $map['novinopay']);
         $this->assertTrue(class_exists($map['novinopay']));
-        $this->assertTrue(is_subclass_of($map['novinopay'], Sepordeh::class));
+        // درایور رسمی پورت‌شده از shetabit/multipay v3.6.0 — زیرکلاس Driver abstract نه هک سپرده
+        $this->assertTrue(is_subclass_of($map['novinopay'], Driver::class));
+        $this->assertNotSame(
+            Shetabit\Multipay\Drivers\Sepordeh\Sepordeh::class,
+            get_parent_class($map['novinopay'])
+        );
+        // استثنای تراکنشِ قبلاً تأییدشده (وارد شده از نسخهٔ رسمی) موجود باشد
+        $this->assertTrue(class_exists(PreviouslyVerifiedException::class));
 
         // درایورهای درخواست‌شدهٔ کاربر همگی در map موجود باشند
         foreach (['parsian', 'pasargad', 'asanpardakht', 'sadad', 'behpardakht', 'irankish', 'payping', 'sepehr'] as $key) {
@@ -180,9 +187,12 @@ class GatewaysPanelTest extends TestCase
         $driver = config('payment.drivers.novinopay');
 
         $this->assertSame('https://novinopay.com/merchant/invoices/add', $driver['apiPurchaseUrl']);
-        $this->assertSame('https://novinopay.com/merchant/invoices/pay/id:', $driver['apiPaymentUrl']);
         $this->assertSame('https://novinopay.com/merchant/invoices/verify', $driver['apiVerificationUrl']);
         $this->assertSame('T', $driver['currency']);
+        // کلیدهای الگوی سپردهٔ کهنه (دو مرحله‌ای) و mode دیگر نباشند — درایور رسمی payment_url را از پاسخ می‌گیرد
+        $this->assertArrayNotHasKey('apiPaymentUrl', $driver);
+        $this->assertArrayNotHasKey('apiDirectPaymentUrl', $driver);
+        $this->assertArrayNotHasKey('mode', $driver);
     }
 
     /* -------------------------------------------------------------- */
@@ -211,18 +221,16 @@ class GatewaysPanelTest extends TestCase
             ->set("gateways.{$index}.name", 'درگاه نوین پی')
             ->set("gateways.{$index}.is_active", true)
             ->set("gateways.{$index}.configs.merchantId", 'MERCHANT-NOVIN-88')
-            ->set("gateways.{$index}.configs.mode", 'direct')
             ->call('save')
             ->assertHasNoErrors();
 
         $model = Gateway::where('key', 'novinopay')->first();
         $this->assertTrue((bool) $model->is_active);
         $this->assertSame('MERCHANT-NOVIN-88', $model->config('merchantId'));
-        $this->assertSame('direct', $model->config('mode'));
 
         // پیکربندی تزریق‌شده به درایور مطابق تنظیمات پنل است
         $this->assertSame(
-            ['merchantId' => 'MERCHANT-NOVIN-88', 'mode' => 'direct'],
+            ['merchantId' => 'MERCHANT-NOVIN-88'],
             get_gateway_configs('novinopay')
         );
     }

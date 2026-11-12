@@ -253,12 +253,8 @@ function get_gateway_configs($gateway)
             break;
 
         case 'novinopay':
-            // نوین‌پی — API فاکتوری (هم‌ساختار سپرده)
+            // نوین‌پی — درایور رسمی (پورت از shetabit/multipay v3.6.0)
             $configs['merchantId'] = $gateway->config('merchantId');
-            $mode = trim((string) ($gateway->config('mode') ?? ''));
-            if (in_array($mode, ['direct'], true)) {
-                $configs['mode'] = $mode; // خالی = عادی (صفحهٔ فاکتور)
-            }
             break;
 
         case 'parsian':

@@ -27,7 +27,7 @@
 | فرانت‌اند | Livewire **3** + Alpine 3 + Vite 7 + Tailwind CSS **4** |
 | فونت | Vazirmatn (ادمین + شاپ)، RTL کامل |
 | دیتابیس | **SQLite** (`database/database.sqlite`) — قابلیت تغییر به MySQL از `.env` |
-| پرداخت | `shetabit/payment` v6 **از پکیج محلی `packages/shetabit/`** (نه packagist! — psr-4 در composer.json: `Shetabit\Payment\` و `Shetabit\Multipay\` به `packages/shetabit/*/src` مپ شده) |
+| پرداخت | `shetabit/payment` v6 **از پکیج محلی `packages/shetabit/`** (نه packagist! — psr-4 در composer.json: `Shetabit\Payment\` و `Shetabit\Multipay\` به `packages/shetabit/*/src` مپ شده) — multipay در composer.lock = **v2.11.0** (آخرین سازگار PHP 8.3؛ v3/v7 نیازمند PHP ^8.4 + Laravel ^12|^13 است) و درایور نوین‌پی = **پورت رسمی v3.6.0** |
 | تاریخ | `morilog/jalali` (helper: `verta_date()`) + `fa_num()` برای اعداد فارسی |
 | UI | کامپوننت‌های Blade خودساخته (`resources/views/components/`) + رجیستری آیکون‌های Lucide inline |
 
@@ -274,6 +274,8 @@ checkout در `Shop\PackageShow::buy()`: کد آپدیت → Customer → گار
     - `verify()` برگرداندن Receipt = موفق؛ ناموفق = `InvalidPaymentException` → متد `isPaid()` وجود ندارد (حذف شد؛ منطق بر اساس رسید/Exception).
     - درایور `local`: ① باید در `config/payment.php` بخش `drivers` (نه فقط `map`) ثبت شود وگرنه `Driver not found`؛ ② `verify()` درایور `Request::input('transactionId')` را از **درخواست جاری** می‌خواند → فراخوانِ verify باید `?transactionId=` در query بفرستد؛ ③ بازگشت درگاه با پارامتر camelCase `transactionId` است → کال‌بک‌های پنل (web+api) این کلید را هم می‌خوانند.
     - درایور local تنظیمات فرم (title/description/payButton/...) را از `get_gateway_configs` می‌گیرد (case «local» در helper با fallback‌ها)؛ ردیف gateway با key=local هم seed شده (پیش‌فرض غیرفعال).
+    - **درایور نوین‌پی = پورت رسمی shetabit/multipay v3.6.0** (`packages/shetabit/multipay/src/Drivers/Novinopay/` — جایگزین هک قبلی extends-Sepordeh): ارتقای کامل پکیج به v3/v7 ممکن نیست (PHP ^8.4 + Laravel ^12|^13)، پس درایور رسمی با کدبیس v2 سازگار شد: ① امضای constructor باید `$settings` بدون typehint بماند (نرو کردن type = fatal پیام «must be compatible» با abstract نسخهٔ ۲)؛ ② سینتکس `new X()->m()` بدون پرانتز فقط PHP 8.4 است → در 8.3 ParseError (پرانتز: `(new X())->m()`)؛ ③ تبدیل ارز با کلید رشته‌ای `currency` (T=Toman → ×۱۰ ریال به درگاه؛ جایگزین trait HasIranCurrency/Currency enum نسخهٔ ۳)؛ ④ درگاه `payment_url` را در پاسخ purchase برمی‌گرداند → کلیدهای کهنهٔ الگوی سپرده (`apiPaymentUrl`/`apiDirectPaymentUrl`/`mode`) حذف شدند؛ ⑤ استثنای `PreviouslyVerifiedException` (وضعیت 101) از upstream پورت شد — سرویس پرداخت با catch \Exception آن را محترمانه مدیریت می‌کند.
+    - آپدیت پکیج پرداخت: `composer update shetabit/multipay` فقط تا v2.x می‌رود (کنترل PHP 8.3)؛ فایل‌هایی که فقط در vendor باشند (مثل درایورهای Azki/Omidpay/Payfa) از `vendor/shetabit/` لود می‌شوند و کلاس‌های override لوکال آن‌ها را سایه می‌اندازد.
 17. **`latestVersion()` رابطه است** — `$package->latestVersion()` خودِ HasOne را برمی‌گرداند (truthy!)؛ همیشه `->first()` صدا بزنید. باگ API verifyPayment همین بود (TypeError در createDownloadToken).
 18. **رکورد pending یتیم**: اگر `createPayment` بعد از `PackagePurchase::create` شکست بخورد، رکورد pending می‌ماند → در purchase API حالا `$purchase->delete()` در catch.
 
