@@ -11,34 +11,20 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Vandar extends Driver
 {
+    use HasIranCurrency;
     /**
      * Vandar Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     const PAYMENT_STATUS_FAILED = 'FAILED';
     const PAYMENT_STATUS_OK = 'OK';
 
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -50,7 +36,7 @@ class Vandar extends Driver
      *
      * @return string
      */
-    private function extractDetails(string $name)
+    private function extractDetails(string $name) : mixed
     {
         return empty($this->invoice->getDetails()[$name]) ? null : $this->invoice->getDetails()[$name];
     }
@@ -60,7 +46,7 @@ class Vandar extends Driver
      * @throws \GuzzleHttp\Exception\GuzzleException
      * @throws \Shetabit\Multipay\Exceptions\PurchaseFailedException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $mobile = $this->extractDetails('mobile');
         $description = $this->extractDetails('description');
@@ -70,7 +56,7 @@ class Vandar extends Driver
 
         $data = [
             'api_key' => $this->settings->merchantId,
-            'amount' => $this->invoice->getAmount() / ($this->settings->currency == 'T' ? 1 : 10), // convert to toman
+            'amount' => $this->convertAmountToRial($this->invoice->getAmount()),
             'callback_url' => $this->settings->callbackUrl,
             'description' => $description,
             'mobile_number' => $mobile,
@@ -86,7 +72,7 @@ class Vandar extends Driver
                 [
                     'json' => $data,
                     'headers' => [
-                        "Accept" => "application/json",
+                        'Accept' => 'application/json',
                     ],
                     'http_errors' => false,
                 ]
@@ -138,7 +124,7 @@ class Vandar extends Driver
                 [
                     'json' => $data,
                     'headers' => [
-                        "Accept" => "application/json",
+                        'Accept' => 'application/json',
                     ],
                     'http_errors' => false,
                 ]
@@ -162,10 +148,10 @@ class Vandar extends Driver
         $receipt = $this->createReceipt($token);
 
         $receipt->detail([
-            "amount" => $responseBody['amount'],
-            "realAmount" => $responseBody['realAmount'],
-            "wage" => $responseBody['wage'],
-            "cardNumber" => $responseBody['cardNumber'],
+            'amount' => $responseBody['amount'],
+            'realAmount' => $responseBody['realAmount'],
+            'wage' => $responseBody['wage'],
+            'cardNumber' => $responseBody['cardNumber'],
         ]);
 
         return $receipt;
@@ -176,7 +162,7 @@ class Vandar extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('vandar', $referenceId);
     }
@@ -185,7 +171,7 @@ class Vandar extends Driver
      * @param $message
      * @throws \Shetabit\Multipay\Exceptions\InvalidPaymentException
      */
-    protected function notVerified($message, $status = 0)
+    protected function notVerified(string|null $message, int|string $status = 0) : never
     {
         if (empty($message)) {
             throw new InvalidPaymentException('خطای ناشناخته ای رخ داده است.', (int)$status);

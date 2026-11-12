@@ -11,29 +11,15 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Shepa extends Driver
 {
+    use HasIranCurrency;
     /**
      * HTTP Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Shepa constructor.
@@ -41,7 +27,7 @@ class Shepa extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -53,7 +39,7 @@ class Shepa extends Driver
      *
      * @return string
      */
-    private function extractDetails(string $name)
+    private function extractDetails(string $name) : mixed
     {
         return empty($this->invoice->getDetails()[$name]) ? null : $this->invoice->getDetails()[$name];
     }
@@ -65,7 +51,7 @@ class Shepa extends Driver
      *
      * @throws PurchaseFailedException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $data = [
             'api' => $this->settings->merchantId,
@@ -137,10 +123,10 @@ class Shepa extends Driver
             $this->getVerificationUrl(),
             [
                 'json' => $data,
-                "headers" => [
+                'headers' => [
                     'Content-Type' => 'application/json',
                 ],
-                "http_errors" => false,
+                'http_errors' => false,
             ]
         );
 
@@ -173,7 +159,7 @@ class Shepa extends Driver
      *
      * @param $referenceId
      */
-    public function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    public function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('shepa', $referenceId);
     }
@@ -183,7 +169,7 @@ class Shepa extends Driver
      */
     protected function getInvoiceAmount(): int|float
     {
-        return $this->invoice->getAmount() * (strtolower($this->settings->currency) === 't' ? 10 : 1); // convert to rial
+        return $this->convertAmountToRial($this->invoice->getAmount());
     }
 
     /**

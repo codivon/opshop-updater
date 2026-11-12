@@ -12,40 +12,27 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Refah extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Refah Client.
-     *
-     * @var object
      */
     protected Client $client;
 
     /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
-
-    /**
      * payment token
      */
-    protected $token;
+    protected string|int|null $token = null;
 
     /**
      * Refah constructor.
      * Construct the class with the relevant settings.
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -60,12 +47,12 @@ class Refah extends Driver
      * @throws PurchaseFailedException
      * @throws GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $this->invoice->uuid(crc32($this->invoice->getUuid()));
         $details = $this->invoice->getDetails();
         $order_id = (string) $this->invoice->getUuid();
-        $amount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1); // convert to rial
+        $amount = $this->convertAmountToRial($this->invoice->getAmount());
         $callback = $this->settings->callbackUrl;
 
         $data = [
@@ -96,7 +83,7 @@ class Refah extends Driver
 
         $body = json_decode($response->getBody()->getContents());
 
-        if (! ($response->getStatusCode() == 200 && $body->success && $body->data->token > 0)) {
+        if (! ($response->getStatusCode() === 200 && $body->success && $body->data->token > 0)) {
             throw new PurchaseFailedException($body->errors[0]->message ?? 'Error', $response->getStatusCode());
         }
 
@@ -118,18 +105,17 @@ class Refah extends Driver
     /**
      * Verify payment
      *
-     * @return mixed|void
      *
      * @throws InvalidPaymentException
      * @throws GuzzleException
      */
     public function verify(): ReceiptInterface
     {
-        $amount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1); // convert to rial
+        $amount = $this->convertAmountToRial($this->invoice->getAmount());
         $refNum = Request::input('RRN');
         $status = Request::input('status');
 
-        if (! ($refNum > 0 && $status == 0)) {
+        if ($refNum <= 0 || $status != 0) {
             throw new InvalidPaymentException('Verify failed with status code : '.$status, $status);
         }
 
@@ -155,7 +141,7 @@ class Refah extends Driver
 
         $body = json_decode($response->getBody()->getContents());
 
-        if (! ($response->getStatusCode() == 200 && $body->success)) {
+        if ($response->getStatusCode() !== 200 || !$body->success) {
             throw new InvalidPaymentException($body->errors[0]->message ?? 'Error', $response->getStatusCode());
         }
 
@@ -165,7 +151,7 @@ class Refah extends Driver
     /**
      * Generate the payment's receipt
      */
-    protected function createReceipt($referenceId): Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('refah', $referenceId);
     }

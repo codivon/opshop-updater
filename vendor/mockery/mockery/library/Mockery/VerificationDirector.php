@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Mockery (https://docs.mockery.io/en/stable/)
+ * Mockery (https://docs.mockery.io/)
  *
  * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @see       https://github.com/mockery/mockery for the canonical source repository
+ * @license https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
+ * @link https://github.com/mockery/mockery for the canonical source repository
  */
 
 namespace Mockery;
@@ -13,19 +13,19 @@ namespace Mockery;
 class VerificationDirector
 {
     /**
+     * @var VerificationExpectation
+     */
+    private $expectation;
+
+    /**
      * @var ReceivedMethodCalls
      */
     private $receivedMethodCalls;
 
-    /**
-     * @var VerificationExpectation
-     */
-    private $verificationExpectation;
-
     public function __construct(ReceivedMethodCalls $receivedMethodCalls, VerificationExpectation $expectation)
     {
         $this->receivedMethodCalls = $receivedMethodCalls;
-        $this->verificationExpectation = $expectation;
+        $this->expectation = $expectation;
     }
 
     /**
@@ -45,8 +45,9 @@ class VerificationDirector
     }
 
     /**
-     * @param  int  $minimum
-     * @param  int  $maximum
+     * @param int $minimum
+     * @param int $maximum
+     *
      * @return self
      */
     public function between($minimum, $maximum)
@@ -63,7 +64,8 @@ class VerificationDirector
     }
 
     /**
-     * @param  int|null $limit
+     * @param int $limit
+     *
      * @return self
      */
     public function times($limit = null)
@@ -79,16 +81,16 @@ class VerificationDirector
         return $this->cloneWithoutCountValidatorsApplyAndVerify('twice', []);
     }
 
-    /**
-     * @return void
-     */
     public function verify()
     {
-        $this->receivedMethodCalls->verify($this->verificationExpectation);
+        $this->receivedMethodCalls->verify($this->expectation);
     }
 
     /**
-     * @param  mixed $args
+     * @template TArgs
+     *
+     * @param TArgs $args
+     *
      * @return self
      */
     public function with(...$args)
@@ -105,7 +107,10 @@ class VerificationDirector
     }
 
     /**
-     * @param  mixed $args
+     * @template TArgs
+     *
+     * @param TArgs $args
+     *
      * @return self
      */
     public function withArgs($args)
@@ -122,13 +127,14 @@ class VerificationDirector
     }
 
     /**
-     * @param  string       $method
-     * @param  array<mixed> $args
+     * @param string $method
+     * @param array  $args
+     *
      * @return self
      */
     protected function cloneApplyAndVerify($method, $args)
     {
-        $verificationExpectation = clone $this->verificationExpectation;
+        $verificationExpectation = clone $this->expectation;
 
         $verificationExpectation->{$method}(...$args);
 
@@ -140,13 +146,14 @@ class VerificationDirector
     }
 
     /**
-     * @param  string       $method
-     * @param  array<mixed> $args
+     * @param string $method
+     * @param array  $args
+     *
      * @return self
      */
     protected function cloneWithoutCountValidatorsApplyAndVerify($method, $args)
     {
-        $verificationExpectation = clone $this->verificationExpectation;
+        $verificationExpectation = clone $this->expectation;
 
         $verificationExpectation->clearCountValidators();
 

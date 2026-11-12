@@ -11,29 +11,16 @@ use Shetabit\Multipay\Abstracts\Driver;
 use Shetabit\Multipay\Contracts\ReceiptInterface;
 use Shetabit\Multipay\Exceptions\InvalidPaymentException;
 use Shetabit\Multipay\Exceptions\PurchaseFailedException;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Minipay extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * HTTP Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Minipay constructor.
@@ -41,7 +28,7 @@ class Minipay extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->client = new Client();
@@ -56,7 +43,7 @@ class Minipay extends Driver
      * @throws PurchaseFailedException
      * @throws \SoapFault
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $metadata = [];
 
@@ -67,11 +54,11 @@ class Minipay extends Driver
         }
 
         $data = [
-            "merchant_id" => $this->settings->merchantId,
-            "amount" => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
-            "callback_url" => $this->settings->callbackUrl,
-            "description" => $description,
-            "metadata" => array_merge($this->invoice->getDetails() ?? [], $metadata),
+            'merchant_id' => $this->settings->merchantId,
+            'amount' => $this->convertAmountToRial($this->invoice->getAmount()),
+            'callback_url' => $this->settings->callbackUrl,
+            'description' => $description,
+            'metadata' => array_merge($this->invoice->getDetails(), $metadata),
         ];
 
         $response = $this
@@ -80,21 +67,21 @@ class Minipay extends Driver
                 'POST',
                 $this->settings->apiPurchaseUrl,
                 [
-                    "json" => $data,
-                    "headers" => [
+                    'json' => $data,
+                    'headers' => [
                         'Content-Type' => 'application/json',
                     ],
-                    "http_errors" => false,
+                    'http_errors' => false,
                 ]
             );
 
         $result = json_decode($response->getBody()->getContents(), true);
-        if ($response->getStatusCode() != 200) {
+        if ($response->getStatusCode() !== 200) {
             $message = $result['messages'][0]['text'] ?? 'خطا در هنگام درخواست برای پرداخت رخ داده است.';
             throw new PurchaseFailedException($message, $response->getStatusCode());
         }
 
-        $this->invoice->transactionId($result['data']["authority"]);
+        $this->invoice->transactionId($result['data']['authority']);
 
         // return the transaction's id
         return $this->invoice->getTransactionId();
@@ -113,7 +100,6 @@ class Minipay extends Driver
     /**
      * Verify payment
      *
-     * @return mixed|void
      *
      * @throws InvalidPaymentException
      * @throws \GuzzleHttp\Exception\GuzzleException
@@ -122,9 +108,9 @@ class Minipay extends Driver
     {
         $authority = $this->invoice->getTransactionId() ?? Request::input('Authority');
         $data = [
-            "merchant_id" => $this->settings->merchantId,
-            "authority" => $authority,
-            "amount" => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'merchant_id' => $this->settings->merchantId,
+            'authority' => $authority,
+            'amount' => $this->convertAmountToRial($this->invoice->getAmount()),
         ];
 
         $response = $this->client->request(
@@ -132,16 +118,16 @@ class Minipay extends Driver
             $this->settings->apiVerificationUrl,
             [
                 'json' => $data,
-                "headers" => [
+                'headers' => [
                     'Content-Type' => 'application/json',
                 ],
-                "http_errors" => false,
+                'http_errors' => false,
             ]
         );
 
         $result = json_decode($response->getBody()->getContents(), true);
 
-        if ($response->getStatusCode() != 200) {
+        if ($response->getStatusCode() !== 200) {
             $message = $result['messages'][0]['text'] ?? 'تراکنش تایید نشد.';
             throw new InvalidPaymentException($message, $response->getStatusCode());
         }
@@ -164,7 +150,7 @@ class Minipay extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): ReceiptInterface
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('minipay', $referenceId);
     }

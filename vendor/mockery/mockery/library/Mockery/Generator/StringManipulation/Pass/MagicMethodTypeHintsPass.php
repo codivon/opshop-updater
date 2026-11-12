@@ -1,22 +1,19 @@
 <?php
 
 /**
- * Mockery (https://docs.mockery.io/en/stable/)
+ * Mockery (https://docs.mockery.io/)
  *
  * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @see       https://github.com/mockery/mockery for the canonical source repository
+ * @license https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
+ * @link https://github.com/mockery/mockery for the canonical source repository
  */
 
 namespace Mockery\Generator\StringManipulation\Pass;
 
-use Mockery\Exception;
 use Mockery\Generator\Method;
 use Mockery\Generator\MockConfiguration;
 use Mockery\Generator\Parameter;
 use Mockery\Generator\TargetClassInterface;
-use Override;
-
 use function array_filter;
 use function array_merge;
 use function end;
@@ -54,22 +51,19 @@ class MagicMethodTypeHintsPass implements Pass
     /**
      * Apply implementation.
      *
-     * @param  non-empty-string $code
-     * @return non-empty-string
+     * @param string $code
      *
-     * @throws Exception
+     * @return string
      */
-    #[Override]
     public function apply($code, MockConfiguration $config)
     {
         $magicMethods = $this->getMagicMethods($config->getTargetClass());
-
         foreach ($config->getTargetInterfaces() as $interface) {
             $magicMethods = array_merge($magicMethods, $this->getMagicMethods($interface));
         }
 
-        foreach ($magicMethods as $magicMethod) {
-            $code = $this->applyMagicTypeHints($code, $magicMethod);
+        foreach ($magicMethods as $method) {
+            $code = $this->applyMagicTypeHints($code, $method);
         }
 
         return $code;
@@ -79,7 +73,7 @@ class MagicMethodTypeHintsPass implements Pass
      * Returns the magic methods within the
      * passed DefinedTargetClass.
      *
-     * @return array<Method>
+     * @return array
      */
     public function getMagicMethods(?TargetClassInterface $class = null)
     {
@@ -92,24 +86,20 @@ class MagicMethodTypeHintsPass implements Pass
         });
     }
 
-    /**
-     * Renders the type hint for the passed parameter.
-     *
-     * @return string
-     */
     protected function renderTypeHint(Parameter $param)
     {
         $typeHint = $param->getTypeHint();
 
-        return null === $typeHint ? '' : sprintf('%s ', $typeHint);
+        return $typeHint === null ? '' : sprintf('%s ', $typeHint);
     }
 
     /**
      * Applies type hints of magic methods from
      * class to the passed code.
      *
-     * @param  non-empty-string $code
-     * @return non-empty-string
+     * @param int $code
+     *
+     * @return string
      */
     private function applyMagicTypeHints($code, Method $method)
     {
@@ -129,8 +119,9 @@ class MagicMethodTypeHintsPass implements Pass
      * Returns a regex string used to match the
      * declaration of some method.
      *
-     * @param  string           $methodName
-     * @return non-empty-string
+     * @param string $methodName
+     *
+     * @return string
      */
     private function getDeclarationRegex($methodName)
     {
@@ -140,7 +131,9 @@ class MagicMethodTypeHintsPass implements Pass
     /**
      * Gets the declaration code, as a string, for the passed method.
      *
-     * @return non-empty-string
+     * @param array $namedParameters
+     *
+     * @return string
      */
     private function getMethodDeclaration(Method $method, array $namedParameters)
     {
@@ -159,7 +152,7 @@ class MagicMethodTypeHintsPass implements Pass
         $declaration .= ') ';
 
         $returnType = $method->getReturnType();
-        if (null !== $returnType) {
+        if ($returnType !== null) {
             $declaration .= sprintf(': %s', $returnType);
         }
 
@@ -170,7 +163,8 @@ class MagicMethodTypeHintsPass implements Pass
      * Returns the method original parameters, as they're
      * described in the $code string.
      *
-     * @param  non-empty-string $code
+     * @param int $code
+     *
      * @return array
      */
     private function getOriginalParameters($code, Method $method)
@@ -180,7 +174,7 @@ class MagicMethodTypeHintsPass implements Pass
 
         preg_match($this->getDeclarationRegex($method->getName()), $code, $matches);
 
-        if ([] !== $matches) {
+        if ($matches !== []) {
             preg_match_all('/(?<=\$)(\w+)+/i', $matches[0], $parameterMatches);
         }
 
@@ -192,7 +186,8 @@ class MagicMethodTypeHintsPass implements Pass
     /**
      * Checks if the method is declared within code.
      *
-     * @param  non-empty-string $code
+     * @param int $code
+     *
      * @return bool
      */
     private function isMethodWithinCode($code, Method $method)

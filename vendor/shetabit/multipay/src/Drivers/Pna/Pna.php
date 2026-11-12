@@ -12,38 +12,23 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Pna extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Pna Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * payment token
-     *
-     * @var $token
      */
-    protected $token;
+    protected string|int|null $token = null;
 
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -57,20 +42,20 @@ class Pna extends Driver
      * @throws PurchaseFailedException
      * @throws GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
-        $amount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1); // convert to rial
+        $amount = $this->convertAmountToRial($this->invoice->getAmount());
         if (!empty($this->invoice->getDetails()['description'])) {
             $description = $this->invoice->getDetails()['description'];
         } else {
             $description = $this->settings->description;
         }
         $data = [
-            "CorporationPin" => $this->settings->CorporationPin,
-            "Amount" => $amount,
-            "OrderId" => intval(1, time()) . crc32($this->invoice->getUuid()),
-            "CallBackUrl" => $this->settings->callbackUrl,
-            "AdditionalData" => $description,
+            'CorporationPin' => $this->settings->CorporationPin,
+            'Amount' => $amount,
+            'OrderId' => intval(1, time()) . crc32($this->invoice->getUuid()),
+            'CallBackUrl' => $this->settings->callbackUrl,
+            'AdditionalData' => $description,
         ];
         if (!empty($this->invoice->getDetails()['mobile'])) {
             $data['Originator'] = $this->invoice->getDetails()['mobile'];
@@ -91,7 +76,7 @@ class Pna extends Driver
             throw new PurchaseFailedException($result['title'] ?? 'اطلاعات وارد شده اشتباه می باشد.', $result['status'] ?? 400);
         }
         if (!isset($result['status']) || (string)$result['status'] !== '0') {
-            throw new PurchaseFailedException($result['message'] ?? "خطای ناشناخته رخ داده است. در صورت کسر مبلغ از حساب حداکثر پس از 72 ساعت به حسابتان برمیگردد", $result['status'] ?? 400);
+            throw new PurchaseFailedException($result['message'] ?? 'خطای ناشناخته رخ داده است. در صورت کسر مبلغ از حساب حداکثر پس از 72 ساعت به حسابتان برمیگردد', $result['status'] ?? 400);
         }
         $this->invoice->transactionId($result['token']);
 
@@ -120,15 +105,15 @@ class Pna extends Driver
     {
         $transactionId = $this->invoice->getTransactionId() ?? Request::input('Token') ?? Request::input('token');
         $data = [
-            "CorporationPin" => $this->settings->CorporationPin,
-            "Token" => $transactionId
+            'CorporationPin' => $this->settings->CorporationPin,
+            'Token' => $transactionId
         ];
         $response = $this->client->request(
             'POST',
             $this->settings->apiConfirmationUrl,
             [
                 'json' => $data,
-                "headers" => [
+                'headers' => [
                     'Content-Type' => 'application/json',
                 ],
                 'http_errors' => false,
@@ -139,7 +124,7 @@ class Pna extends Driver
             || ((string)$result['status'] !== '0'
                 && (string)$result['status'] !== '2')
             || (string)$result['rrn'] === '0') {
-            throw new InvalidPaymentException("خطای ناشناخته رخ داده است. در صورت کسر مبلغ از حساب حداکثر پس از 72 ساعت به حسابتان برمیگردد", $result['status'] ?? 400);
+            throw new InvalidPaymentException('خطای ناشناخته رخ داده است. در صورت کسر مبلغ از حساب حداکثر پس از 72 ساعت به حسابتان برمیگردد', $result['status'] ?? 400);
         }
         $refId = $result['rrn'];
         $receipt = new Receipt('pna', $refId);

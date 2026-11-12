@@ -10,33 +10,20 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 require_once __DIR__ . '/Core/fn.atipay.php';
 
 class Atipay extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Atipay Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
+    protected Client $client;
 
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
-
-    public $tokenId;
+    public string|int|null $tokenId = null;
 
     /**
      * Atipay constructor.
@@ -44,7 +31,7 @@ class Atipay extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -56,7 +43,7 @@ class Atipay extends Driver
      *
      * @return string
      */
-    private function extractDetails(string $name)
+    private function extractDetails(string $name) : mixed
     {
         return empty($this->invoice->getDetails()[$name]) ? null : $this->invoice->getDetails()[$name];
     }
@@ -69,9 +56,9 @@ class Atipay extends Driver
      * @throws PurchaseFailedException
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
-        $amount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1); // convert to rial
+        $amount = $this->convertAmountToRial($this->invoice->getAmount());
 
         $order_id = $this->invoice->getUuid();
         $mobile = $this->extractDetails('mobile');
@@ -121,7 +108,7 @@ class Atipay extends Driver
         $result = fn_check_callback_data($params);
         if ($result['success'] == 1) { //will verify here
             $apiKey = $this->settings->apikey;
-            $amount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1); // convert to rial
+            $amount = $this->convertAmountToRial($this->invoice->getAmount());
             $verify_params = ['apiKey' => $apiKey,
                 'referenceNumber' => $params['referenceNumber']
             ];
@@ -149,7 +136,7 @@ class Atipay extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('Atipay', $referenceId);
     }

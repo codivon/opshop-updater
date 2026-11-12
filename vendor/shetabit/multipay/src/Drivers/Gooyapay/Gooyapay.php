@@ -11,29 +11,16 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Gooyapay extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Gooyapay Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Gooyapay constructor.
@@ -41,7 +28,7 @@ class Gooyapay extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -55,7 +42,7 @@ class Gooyapay extends Driver
      *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $details = $this->invoice->getDetails();
 
@@ -85,11 +72,8 @@ class Gooyapay extends Driver
             $desc = $details['description'];
         }
 
-        $amount = $this->invoice->getAmount();
-        if ($this->settings->currency != 'T') {
-            $amount /= 10;
-        }
-        $amount = intval(ceil($amount));
+        $amount = intval(ceil($this->convertAmountToToman($this->invoice->getAmount())));
+
 
         $orderId = crc32($this->invoice->getUuid());
         if (!empty($details['orderId'])) {
@@ -99,17 +83,17 @@ class Gooyapay extends Driver
         }
 
         $data = [
-            "MerchantID"    => $this->settings->merchantId,
-            "Amount"        => $amount,
-            "InvoiceID"     => $orderId,
-            "Description"   => $desc,
-            "FullName"      => $name,
-            "Email"         => $email,
-            "Mobile"        => $mobile,
-            "CallbackURL"   => $this->settings->callbackUrl,
+            'MerchantID'    => $this->settings->merchantId,
+            'Amount'        => $amount,
+            'InvoiceID'     => $orderId,
+            'Description'   => $desc,
+            'FullName'      => $name,
+            'Email'         => $email,
+            'Mobile'        => $mobile,
+            'CallbackURL'   => $this->settings->callbackUrl,
         ];
 
-        $response = $this->client->request('POST', $this->settings->apiPurchaseUrl, ["json" => $data, "http_errors" => false]);
+        $response = $this->client->request('POST', $this->settings->apiPurchaseUrl, ['json' => $data, 'http_errors' => false]);
 
         $body = json_decode($response->getBody()->getContents(), false);
 
@@ -137,7 +121,6 @@ class Gooyapay extends Driver
     /**
      * Verify payment
      *
-     * @return mixed|void
      *
      * @throws InvalidPaymentException
      * @throws \GuzzleHttp\Exception\GuzzleException
@@ -156,20 +139,17 @@ class Gooyapay extends Driver
             throw new InvalidPaymentException('اطلاعات تراکنش دریافتی با صورتحساب همخوانی ندارد');
         }
 
-        $amount = $this->invoice->getAmount();
-        if ($this->settings->currency != 'T') {
-            $amount /= 10;
-        }
-        $amount = intval(ceil($amount));
+        $amount = intval(ceil($this->convertAmountToToman($this->invoice->getAmount())));
+
 
         //start verfication
         $data = [
-            "MerchantID"    => $this->settings->merchantId,
-            "Authority"     => $Authority,
-            "Amount"        => $amount,
+            'MerchantID'    => $this->settings->merchantId,
+            'Authority'     => $Authority,
+            'Amount'        => $amount,
         ];
 
-        $response = $this->client->request('POST', $this->settings->apiVerificationUrl, ["json" => $data, "http_errors" => false]);
+        $response = $this->client->request('POST', $this->settings->apiVerificationUrl, ['json' => $data, 'http_errors' => false]);
 
         $body = json_decode($response->getBody()->getContents(), false);
 

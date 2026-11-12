@@ -8,36 +8,22 @@ use Shetabit\Multipay\Exceptions\PurchaseFailedException;
 use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Receipt;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Jibit extends Driver
 {
+    use HasIranCurrency;
     /**
      * Jibit client
      */
-    protected \Shetabit\Multipay\Drivers\Jibit\JibitClient $jibit;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected JibitClient $jibit;
 
     /**
      * Payment URL
-     *
-     * @var string
      */
-    protected $paymentUrl;
+    protected string|null $paymentUrl = null;
 
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -55,9 +41,9 @@ class Jibit extends Driver
      * @return string
      * @throws PurchaseFailedException
      */
-    public function purchase()
+    public function purchase() : string|int|null
     {
-        $amount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1); // Convert to Rial
+        $amount = $this->convertAmountToRial($this->invoice->getAmount());
 
         $requestResult = $this->jibit->paymentRequest(
             $amount,

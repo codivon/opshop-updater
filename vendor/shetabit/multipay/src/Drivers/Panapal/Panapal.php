@@ -11,29 +11,16 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Panapal extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Panapal Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Panapal constructor.
@@ -41,7 +28,7 @@ class Panapal extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -55,7 +42,7 @@ class Panapal extends Driver
      *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $details = $this->invoice->getDetails();
 
@@ -85,11 +72,8 @@ class Panapal extends Driver
             $desc = $details['description'];
         }
 
-        $amount = $this->invoice->getAmount();
-        if ($this->settings->currency != 'T') {
-            $amount /= 10;
-        }
-        $amount = intval(ceil($amount));
+        $amount = intval(ceil($this->convertAmountToToman($this->invoice->getAmount())));
+
 
         $uuid = str_replace('-', '', $this->invoice->getUuid());
         $hash = unpack('J', hash('sha256', $uuid, true))[1];
@@ -104,17 +88,17 @@ class Panapal extends Driver
         }
 
         $data = [
-            "MerchantID"    => $this->settings->merchantId,
-            "Amount"        => $amount,
-            "InvoiceID"     => $orderId,
-            "Description"   => $desc,
-            "FullName"      => $name,
-            "Email"         => $email,
-            "Mobile"        => $mobile,
-            "CallbackURL"   => $this->settings->callbackUrl,
+            'MerchantID'    => $this->settings->merchantId,
+            'Amount'        => $amount,
+            'InvoiceID'     => $orderId,
+            'Description'   => $desc,
+            'FullName'      => $name,
+            'Email'         => $email,
+            'Mobile'        => $mobile,
+            'CallbackURL'   => $this->settings->callbackUrl,
         ];
 
-        $response = $this->client->request('POST', $this->settings->apiPurchaseUrl, ["json" => $data, "http_errors" => false]);
+        $response = $this->client->request('POST', $this->settings->apiPurchaseUrl, ['json' => $data, 'http_errors' => false]);
 
         $body = json_decode($response->getBody()->getContents(), true);
 
@@ -142,7 +126,6 @@ class Panapal extends Driver
     /**
      * Verify payment
      *
-     * @return mixed|void
      *
      * @throws InvalidPaymentException
      * @throws \GuzzleHttp\Exception\GuzzleException
@@ -161,20 +144,17 @@ class Panapal extends Driver
             throw new InvalidPaymentException('اطلاعات تراکنش دریافتی با صورتحساب همخوانی ندارد');
         }
 
-        $amount = $this->invoice->getAmount();
-        if ($this->settings->currency != 'T') {
-            $amount /= 10;
-        }
-        $amount = intval(ceil($amount));
+        $amount = intval(ceil($this->convertAmountToToman($this->invoice->getAmount())));
+
 
         //start verfication
         $data = [
-            "MerchantID"    => $this->settings->merchantId,
-            "Authority"     => $Authority,
-            "Amount"        => $amount,
+            'MerchantID'    => $this->settings->merchantId,
+            'Authority'     => $Authority,
+            'Amount'        => $amount,
         ];
 
-        $response = $this->client->request('POST', $this->settings->apiVerificationUrl, ["json" => $data, "http_errors" => false]);
+        $response = $this->client->request('POST', $this->settings->apiVerificationUrl, ['json' => $data, 'http_errors' => false]);
 
         $body = json_decode($response->getBody()->getContents(), true);
 
@@ -205,7 +185,7 @@ class Panapal extends Driver
      *
      * @param $code
      */
-    private function translateStatusCode($code): string
+    private function translateStatusCode(int $code): string
     {
         $translations = [
             -1 => 'درخواست باید از طریق وب سرویس ارسال شود',

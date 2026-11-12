@@ -13,29 +13,16 @@ use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
 use DateTimeZone;
 use DateTime;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Sadad extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Sadad Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Sadad constructor.
@@ -43,7 +30,7 @@ class Sadad extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -58,11 +45,11 @@ class Sadad extends Driver
      * @throws PurchaseFailedException
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $terminalId = $this->settings->terminalId;
         $orderId = crc32($this->invoice->getUuid());
-        $amount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1); // convert to rial
+        $amount = $this->convertAmountToRial($this->invoice->getAmount());
         $key = $this->settings->key;
 
         $signData = $this->encrypt_pkcs7("$terminalId;$orderId;$amount", $key);
@@ -76,12 +63,12 @@ class Sadad extends Driver
         }
 
         //set MobileNo for get user cards
-        $mobile = empty($this->invoice->getDetails()['mobile']) ? "" : $this->invoice->getDetails()['mobile'];
+        $mobile = empty($this->invoice->getDetails()['mobile']) ? '' : $this->invoice->getDetails()['mobile'];
 
         $data = [
             'MerchantId' => $this->settings->merchantId,
             'ReturnUrl' => $this->settings->callbackUrl,
-            'LocalDateTime' => $iranTime->format("m/d/Y g:i:s a"),
+            'LocalDateTime' => $iranTime->format('m/d/Y g:i:s a'),
             'SignData' => $signData,
             'TerminalId' => $terminalId,
             'Amount' => $amount,
@@ -107,13 +94,11 @@ class Sadad extends Driver
                 $multiIdentityRows = $this->settings->MultiIdentityRows;
             }
 
-            // convert to rial
-            if ($this->settings->currency == 'T') {
-                $multiIdentityRows = array_map(function (array $item) {
-                    $item['Amount'] *= 10;
-                    return $item;
-                }, $multiIdentityRows);
-            }
+           
+            $multiIdentityRows = array_map(function (array $item): array {
+                $item['Amount'] = $this->convertAmountToRial($item['Amount']);
+                return $item;
+            }, $multiIdentityRows);
 
             $data['MultiIdentityData'] = ['MultiIdentityRows' => $multiIdentityRows];
         }
@@ -124,12 +109,12 @@ class Sadad extends Driver
                 'POST',
                 $this->getPaymentUrl(),
                 [
-                    "json" => $data,
-                    "headers" => [
+                    'json' => $data,
+                    'headers' => [
                         'Content-Type' => 'application/json',
                         'User-Agent' => '',
                     ],
-                    "http_errors" => false,
+                    'http_errors' => false,
                 ]
             );
 
@@ -187,12 +172,12 @@ class Sadad extends Driver
                 'POST',
                 $this->settings->apiVerificationUrl,
                 [
-                    "json" => $data,
-                    "headers" => [
+                    'json' => $data,
+                    'headers' => [
                         'Content-Type' => 'application/json',
                         'User-Agent' => '',
                     ],
-                    "http_errors" => false,
+                    'http_errors' => false,
                 ]
             );
 
@@ -225,7 +210,7 @@ class Sadad extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('sadad', $referenceId);
     }
@@ -236,10 +221,10 @@ class Sadad extends Driver
      * @param $str
      * @param $key
      */
-    protected function encrypt_pkcs7($str, $key): string
+    protected function encrypt_pkcs7(string $str, string $key): string
     {
         $key = base64_decode($key);
-        $ciphertext = OpenSSL_encrypt($str, "DES-EDE3", $key, OPENSSL_RAW_DATA);
+        $ciphertext = OpenSSL_encrypt($str, 'DES-EDE3', $key, OPENSSL_RAW_DATA);
 
         return base64_encode($ciphertext);
     }
@@ -280,10 +265,8 @@ class Sadad extends Driver
      * Convert status to a readable message.
      *
      * @param $status
-     *
-     * @return mixed|string
      */
-    private function translateStatus($status): string
+    private function translateStatus(int|string|null $status): string
     {
         $translations = [
             '0' => 'تراکنش با موفقیت انجام شد',

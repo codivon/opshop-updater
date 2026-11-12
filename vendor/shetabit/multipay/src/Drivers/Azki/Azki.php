@@ -9,9 +9,11 @@ use Shetabit\Multipay\Exceptions\PurchaseFailedException;
 use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Azki extends Driver
 {
+    use HasIranCurrency;
     const STATUS_DONE = 8;
 
     const SUCCESSFUL = 0;
@@ -23,42 +25,23 @@ class Azki extends Driver
     ];
     /**
      * Azki Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
+    protected Client $client;
 
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
-
-    protected $paymentUrl;
+    protected string|null $paymentUrl = null;
 
     public function getPaymentUrl(): string
     {
         return $this->paymentUrl;
     }
 
-    /**
-     * @param mixed $paymentUrl
-     */
-    public function setPaymentUrl($paymentUrl): void
+    public function setPaymentUrl(string $paymentUrl): void
     {
         $this->paymentUrl = $paymentUrl;
     }
 
 
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -66,7 +49,7 @@ class Azki extends Driver
         $this->convertAmountItems();
     }
 
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $details  = $this->invoice->getDetails();
         $order_id = $this->invoice->getUuid();
@@ -74,7 +57,7 @@ class Azki extends Driver
         if (empty($details['phone']) && empty($details['mobile'])) {
             throw new PurchaseFailedException('Phone number is required');
         }
-        if (!isset($details['items']) ||  count($details['items']) == 0) {
+        if (!isset($details['items']) ||  count($details['items']) === 0) {
             throw new PurchaseFailedException('Items is required for this driver');
         }
 
@@ -93,14 +76,14 @@ class Azki extends Driver
         );
 
         $data = [
-            "amount"        => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
-            "redirect_uri"  => $callback,
-            "fallback_uri"  => $fallback,
-            "provider_id"   => $order_id,
-            "mobile_number" => $details['mobile'] ?? $details['phone'] ?? null,
-            "merchant_id"   => $merchant_id,
-            "description"   => $details['description'] ?? $this->settings->description,
-            "items"         => $details['items'],
+            'amount'        => $this->convertAmountToRial($this->invoice->getAmount()),
+            'redirect_uri'  => $callback,
+            'fallback_uri'  => $fallback,
+            'provider_id'   => $order_id,
+            'mobile_number' => $details['mobile'] ?? $details['phone'] ?? null,
+            'merchant_id'   => $merchant_id,
+            'description'   => $details['description'] ?? $this->settings->description,
+            'items'         => $details['items'],
         ];
 
         $response = $this->ApiCall($data, $signature, $url);
@@ -145,7 +128,7 @@ class Azki extends Driver
         $key  = $this->settings->key;
 
         $plain_signature = "{$sub_url}#{$time}#{$request_method}#{$key}";
-        $encrypt_method  = "AES-256-CBC";
+        $encrypt_method  = 'AES-256-CBC';
         $secret_key      = hex2bin($key);
 
         $digest = @openssl_encrypt($plain_signature, $encrypt_method, $secret_key, OPENSSL_RAW_DATA);
@@ -180,7 +163,8 @@ class Azki extends Driver
 
         $new_items = array_map(
             function (array $item) {
-                $item['amount'] *= ($this->settings->currency == 'T' ? 10 : 1); // convert to rial
+                $item['amount'] = $this->convertAmountToRial($item['amount']) ;
+
                 return $item;
             },
             $this->invoice->getDetails()['items'] ?? []
@@ -193,9 +177,8 @@ class Azki extends Driver
     /**
      * @param       $signature
      * @param       $url
-     * @return mixed
      */
-    public function ApiCall(array $data, $signature, $url, string $request_method = 'POST')
+    public function ApiCall(array $data, string $signature, string $url, string $request_method = 'POST') : mixed
     {
         $response = $this
             ->client
@@ -203,25 +186,24 @@ class Azki extends Driver
                 $request_method,
                 $url,
                 [
-                    "json"        => $data,
-                    "headers"     => [
+                    'json'        => $data,
+                    'headers'     => [
                         'Content-Type' => 'application/json',
                         'Signature'    => $signature,
                         'MerchantId'   => $this->settings->merchantId,
                     ],
-                    "http_errors" => false,
+                    'http_errors' => false,
                 ]
             );
 
         $response_array = json_decode($response->getBody()->getContents(), true);
 
 
-        if (($response->getStatusCode() === null || $response->getStatusCode() != 200) || $response_array['rsCode'] != self::SUCCESSFUL) {
+        if ($response->getStatusCode() !== 200 || $response_array['rsCode'] != self::SUCCESSFUL) {
             $this->purchaseFailed($response_array['rsCode']);
-        } else {
-            return $response_array['result'];
         }
-        return null;
+
+        return $response_array['result'];
     }
 
     /**
@@ -231,28 +213,28 @@ class Azki extends Driver
      *
      * @throws PurchaseFailedException
      */
-    protected function purchaseFailed($status)
+    protected function purchaseFailed(int|string|null $status) : never
     {
         $translations = [
-            "1"  => "Internal Server Error",
-            "2"  => "Resource Not Found",
-            "4"  => "Malformed Data",
-            "5"  => "Data Not Found",
-            "15" => "Access Denied",
-            "16" => "Transaction already reversed",
-            "17" => "Ticket Expired",
-            "18" => "Signature Invalid",
-            "19" => "Ticket unpayable",
-            "20" => "Ticket customer mismatch",
-            "21" => "Insufficient Credit",
-            "28" => "Unverifiable ticket due to status",
-            "32" => "Invalid Invoice Data",
-            "33" => "Contract is not started",
-            "34" => "Contract is expired",
-            "44" => "Validation exception",
-            "51" => "Request data is not valid",
-            "59" => "Transaction not reversible",
-            "60" => "Transaction must be in verified state",
+            '1'  => 'Internal Server Error',
+            '2'  => 'Resource Not Found',
+            '4'  => 'Malformed Data',
+            '5'  => 'Data Not Found',
+            '15' => 'Access Denied',
+            '16' => 'Transaction already reversed',
+            '17' => 'Ticket Expired',
+            '18' => 'Signature Invalid',
+            '19' => 'Ticket unpayable',
+            '20' => 'Ticket customer mismatch',
+            '21' => 'Insufficient Credit',
+            '28' => 'Unverifiable ticket due to status',
+            '32' => 'Invalid Invoice Data',
+            '33' => 'Contract is not started',
+            '34' => 'Contract is expired',
+            '44' => 'Validation exception',
+            '51' => 'Request data is not valid',
+            '59' => 'Transaction not reversible',
+            '60' => 'Transaction must be in verified state',
         ];
 
         if (array_key_exists($status, $translations)) {
@@ -261,7 +243,7 @@ class Azki extends Driver
         throw new PurchaseFailedException('خطای ناشناخته ای رخ داده است.');
     }
 
-    private function getPaymentStatus()
+    private function getPaymentStatus() : mixed
     {
         $sub_url = self::subUrls['paymentStatus'];
         $url     = $this->settings->apiPaymentUrl . $sub_url;
@@ -272,7 +254,7 @@ class Azki extends Driver
         );
 
         $data = [
-            "ticket_id" => $this->invoice->getTransactionId(),
+            'ticket_id' => $this->invoice->getTransactionId(),
         ];
 
         return $this->ApiCall($data, $signature, $url)['status'];
@@ -286,22 +268,22 @@ class Azki extends Driver
      *
      * @throws PurchaseFailedException
      */
-    protected function verifyFailed($status)
+    protected function verifyFailed(int|string|null $status) : never
     {
         $translations = [
-            "1" => "Created",
-            "2" => "Verified",
-            "3" => "Reversed",
-            "4" => "Failed",
-            "5" => "Canceled",
-            "6" => "Settled",
-            "7" => "Expired",
-            "8" => "Done",
-            "9" => "Settle Queue",
+            '1' => 'Created',
+            '2' => 'Verified',
+            '3' => 'Reversed',
+            '4' => 'Failed',
+            '5' => 'Canceled',
+            '6' => 'Settled',
+            '7' => 'Expired',
+            '8' => 'Done',
+            '9' => 'Settle Queue',
         ];
 
         if (array_key_exists($status, $translations)) {
-            throw new PurchaseFailedException("تراکنش در وضعیت " . $translations[$status] . " است.");
+            throw new PurchaseFailedException('تراکنش در وضعیت ' . $translations[$status] . ' است.');
         }
         throw new PurchaseFailedException('خطای ناشناخته ای رخ داده است.');
     }
@@ -311,12 +293,12 @@ class Azki extends Driver
      *
      * @param $referenceId
      */
-    private function createReceipt($referenceId): Receipt
+    private function createReceipt(string|int|null $referenceId): Receipt
     {
         return new Receipt('azki', $referenceId);
     }
 
-    private function VerifyTransaction()
+    private function VerifyTransaction() : mixed
     {
         $sub_url = self::subUrls['verify'];
         $url     = $this->settings->apiPaymentUrl . $sub_url;
@@ -327,7 +309,7 @@ class Azki extends Driver
         );
 
         $data = [
-            "ticket_id" => $this->invoice->getTransactionId(),
+            'ticket_id' => $this->invoice->getTransactionId(),
         ];
 
         return $this->ApiCall($data, $signature, $url);

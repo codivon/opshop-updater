@@ -11,36 +11,24 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 use chillerlan\SimpleCache\CacheOptions;
 use chillerlan\SimpleCache\FileCache;
+use Psr\SimpleCache\CacheInterface;
 
 class Parspal extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * HTTP Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Cache
      */
-    protected \chillerlan\SimpleCache\FileCache $cache;
+    protected CacheInterface $cache;
 
     protected const PAYMENT_PURCHASE_STATUS_OK = 'ACCEPTED';
 
@@ -52,14 +40,18 @@ class Parspal extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
         $this->client = new Client();
+        if (!is_dir((string) $this->settings->cachePath)) {
+            mkdir((string) $this->settings->cachePath, 0755, true);
+        }
+
         $this->cache = new FileCache(
             new CacheOptions([
-                'filestorage' => $this->settings->cachePath,
+                'cacheFilestorage' => $this->settings->cachePath,
             ])
         );
     }
@@ -69,7 +61,7 @@ class Parspal extends Driver
      *
      * @return string
      */
-    private function extractDetails(string $name)
+    private function extractDetails(string $name) : mixed
     {
         return empty($this->invoice->getDetails()[$name]) ? null : $this->invoice->getDetails()[$name];
     }
@@ -81,7 +73,7 @@ class Parspal extends Driver
      *
      * @throws PurchaseFailedException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $data = [
             'amount' => $this->getInvoiceAmount(),
@@ -161,7 +153,7 @@ class Parspal extends Driver
                     'Content-Type' => 'application/json',
                 ],
                 'json' => $data,
-                "http_errors" => false,
+                'http_errors' => false,
             ]
         );
 
@@ -187,7 +179,7 @@ class Parspal extends Driver
      *
      * @param $referenceId
      */
-    public function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    public function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('parspal', $referenceId);
     }
@@ -197,7 +189,7 @@ class Parspal extends Driver
      */
     protected function getInvoiceAmount(): int|float
     {
-        return $this->invoice->getAmount() * (strtolower($this->settings->currency) === 't' ? 10 : 1); // convert to rial
+        return $this->convertAmountToRial($this->invoice->getAmount());
     }
 
     /**
@@ -232,10 +224,8 @@ class Parspal extends Driver
      * Convert status to a readable message.
      *
      * @param $status
-     *
-     * @return mixed|string
      */
-    private function translateStatus($status): string
+    private function translateStatus(int|string|null $status): string
     {
         $translations = [
             '99' => 'انصراف کاربر از پرداخت',

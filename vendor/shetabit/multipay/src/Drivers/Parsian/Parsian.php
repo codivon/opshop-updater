@@ -10,22 +10,12 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
+use SoapClient;
 
 class Parsian extends Driver
 {
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    use HasIranCurrency;
 
     /**
      * Parsian constructor.
@@ -33,7 +23,7 @@ class Parsian extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -47,9 +37,9 @@ class Parsian extends Driver
      * @throws PurchaseFailedException
      * @throws \SoapFault
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
-        $soap = new \SoapClient($this->settings->apiPurchaseUrl);
+        $soap = new SoapClient($this->settings->apiPurchaseUrl);
         $response = $soap->SalePaymentRequest(
             ['requestData' => $this->preparePurchaseData()]
         );
@@ -109,7 +99,7 @@ class Parsian extends Driver
         }
 
         $data = $this->prepareVerificationData();
-        $soap = new \SoapClient($this->settings->apiVerificationUrl);
+        $soap = new SoapClient($this->settings->apiVerificationUrl);
 
         $response = $soap->ConfirmPayment(['requestData' => $data]);
         if (empty($response->ConfirmPaymentResult)) {
@@ -133,7 +123,7 @@ class Parsian extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('parsian', $referenceId);
     }
@@ -168,7 +158,7 @@ class Parsian extends Driver
 
         return [
             'LoginAccount'   => $this->settings->merchantId,
-            'Amount'         => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'Amount'         => $this->convertAmountToRial($this->invoice->getAmount()),
             'OrderId'        => crc32($this->invoice->getUuid()),
             'CallBackUrl'    => $this->settings->callbackUrl,
             'Originator'     => $phone,
@@ -180,11 +170,9 @@ class Parsian extends Driver
      * Convert status code to a readable Persian message.
      *
      * @param int|string $status
-     * @param string $fallbackMessage
      *
-     * @return string
      */
-    private function translateStatus($status, string $fallbackMessage = ''): string
+    private function translateStatus(int|string|null $status, string $fallbackMessage = ''): string
     {
         $translations = [
             -32768 => 'خطای ناشناخته رخ داده است',

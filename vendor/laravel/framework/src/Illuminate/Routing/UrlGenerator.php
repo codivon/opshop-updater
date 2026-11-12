@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
 use Illuminate\Support\Traits\Macroable;
 use InvalidArgumentException;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 class UrlGenerator implements UrlGeneratorContract
@@ -37,21 +38,21 @@ class UrlGenerator implements UrlGeneratorContract
     /**
      * The asset root URL.
      *
-     * @var string
+     * @var string|null
      */
     protected $assetRoot;
 
     /**
      * The forced URL root.
      *
-     * @var string
+     * @var string|null
      */
     protected $forcedRoot;
 
     /**
      * The forced scheme for URLs.
      *
-     * @var string
+     * @var string|null
      */
     protected $forceScheme;
 
@@ -506,6 +507,17 @@ class UrlGenerator implements UrlGeneratorContract
     public function signatureHasNotExpired(Request $request)
     {
         $expires = $request->query('expires');
+
+        if (is_null($expires)) {
+            $queries = HeaderUtils::parseQuery(match (true) {
+                $request->server->has('VAPOR_RAW_QUERY_STRING') => $request->server->get('VAPOR_RAW_QUERY_STRING'),
+                default => $request->getQueryString() ?? '',
+            });
+
+            if (isset($queries['expires'])) {
+                $expires = $queries['expires'];
+            }
+        }
 
         if ($expires !== null && ! is_string($expires)) {
             return false;

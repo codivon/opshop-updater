@@ -11,27 +11,16 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Nextpay extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Nextpay Client.
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Nextpay constructor.
@@ -39,7 +28,7 @@ class Nextpay extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -54,12 +43,12 @@ class Nextpay extends Driver
      * @throws PurchaseFailedException
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $data = [
             'api_key' => $this->settings->merchantId,
             'order_id' => intval(1, time()) . crc32($this->invoice->getUuid()),
-            'amount' => $this->invoice->getAmount() / ($this->settings->currency == 'T' ? 1 : 10), // convert to toman
+            'amount' => $this->convertAmountToToman($this->invoice->getAmount()),
             'callback_uri' => $this->settings->callbackUrl,
         ];
 
@@ -93,8 +82,8 @@ class Nextpay extends Driver
                 'POST',
                 $this->settings->apiPurchaseUrl,
                 [
-                    "form_params" => $data,
-                    "http_errors" => false,
+                    'form_params' => $data,
+                    'http_errors' => false,
                 ]
             );
 
@@ -135,7 +124,7 @@ class Nextpay extends Driver
         $data = [
             'api_key' => $this->settings->merchantId,
             'order_id' => Request::input('order_id'),
-            'amount' => $this->invoice->getAmount() / ($this->settings->currency == 'T' ? 1 : 10), // convert to toman
+            'amount' => $this->convertAmountToToman($this->invoice->getAmount()),
             'trans_id' => $transactionId,
         ];
 
@@ -145,8 +134,8 @@ class Nextpay extends Driver
                 'POST',
                 $this->settings->apiVerificationUrl,
                 [
-                    "form_params" => $data,
-                    "http_errors" => false,
+                    'form_params' => $data,
+                    'http_errors' => false,
                 ]
             );
 
@@ -165,7 +154,7 @@ class Nextpay extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('nextpay', $referenceId);
     }
@@ -176,7 +165,7 @@ class Nextpay extends Driver
      *
      * @param $code
      */
-    private function translateStatusCode($code): string
+    private function translateStatusCode(int|string|null $code): string
     {
         $translations = [
             0 => 'پرداخت تکمیل و با موفقیت انجام شده است',

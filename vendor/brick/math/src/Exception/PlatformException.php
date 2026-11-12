@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Brick\Math\Exception;
 
+use RuntimeException;
+
 use function preg_last_error_msg;
 use function sprintf;
 
@@ -11,10 +13,8 @@ use const PHP_INT_SIZE;
 
 /**
  * Exception thrown when the current PHP platform does not support a required feature.
- *
- * @phpstan-ignore class.extendsFinalByPhpDoc
  */
-final class PlatformException extends UnsupportedPlatformException
+final class PlatformException extends RuntimeException implements MathException
 {
     /**
      * @internal
@@ -30,6 +30,8 @@ final class PlatformException extends UnsupportedPlatformException
      * @internal
      *
      * @pure
+     *
+     * @codeCoverageIgnore
      */
     public static function unsupportedFloatFormat(): self
     {
@@ -40,6 +42,8 @@ final class PlatformException extends UnsupportedPlatformException
      * @internal
      *
      * @pure
+     *
+     * @codeCoverageIgnore
      */
     public static function unsupportedIntSize(): self
     {

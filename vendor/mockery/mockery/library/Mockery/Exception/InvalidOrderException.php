@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Mockery (https://docs.mockery.io/en/stable/)
+ * Mockery (https://docs.mockery.io/)
  *
  * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @see       https://github.com/mockery/mockery for the canonical source repository
+ * @license https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
+ * @link https://github.com/mockery/mockery for the canonical source repository
  */
 
 namespace Mockery\Exception;
@@ -18,7 +18,7 @@ class InvalidOrderException extends Exception
     /**
      * @var int|null
      */
-    protected $actual;
+    protected $actual = null;
 
     /**
      * @var int
@@ -28,12 +28,12 @@ class InvalidOrderException extends Exception
     /**
      * @var string|null
      */
-    protected $method;
+    protected $method = null;
 
     /**
      * @var LegacyMockInterface|null
      */
-    protected $mockObject;
+    protected $mockObject = null;
 
     /**
      * @return int|null
@@ -74,7 +74,7 @@ class InvalidOrderException extends Exception
     {
         $mock = $this->getMock();
 
-        if (null === $mock) {
+        if ($mock === null) {
             return $mock;
         }
 
@@ -82,35 +82,35 @@ class InvalidOrderException extends Exception
     }
 
     /**
-     * @param  int  $count
+     * @param int $count
+     *
      * @return self
      */
     public function setActualOrder($count)
     {
         $this->actual = $count;
-
         return $this;
     }
 
     /**
-     * @param  int  $count
+     * @param int $count
+     *
      * @return self
      */
     public function setExpectedOrder($count)
     {
         $this->expected = $count;
-
         return $this;
     }
 
     /**
-     * @param  string $name
+     * @param string $name
+     *
      * @return self
      */
     public function setMethodName($name)
     {
         $this->method = $name;
-
         return $this;
     }
 
@@ -120,7 +120,6 @@ class InvalidOrderException extends Exception
     public function setMock(LegacyMockInterface $mock)
     {
         $this->mockObject = $mock;
-
         return $this;
     }
 }

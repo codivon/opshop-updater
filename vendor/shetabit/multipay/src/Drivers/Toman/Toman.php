@@ -13,23 +13,19 @@ use Shetabit\Multipay\Request;
 
 class Toman extends Driver
 {
-    protected \GuzzleHttp\Client $client;
+    protected Client $client;
 
-    protected $invoice; // Invoice.
+    protected string $base_url;
 
-    protected $settings; // Driver settings.
+    protected string $shop_slug;
 
-    protected $base_url;
-
-    protected $shop_slug;
-
-    protected $auth_code;
+    protected string $auth_code;
 
     protected string $code;
 
     protected string $auth_token;
 
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice); // Set the invoice.
         $this->settings = (object) $settings; // Set settings.
@@ -42,9 +38,9 @@ class Toman extends Driver
     }
 
     // Purchase the invoice, save its transactionId and finaly return it.
-    public function purchase()
+    public function purchase(): string|int|null
     {
-        $url = $this->base_url . "/users/me/shops/" . $this->shop_slug . "/deals";
+        $url = $this->base_url . '/users/me/shops/' . $this->shop_slug . '/deals';
         $data = $this->settings->data;
 
         $response = $this->client
@@ -55,7 +51,7 @@ class Toman extends Driver
                     'json' => $data,
                     'headers' => [
                         'Authorization' => "Basic {$this->auth_token}",
-                        "Content-Type" => 'application/json'
+                        'Content-Type' => 'application/json'
                     ]
                 ]
             );
@@ -84,7 +80,7 @@ class Toman extends Driver
         $state = Request::input('state');
 
         $transactionId = $this->invoice->getTransactionId();
-        $verifyUrl = $this->base_url . "/users/me/shops/" . $this->shop_slug . "/deals/" . $transactionId . "/verify";
+        $verifyUrl = $this->base_url . '/users/me/shops/' . $this->shop_slug . '/deals/' . $transactionId . '/verify';
 
         if ($state != 'funded') {
             throw new InvalidPaymentException('پرداخت انجام نشد');
@@ -97,7 +93,7 @@ class Toman extends Driver
                 [
                     'headers' => [
                         'Authorization' => "Basic {$this->auth_token}",
-                        "Content-Type" => 'application/json'
+                        'Content-Type' => 'application/json'
                     ]
                 ]
             );
@@ -110,7 +106,7 @@ class Toman extends Driver
      *
      * @param $referenceId
      */
-    public function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    public function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('toman', $referenceId);
     }

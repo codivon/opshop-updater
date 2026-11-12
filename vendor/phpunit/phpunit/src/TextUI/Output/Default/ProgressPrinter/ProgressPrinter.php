@@ -99,11 +99,7 @@ final class ProgressPrinter
 
     public function testMarkedIncomplete(): void
     {
-        if (!$this->prepared) {
-            $this->printProgressForIncomplete();
-        } else {
-            $this->updateTestStatus(TestStatus::incomplete());
-        }
+        $this->updateTestStatus(TestStatus::incomplete());
     }
 
     public function testTriggeredNotice(NoticeTriggered $event): void

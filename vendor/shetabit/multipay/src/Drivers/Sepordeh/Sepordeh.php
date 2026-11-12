@@ -11,29 +11,16 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Sepordeh extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Sepordeh Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Sepordeh constructor.
@@ -41,7 +28,7 @@ class Sepordeh extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -56,19 +43,19 @@ class Sepordeh extends Driver
      * @throws PurchaseFailedException
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $orderId = $this->extractDetails('orderId');
         $phone = $this->extractDetails('phone');
         $description = $this->extractDetails('description') ?: $this->settings->description;
 
         $data = [
-            "merchant" => $this->settings->merchantId,
-            "amount" => $this->invoice->getAmount() / ($this->settings->currency == 'T' ? 1 : 10), // convert to toman
-            "phone" => $phone,
-            "orderId" => $orderId,
-            "callback" => $this->settings->callbackUrl,
-            "description" => $description,
+            'merchant' => $this->settings->merchantId,
+            'amount' => $this->convertAmountToToman($this->invoice->getAmount()),
+            'phone' => $phone,
+            'orderId' => $orderId,
+            'callback' => $this->settings->callbackUrl,
+            'description' => $description,
         ];
 
         $response = $this
@@ -77,8 +64,8 @@ class Sepordeh extends Driver
                 'POST',
                 $this->settings->apiPurchaseUrl,
                 [
-                    "form_params" => $data,
-                    "http_errors" => false,
+                    'form_params' => $data,
+                    'http_errors' => false,
                     'verify' => false,
                 ]
             );
@@ -104,7 +91,7 @@ class Sepordeh extends Driver
      *
      * @return string
      */
-    private function extractDetails(string $name)
+    private function extractDetails(string $name) : mixed
     {
         return empty($this->invoice->getDetails()[$name]) ? null : $this->invoice->getDetails()[$name];
     }
@@ -162,9 +149,7 @@ class Sepordeh extends Driver
             $this->settings->apiVerificationUrl,
             [
                 'form_params' => $data,
-                "headers" => [
-                    "http_errors" => false,
-                ],
+                'http_errors' => false,
                 'verify' => false,
             ]
         );
@@ -195,7 +180,7 @@ class Sepordeh extends Driver
      *
      * @throws InvalidPaymentException
      */
-    private function notVerified($message, int $status)
+    private function notVerified(string|null $message, int $status): never
     {
         throw new InvalidPaymentException($message, $status);
     }
@@ -205,7 +190,7 @@ class Sepordeh extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId, $detail = []): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId, array|string $detail = []): Receipt
     {
         $receipt = new Receipt('sepordeh', $referenceId);
         $receipt->detail($detail);

@@ -11,29 +11,16 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Payping extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Payping Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Payping constructor.
@@ -42,7 +29,7 @@ class Payping extends Driver
      * @param $settings
      * @throws InvalidPaymentException
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -54,9 +41,26 @@ class Payping extends Driver
      *
      * @return string
      */
-    private function extractDetails(string $name)
+    private function extractDetails(string $name) : mixed
     {
         return empty($this->invoice->getDetails()[$name]) ? null : $this->invoice->getDetails()[$name];
+    }
+
+    /**
+     * Retrieve a value from the gateway's response, no matter how it is cased.
+     */
+    private function extractResponseValue(mixed $body, string $name) : mixed
+    {
+        if (!is_array($body)) {
+            return null;
+        }
+
+        $key = array_find(
+            array_keys($body),
+            static fn ($key): bool => strcasecmp((string) $key, $name) === 0
+        );
+
+        return $key === null ? null : $body[$key];
     }
 
     /**
@@ -67,7 +71,7 @@ class Payping extends Driver
      * @throws PurchaseFailedException
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $name = $this->extractDetails('name');
         $mobile = $this->extractDetails('mobile');
@@ -75,12 +79,12 @@ class Payping extends Driver
         $description = $this->extractDetails('description');
 
         $data = [
-            "amount" => $this->invoice->getAmount() / ($this->settings->currency == 'T' ? 1 : 10), // convert to toman
-            "returnUrl" => $this->settings->callbackUrl,
-            "payerIdentity" => $mobile ?: $email,
-            "payerName" => $name,
-            "description" => $description,
-            "clientRefId" => $this->invoice->getUuid(),
+            'amount' => $this->convertAmountToToman($this->invoice->getAmount()),
+            'returnUrl' => $this->settings->callbackUrl,
+            'payerIdentity' => $mobile ?: $email,
+            'payerName' => $name,
+            'description' => $description,
+            'clientRefId' => $this->invoice->getUuid(),
         ];
 
         $response = $this
@@ -89,17 +93,16 @@ class Payping extends Driver
                 'POST',
                 $this->settings->apiPurchaseUrl,
                 [
-                    "json" => $data,
-                    "headers" => [
-                        "Accept" => "application/json",
-                        "Authorization" => "bearer ".$this->settings->merchantId,
+                    'json' => $data,
+                    'headers' => [
+                        'Accept' => 'application/json',
+                        'Authorization' => 'bearer '.$this->settings->merchantId,
                     ],
-                    "http_errors" => false,
+                    'http_errors' => false,
                 ]
             );
 
-        $responseBody = mb_strtolower($response->getBody()->getContents());
-        $body = @json_decode($responseBody, true);
+        $body = @json_decode($response->getBody()->getContents(), true);
         $statusCode = $response->getStatusCode();
 
         if ($statusCode !== 200) {
@@ -109,7 +112,13 @@ class Payping extends Driver
             throw new PurchaseFailedException($message);
         }
 
-        $this->invoice->transactionId($body['paymentCode']);
+        $paymentCode = $this->extractResponseValue($body, 'paymentCode');
+
+        if (empty($paymentCode)) {
+            throw new PurchaseFailedException($this->convertStatusCodeToMessage($statusCode));
+        }
+
+        $this->invoice->transactionId($paymentCode);
 
 
         // return the transaction's id
@@ -147,16 +156,15 @@ class Payping extends Driver
             $this->settings->apiVerificationUrl,
             [
                 'json' => $data,
-                "headers" => [
-                    "Accept" => "application/json",
-                    "Authorization" => "bearer ".$this->settings->merchantId,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Authorization' => 'bearer '.$this->settings->merchantId,
                 ],
-                "http_errors" => false,
+                'http_errors' => false,
             ]
         );
 
-        $responseBody = mb_strtolower($response->getBody()->getContents());
-        $body = @json_decode($responseBody, true);
+        $body = @json_decode($response->getBody()->getContents(), true);
 
         $statusCode = $response->getStatusCode();
 
@@ -169,7 +177,7 @@ class Payping extends Driver
         $receipt = $this->createReceipt($refId);
 
         $receipt->detail([
-            "cardNumber" => $body['cardnumber'],
+            'cardNumber' => $this->extractResponseValue($body, 'cardNumber'),
         ]);
 
 
@@ -181,7 +189,7 @@ class Payping extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('payping', $referenceId);
     }
@@ -193,7 +201,7 @@ class Payping extends Driver
      *
      * @throws InvalidPaymentException
      */
-    private function notVerified($message, int $status)
+    private function notVerified(string|null $message, int $status): never
     {
         throw new InvalidPaymentException($message, $status);
     }

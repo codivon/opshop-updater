@@ -10,22 +10,12 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
+use SoapClient;
 
 class Saman extends Driver
 {
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    use HasIranCurrency;
 
     /**
      * Saman constructor.
@@ -33,7 +23,7 @@ class Saman extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -47,12 +37,12 @@ class Saman extends Driver
      * @throws PurchaseFailedException
      * @throws \SoapFault
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $data = [
             'MID' => $this->settings->merchantId,
             'ResNum' => $this->invoice->getUuid(),
-            'Amount' => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'Amount' => $this->convertAmountToRial($this->invoice->getAmount()),
             'CellNumber' => ''
         ];
 
@@ -61,7 +51,7 @@ class Saman extends Driver
             $data['CellNumber'] = $this->invoice->getDetails()['mobile'];
         }
 
-        $soap = new \SoapClient(
+        $soap = new SoapClient(
             $this->settings->apiPurchaseUrl,
             [
                 'encoding'       => 'UTF-8',
@@ -121,7 +111,7 @@ class Saman extends Driver
             'password' => $this->settings->password,
         ];
 
-        $soap = new \SoapClient(
+        $soap = new SoapClient(
             $this->settings->apiVerificationUrl,
             [
                 'encoding'       => 'UTF-8',
@@ -140,14 +130,14 @@ class Saman extends Driver
         }
 
         $verifiedAmount = $status; // if status is bigger than 0 , it represents amount
-        if ($verifiedAmount !== $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1)) {
-            $soap->ReverseTransaction($data["RefNum"], $data["merchantId"], $data["password"], $verifiedAmount);
+        if ($verifiedAmount !== $this->convertAmountToRial($this->invoice->getAmount())) {
+            $soap->ReverseTransaction($data['RefNum'], $data['merchantId'], $data['password'], $verifiedAmount);
             $status = -100;
             $this->notVerified($status);
         }
 
         if ($this->getInvoice()->getTransactionId() !== Request::input('ResNum')) {
-            $soap->ReverseTransaction($data["RefNum"], $data["merchantId"], $data["password"], $verifiedAmount);
+            $soap->ReverseTransaction($data['RefNum'], $data['merchantId'], $data['password'], $verifiedAmount);
             $status = -101;
             $this->notVerified($status);
         }
@@ -168,7 +158,7 @@ class Saman extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('saman', $referenceId);
     }
@@ -180,7 +170,7 @@ class Saman extends Driver
      *
      * @throws PurchaseFailedException
      */
-    protected function purchaseFailed($status)
+    protected function purchaseFailed(int|string|null $status) : never
     {
         $translations = [
             -1 => ' تراکنش توسط خریدار کنسل شده است.',

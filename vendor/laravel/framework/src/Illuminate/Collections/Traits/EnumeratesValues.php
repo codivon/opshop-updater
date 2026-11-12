@@ -45,6 +45,7 @@ use function Illuminate\Support\enum_value;
  * @property-read HigherOrderCollectionProxy<'reject', TValue, static> $reject
  * @property-read HigherOrderCollectionProxy<'skipUntil', TValue, static> $skipUntil
  * @property-read HigherOrderCollectionProxy<'skipWhile', TValue, static> $skipWhile
+ * @property-read HigherOrderCollectionProxy<'sole', TValue, static> $sole
  * @property-read HigherOrderCollectionProxy<'some', TValue, static> $some
  * @property-read HigherOrderCollectionProxy<'sortBy', TValue, static> $sortBy
  * @property-read HigherOrderCollectionProxy<'sortByDesc', TValue, static> $sortByDesc
@@ -53,7 +54,6 @@ use function Illuminate\Support\enum_value;
  * @property-read HigherOrderCollectionProxy<'takeWhile', TValue, static> $takeWhile
  * @property-read HigherOrderCollectionProxy<'unique', TValue, static> $unique
  * @property-read HigherOrderCollectionProxy<'unless', TValue, static> $unless
- * @property-read HigherOrderCollectionProxy<'until', TValue, static> $until
  * @property-read HigherOrderCollectionProxy<'when', TValue, static> $when
  */
 trait EnumeratesValues
@@ -95,6 +95,7 @@ trait EnumeratesValues
         'reject',
         'skipUntil',
         'skipWhile',
+        'sole',
         'some',
         'sortBy',
         'sortByDesc',
@@ -103,7 +104,6 @@ trait EnumeratesValues
         'takeWhile',
         'unique',
         'unless',
-        'until',
         'when',
     ];
 
@@ -727,6 +727,8 @@ trait EnumeratesValues
      */
     public function whereBetween($key, $values)
     {
+        $values = $this->getArrayableItems($values);
+
         return $this->where($key, '>=', reset($values))->where($key, '<=', end($values));
     }
 
@@ -739,6 +741,8 @@ trait EnumeratesValues
      */
     public function whereNotBetween($key, $values)
     {
+        $values = $this->getArrayableItems($values);
+
         return $this->filter(
             fn ($item) => data_get($item, $key) < reset($values) || data_get($item, $key) > end($values)
         );

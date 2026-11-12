@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Mockery (https://docs.mockery.io/en/stable/)
+ * Mockery (https://docs.mockery.io/)
  *
  * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @see       https://github.com/mockery/mockery for the canonical source repository
+ * @license https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
+ * @link https://github.com/mockery/mockery for the canonical source repository
  */
 
 namespace Mockery;
@@ -29,13 +29,14 @@ use function unserialize;
 final class Instantiator
 {
     /**
-     * @template TObject of object
+     * @template TClass of object
      *
-     * @param  class-string<TObject> $className
-     * @return TObject
+     * @param class-string<TClass> $className
      *
      * @throws InvalidArgumentException
      * @throws UnexpectedValueException
+     *
+     * @return TClass
      */
     public function instantiate($className): object
     {
@@ -105,11 +106,6 @@ final class Instantiator
     }
 
     /**
-     * @template TObject of object
-     *
-     * @param  class-string<TObject>    $className
-     * @return ReflectionClass<TObject>
-     *
      * @throws InvalidArgumentException
      */
     private function getReflectionClass(string $className): ReflectionClass
@@ -118,13 +114,13 @@ final class Instantiator
             throw new InvalidArgumentException(sprintf('Class:%s does not exist', $className));
         }
 
-        $reflectionClass = new ReflectionClass($className);
+        $reflection = new ReflectionClass($className);
 
-        if ($reflectionClass->isAbstract()) {
+        if ($reflection->isAbstract()) {
             throw new InvalidArgumentException(sprintf('Class:%s is an abstract class', $className));
         }
 
-        return $reflectionClass;
+        return $reflection;
     }
 
     /**
@@ -146,6 +142,6 @@ final class Instantiator
      */
     private function isInstantiableViaReflection(ReflectionClass $reflectionClass): bool
     {
-        return ! ($this->hasInternalAncestors($reflectionClass) && $reflectionClass->isFinal());
+        return ! ($reflectionClass->isInternal() && $reflectionClass->isFinal());
     }
 }

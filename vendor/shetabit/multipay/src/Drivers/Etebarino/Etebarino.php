@@ -13,26 +13,12 @@ use Shetabit\Multipay\RedirectionForm;
 class Etebarino extends Driver
 {
     /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
-
-    /**
      * Etebarino constructor.
      * Construct the class with the relevant settings.
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -45,7 +31,7 @@ class Etebarino extends Driver
      *
      * @throws PurchaseFailedException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $this->invoice->uuid(crc32($this->invoice->getUuid()));
 
@@ -98,18 +84,17 @@ class Etebarino extends Driver
      *
      * @param $method
      * @param $url
-     * @param array $data
      */
-    protected function callApi(string $method, $url, $data = []): array
+    protected function callApi(string $method, string $url, array $data = []): array
     {
         $client = new Client();
 
         $response = $client->request($method, $url, [
-            "json" => $data,
-            "headers" => [
+            'json' => $data,
+            'headers' => [
                 'Content-Type' => 'application/json',
             ],
-            "http_errors" => false,
+            'http_errors' => false,
         ]);
 
         return [
@@ -123,7 +108,7 @@ class Etebarino extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('etebarino', $referenceId);
     }
@@ -139,8 +124,8 @@ class Etebarino extends Driver
             'merchantCode' => $this->settings->merchantId,
             'terminalPass' => $this->settings->password,
             'merchantRefCode' => $this->invoice->getUuid(),
-            "description" => $this->invoice->getDetail('description'),
-            "returnUrl" => $this->settings->callbackUrl,
+            'description' => $this->invoice->getDetail('description'),
+            'returnUrl' => $this->settings->callbackUrl,
             'paymentItems' => $this->getItems(),
         ]);
     }
@@ -165,7 +150,7 @@ class Etebarino extends Driver
      *
      *
      */
-    private function getItems()
+    private function getItems() : array
     {
         /**
          * example data
@@ -178,7 +163,7 @@ class Etebarino extends Driver
          *       ]
          *   ];
          */
-        return $this->invoice->getDetails()['items'];
+        return $this->invoice->getDetails()['items'] ?? [];
     }
 
 
@@ -189,7 +174,7 @@ class Etebarino extends Driver
      *
      * @throws PurchaseFailedException
      */
-    protected function purchaseFailed($message)
+    protected function purchaseFailed(string|null $message): never
     {
         throw new PurchaseFailedException($message);
     }

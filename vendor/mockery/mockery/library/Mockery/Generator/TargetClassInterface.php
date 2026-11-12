@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Mockery (https://docs.mockery.io/en/stable/)
+ * Mockery (https://docs.mockery.io/)
  *
  * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @see       https://github.com/mockery/mockery for the canonical source repository
+ * @license https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
+ * @link https://github.com/mockery/mockery for the canonical source repository
  */
 
 namespace Mockery\Generator;
@@ -15,7 +15,8 @@ interface TargetClassInterface
     /**
      * Returns a new instance of the current TargetClassInterface's implementation.
      *
-     * @param  class-string         $name
+     * @param class-string $name
+     *
      * @return TargetClassInterface
      */
     public static function factory($name);
@@ -74,7 +75,8 @@ interface TargetClassInterface
      * Returns whether the targetClass is in
      * the passed interface.
      *
-     * @param  class-string|string $interface
+     * @param class-string|string $interface
+     *
      * @return bool
      */
     public function implementsInterface($interface);
@@ -99,11 +101,4 @@ interface TargetClassInterface
      * @return bool
      */
     public function isFinal();
-
-    /**
-     * Returns whether the targetClass is readonly.
-     *
-     * @return bool
-     */
-    public function isReadOnly();
 }

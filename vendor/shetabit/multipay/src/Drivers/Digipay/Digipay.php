@@ -14,9 +14,12 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Digipay extends Driver
 {
+    use HasIranCurrency;
+
     const VERSION = '2022-02-02';
     const OAUTH_URL = '/digipay/api/oauth/token';
     const PURCHASE_URL = '/digipay/api/tickets/business';
@@ -29,40 +32,23 @@ class Digipay extends Driver
     /**
      * Digipay Client.
      */
-    protected \GuzzleHttp\Client $client;
+    protected Client $client;
 
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
     /**
      * Digipay Oauth Token
-     *
-     * @var string
      */
-    protected $oauthToken;
+    protected string|null $oauthToken = null;
 
     /**
      * Digipay payment url
-     *
-     * @var string
      */
-    protected $paymentUrl;
+    protected string|null $paymentUrl = null;
 
     /**
      * Digipay constructor.
      * Construct the class with the relevant settings.
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -83,7 +69,7 @@ class Digipay extends Driver
          * @see https://docs.mydigipay.com/upg.html#_request_fields_2
          */
         $data = [
-            'amount' => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1),
+            'amount' => $this->convertAmountToRial($this->invoice->getAmount()),
             'cellNumber' => $phone,
             'providerId' => $this->invoice->getUuid(),
             'callbackUrl' => $this->settings->callbackUrl,
@@ -126,7 +112,7 @@ class Digipay extends Driver
 
         $body = json_decode($response->getBody()->getContents(), true);
 
-        if ($response->getStatusCode() != 200) {
+        if ($response->getStatusCode() !== 200) {
             // error has happened
             $message = $body['result']['message'] ?? 'خطا در هنگام درخواست برای پرداخت رخ داده است.';
             throw new PurchaseFailedException($message);
@@ -170,18 +156,18 @@ class Digipay extends Driver
 
         $body = json_decode($response->getBody()->getContents(), true);
 
-        if ($response->getStatusCode() != 200) {
+        if ($response->getStatusCode() !== 200) {
             $message = $body['result']['message'] ?? 'تراکنش تایید نشد';
             throw new InvalidPaymentException($message, (int) $response->getStatusCode());
         }
 
-        return (new Receipt('digipay', $body["trackingCode"]))->detail($body);
+        return new Receipt('digipay', $body['trackingCode'])->detail($body);
     }
 
     /**
      * @throws PurchaseFailedException
      */
-    protected function oauth()
+    protected function oauth() : string
     {
         $response = $this
             ->client
@@ -210,8 +196,8 @@ class Digipay extends Driver
                 ]
             );
 
-        if ($response->getStatusCode() != 200) {
-            if ($response->getStatusCode() == 401) {
+        if ($response->getStatusCode() !== 200) {
+            if ($response->getStatusCode() === 401) {
                 throw new PurchaseFailedException('خطا نام کاربری یا رمز عبور شما اشتباه می‌باشد.');
             }
             throw new PurchaseFailedException('خطا در هنگام احراز هویت.');
@@ -229,7 +215,7 @@ class Digipay extends Driver
      *
      * @throws PurchaseFailedException
      */
-    public function reverse()
+    public function reverse() : array
     {
         if (is_null($digipayTicketType = $this->invoice->getDetail('type'))) {
             throw new PurchaseFailedException('"type" is required for this method.');
@@ -262,7 +248,7 @@ class Digipay extends Driver
 
         $body = json_decode($response->getBody()->getContents(), true);
 
-        if ($response->getStatusCode() != 200 || (isset($body['result']['code']) && $body['result']['code'] != 0)) {
+        if ($response->getStatusCode() !== 200 || (isset($body['result']['code']) && $body['result']['code'] != 0)) {
             $message = $body['result']['message'] ?? 'خطا در هنگام درخواست برای برگشت وجه رخ داده است.';
             throw new InvalidPaymentException($message, $response->getStatusCode());
         }
@@ -275,7 +261,7 @@ class Digipay extends Driver
      *
      * @throws PurchaseFailedException
      */
-    public function deliver()
+    public function deliver() : array
     {
         if (empty($type = $this->invoice->getDetail('type'))) {
             throw new PurchaseFailedException('"type" is required for this method.');
@@ -334,7 +320,7 @@ class Digipay extends Driver
 
         $body = json_decode($response->getBody()->getContents(), true);
 
-        if ($response->getStatusCode() != 200 || (isset($body['result']['code']) && $body['result']['code'] != 0)) {
+        if ($response->getStatusCode() !== 200 || (isset($body['result']['code']) && $body['result']['code'] != 0)) {
             $message = $body['result']['message'] ?? 'خطا در هنگام درخواست برای تحویل کالا رخ داده است.';
             throw new InvalidPaymentException($message, $response->getStatusCode());
         }
@@ -342,7 +328,7 @@ class Digipay extends Driver
         return $body;
     }
 
-    public function getRefundConfig()
+    public function getRefundConfig() : mixed
     {
         $response = $this->client->request(
             'POST',
@@ -358,7 +344,7 @@ class Digipay extends Driver
 
         $body = json_decode($response->getBody()->getContents(), true);
 
-        if ($response->getStatusCode() != 200 || (isset($body['result']['code']) && $body['result']['code'] != 0)) {
+        if ($response->getStatusCode() !== 200 || (isset($body['result']['code']) && $body['result']['code'] != 0)) {
             $message = $body['result']['message'] ?? 'خطا در هنگام درخواست برای دریافت تنظیمات مرجوعی رخ داده است.';
             throw new InvalidPaymentException($message, $response->getStatusCode());
         }
@@ -366,7 +352,7 @@ class Digipay extends Driver
         return $response['certFile'];
     }
 
-    public function refundTransaction()
+    public function refundTransaction() : array
     {
         if (empty($type = $this->invoice->getDetail('type'))) {
             throw new PurchaseFailedException('"type" is required for this method.');
@@ -386,7 +372,7 @@ class Digipay extends Driver
 
         $data = [
             'providerId' => $providerId,
-            'amount' => $amount * ($this->settings->currency == 'T' ? 10 : 1),
+            'amount' =>  $this->convertAmountToRial($amount),
             'saleTrackingCode' => $saleTrackingCode,
         ];
 
@@ -408,7 +394,7 @@ class Digipay extends Driver
 
         $body = json_decode($response->getBody()->getContents(), true);
 
-        if ($response->getStatusCode() != 200 || (isset($body['result']['code']) && $body['result']['code'] != 0)) {
+        if ($response->getStatusCode() !== 200 || (isset($body['result']['code']) && $body['result']['code'] != 0)) {
             $message = $body['result']['message'] ?? 'خطا در هنگام درخواست مرجوعی تراکنش رخ داده است.';
             throw new InvalidPaymentException($message, $response->getStatusCode());
         }

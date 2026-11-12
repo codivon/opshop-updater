@@ -11,23 +11,12 @@ use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\Request;
 use Carbon\Carbon;
 use Shetabit\Multipay\RedirectionForm;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 use SoapClient;
 
 class Behpardakht extends Driver
 {
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    use HasIranCurrency;
 
     /**
      * Behpardakht constructor.
@@ -35,7 +24,7 @@ class Behpardakht extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -50,7 +39,7 @@ class Behpardakht extends Driver
      * @throws \SoapFault
      */
 
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $soap = $this->client($this->settings->apiPurchaseUrl);
 
@@ -70,7 +59,7 @@ class Behpardakht extends Driver
         $data = explode(',', $response->return);
 
         // purchase was not successful
-        if ($data[0] !== "0") {
+        if ($data[0] !== '0') {
             throw new PurchaseFailedException($this->translateStatus($data[0]), (int)$data[0]);
         }
 
@@ -100,7 +89,6 @@ class Behpardakht extends Driver
     /**
      * Verify payment
      *
-     * @return mixed|Receipt
      *
      * @throws InvalidPaymentException
      * @throws \SoapFault
@@ -118,10 +106,10 @@ class Behpardakht extends Driver
 
         // step1: verify request
         $verifyResponse = (int)$soap->bpVerifyRequest($data)->return;
-        if ($verifyResponse != 0) {
+        if ($verifyResponse !== 0) {
             // rollback money and throw exception
             // avoid rollback if request was already verified
-            if ($verifyResponse != 43) {
+            if ($verifyResponse !== 43) {
                 $soap->bpReversalRequest($data);
             }
 
@@ -143,11 +131,11 @@ class Behpardakht extends Driver
         $receipt = $this->createReceipt($data['saleReferenceId']);
 
         $receipt->detail([
-            "RefId" => Request::input('RefId'),
-            "SaleOrderId" => Request::input('SaleOrderId'),
-            "CardHolderPan" => Request::input('CardHolderPan'),
-            "CardHolderInfo" => Request::input('CardHolderInfo'),
-            "SaleReferenceId" => Request::input('SaleReferenceId'),
+            'RefId' => Request::input('RefId'),
+            'SaleOrderId' => Request::input('SaleOrderId'),
+            'CardHolderPan' => Request::input('CardHolderPan'),
+            'CardHolderInfo' => Request::input('CardHolderInfo'),
+            'SaleReferenceId' => Request::input('SaleReferenceId'),
         ]);
 
         return $receipt;
@@ -158,7 +146,7 @@ class Behpardakht extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('behpardakht', $referenceId);
     }
@@ -200,7 +188,7 @@ class Behpardakht extends Driver
             'userName' => $this->settings->username,
             'userPassword' => $this->settings->password,
             'callBackUrl' => $this->settings->callbackUrl,
-            'amount' => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'amount' => $this->convertAmountToRial($this->invoice->getAmount()),
             'localDate' => Carbon::now()->format('Ymd'),
             'localTime' => Carbon::now()->format('Gis'),
             'orderId' => crc32($this->invoice->getUuid()),
@@ -211,7 +199,7 @@ class Behpardakht extends Driver
 
     private function client(string $url): SoapClient
     {
-        if (isset($_SERVER['SERVER_PROTOCOL']) && $_SERVER['SERVER_PROTOCOL'] == "HTTP/2.0") {
+        if (isset($_SERVER['SERVER_PROTOCOL']) && $_SERVER['SERVER_PROTOCOL'] == 'HTTP/2.0') {
             $context = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);
 
             return new SoapClient($url, ['stream_context' => $context]);
@@ -224,10 +212,8 @@ class Behpardakht extends Driver
      * Convert status to a readable message.
      *
      * @param $status
-     *
-     * @return mixed|string
      */
-    private function translateStatus($status): string
+    private function translateStatus(int|string|null $status): string
     {
         $translations = [
             '0' => 'تراکنش با موفقیت انجام شد',

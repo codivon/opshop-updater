@@ -11,30 +11,17 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 use const CURLOPT_SSL_CIPHER_LIST;
 
 class Fanavacard extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * client
-     *
-     * @var Client
      */
-    protected $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Etebarino constructor.
@@ -42,7 +29,7 @@ class Fanavacard extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -56,7 +43,7 @@ class Fanavacard extends Driver
      *
      * @throws PurchaseFailedException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $this->invoice->uuid(crc32($this->invoice->getUuid()));
         $token  = $this->getToken();
@@ -88,32 +75,36 @@ class Fanavacard extends Driver
     public function verify(): ReceiptInterface
     {
         $transaction_amount = Request::input('transactionAmount');
-        $amount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1); // convert to rial
+        $amount = $this->convertAmountToRial($this->invoice->getAmount());
 
-        if ($amount == $transaction_amount) {
-            $param = ['Token'=>Request::input('token'), 'RefNum'=>Request::input('RefNum')];
-            $response = $this->client->post($this->settings->apiVerificationUrl, [
-                'json'=> array_merge(
-                    ['WSContext'=> $this->getWsContext()],
-                    $param
-                )]);
+        // a callback without the amount of the invoice is not a payment of the invoice: it must not
+        // pass as one without asking the gateway (a forged callback, or a verification without one)
+        if ($transaction_amount === null || $transaction_amount === '' || $amount != $transaction_amount) {
+            throw new InvalidPaymentException('مبلغ تراکنش با مبلغ فاکتور مطابقت ندارد');
+        }
 
-            $response_data = json_decode($response->getBody()->getContents());
-            if ($response_data->Result != 'erSucceed') {
-                throw new InvalidPaymentException($response_data->Result);
-            }
-            if ($amount != $response_data->Amount) {
-                $this->client->post(
-                    $this->settings->apiReverseAmountUrl,
-                    [
-                        'json'=> [
-                            'WSContext'=> $this->getWsContext(),
-                            $param
-                        ]
-                    ]
-                );
-                throw new InvalidPaymentException('مبلغ تراکنش برگشت داده شد');
-            }
+        $param = ['Token'=>Request::input('token'), 'RefNum'=>Request::input('RefNum')];
+        $response = $this->client->post($this->settings->apiVerificationUrl, [
+            'json'=> array_merge(
+                ['WSContext'=> $this->getWsContext()],
+                $param
+            )]);
+
+        $response_data = json_decode($response->getBody()->getContents());
+        if ($response_data->Result != 'erSucceed') {
+            throw new InvalidPaymentException($response_data->Result);
+        }
+        if ($amount != $response_data->Amount) {
+            $this->client->post(
+                $this->settings->apiReverseAmountUrl,
+                [
+                    'json'=> array_merge(
+                        ['WSContext'=> $this->getWsContext()],
+                        $param
+                    )
+                ]
+            );
+            throw new InvalidPaymentException('مبلغ تراکنش برگشت داده شد');
         }
 
         return $this->createReceipt(Request::input('ResNum'));
@@ -125,7 +116,7 @@ class Fanavacard extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         $receipt = new Receipt('fanavacard', $referenceId);
         $receipt->detail([
@@ -153,11 +144,11 @@ class Fanavacard extends Driver
                 'WSContext'=> $this->getWsContext(),
                 'TransType'=>'EN_GOODS',
                 'ReserveNum'=>$this->invoice->getDetail('invoice_number') ?? crc32($this->invoice->getUuid()),
-                'Amount'=> $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+                'Amount'=> $this->convertAmountToRial($this->invoice->getAmount()),
                 'RedirectUrl'=>$this->settings->callbackUrl,
             ]]);
 
-        if ($response->getStatusCode() != 200) {
+        if ($response->getStatusCode() !== 200) {
             throw new PurchaseFailedException(
                 "cant get token |  {$response->getBody()->getContents()}",
                 $response->getStatusCode()

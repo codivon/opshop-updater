@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Mockery (https://docs.mockery.io/en/stable/)
+ * Mockery (https://docs.mockery.io/)
  *
  * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @see       https://github.com/mockery/mockery for the canonical source repository
+ * @license https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
+ * @link https://github.com/mockery/mockery for the canonical source repository
  */
 
 namespace Mockery;
@@ -13,19 +13,21 @@ namespace Mockery;
 interface ExpectationInterface
 {
     /**
-     * @param  mixed ...$args
+     * @template TArgs
+     *
+     * @param TArgs ...$args
+     *
      * @return self
      */
     public function andReturn(...$args);
 
     /**
-     * @param  mixed ...$args
      * @return self
      */
-    public function andReturns(...$args);
+    public function andReturns();
 
     /**
-     * @return MockInterface
+     * @return LegacyMockInterface|MockInterface
      */
     public function getMock();
 

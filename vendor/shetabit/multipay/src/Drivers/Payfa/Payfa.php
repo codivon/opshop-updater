@@ -11,29 +11,16 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Payfa extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Payfa Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Payfa constructor.
@@ -41,7 +28,7 @@ class Payfa extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice); // Set the invoice.
         $this->settings = (object)$settings; // Set settings.
@@ -53,18 +40,18 @@ class Payfa extends Driver
      *
      * @return string
      */
-    private function extractDetails(string $name)
+    private function extractDetails(string $name) : mixed
     {
         return empty($this->invoice->getDetails()[$name]) ? null : $this->invoice->getDetails()[$name];
     }
 
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $mobile = $this->extractDetails('mobile');
         $cardNumber = $this->extractDetails('cardNumber');
 
         $data = [
-            'amount' => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'amount' => $this->convertAmountToRial($this->invoice->getAmount()),
             'callbackUrl' => $this->settings->callbackUrl,
             'mobileNumber' => $mobile,
             'invoiceId' => $this->invoice->getUuid(),
@@ -75,10 +62,10 @@ class Payfa extends Driver
             'POST',
             $this->settings->apiPurchaseUrl,
             [
-                "json" => $data,
-                "http_errors" => false,
-                "headers" => [
-                    "X-API-Key" => $this->settings->apiKey,
+                'json' => $data,
+                'http_errors' => false,
+                'headers' => [
+                    'X-API-Key' => $this->settings->apiKey,
                     'Content-Type' => 'application/json',
                 ]
             ]
@@ -86,8 +73,8 @@ class Payfa extends Driver
         $body = json_decode($response->getBody()->getContents(), true);
 
 
-        if ($response->getStatusCode() != 200) {
-            throw new PurchaseFailedException($body["title"]);
+        if ($response->getStatusCode() !== 200) {
+            throw new PurchaseFailedException($body['title']);
         }
 
         $this->invoice->transactionId($body['paymentId']);
@@ -123,23 +110,23 @@ class Payfa extends Driver
             'POST',
             $this->settings->apiVerificationUrl . $paymentId,
             [
-                "http_errors" => false,
-                "headers" => [
-                    "X-API-Key" => $this->settings->apiKey,
+                'http_errors' => false,
+                'headers' => [
+                    'X-API-Key' => $this->settings->apiKey,
                     'Content-Type' => 'application/json',
                 ]
             ]
         );
         $body = json_decode($response->getBody()->getContents(), true);
 
-        if ($response->getStatusCode() != 200) {
-            $this->notVerified($body["message"], $response->getStatusCode());
+        if ($response->getStatusCode() !== 200) {
+            $this->notVerified($body['message'], $response->getStatusCode());
         }
 
         return $this->createReceipt($body['transactionId']);
     }
 
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('payfa', $referenceId);
     }
@@ -150,7 +137,7 @@ class Payfa extends Driver
      * @param $message
      * @throws InvalidPaymentException
      */
-    private function notVerified($message, int $status): void
+    private function notVerified(string|null $message, int $status): void
     {
         if (empty($message)) {
             throw new InvalidPaymentException('خطای ناشناخته ای رخ داده است.', $status);

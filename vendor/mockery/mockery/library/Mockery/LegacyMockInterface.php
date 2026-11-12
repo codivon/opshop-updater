@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Mockery (https://docs.mockery.io/en/stable/)
+ * Mockery (https://docs.mockery.io/)
  *
  * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @see       https://github.com/mockery/mockery for the canonical source repository
+ * @license https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
+ * @link https://github.com/mockery/mockery for the canonical source repository
  */
 
 namespace Mockery;
@@ -20,14 +20,14 @@ interface LegacyMockInterface
      * this method will switch them from normal expectations to default
      * expectations
      *
-     * @return static
+     * @return self
      */
     public function byDefault();
 
     /**
      * Set mock to defer unexpected methods to its parent if possible
      *
-     * @return static
+     * @return self
      */
     public function makePartial();
 
@@ -41,8 +41,11 @@ interface LegacyMockInterface
     /**
      * Find an expectation matching the given method and arguments
      *
-     * @param  string           $method
-     * @param  array<mixed>     $args
+     * @template TMixed
+     *
+     * @param string        $method
+     * @param array<TMixed> $args
+     *
      * @return null|Expectation
      */
     public function mockery_findExpectation($method, array $args);
@@ -71,7 +74,8 @@ interface LegacyMockInterface
     /**
      * Return the expectations director for the given method
      *
-     * @param  string                   $method
+     * @param string $method
+     *
      * @return null|ExpectationDirector
      */
     public function mockery_getExpectationsFor($method);
@@ -84,12 +88,12 @@ interface LegacyMockInterface
     public function mockery_getGroups();
 
     /**
-     * @return list<string>
+     * @return string[]
      */
     public function mockery_getMockableMethods();
 
     /**
-     * @return array<string,mixed>
+     * @return array
      */
     public function mockery_getMockableProperties();
 
@@ -103,7 +107,8 @@ interface LegacyMockInterface
     /**
      * Alternative setup method to constructor
      *
-     * @param  object $partialObject
+     * @param object $partialObject
+     *
      * @return void
      */
     public function mockery_init(?Container $container = null, $partialObject = null);
@@ -116,24 +121,27 @@ interface LegacyMockInterface
     /**
      * Set current ordered number
      *
-     * @param  int  $order
-     * @return void
+     * @param int $order
+     *
+     * @return int
      */
     public function mockery_setCurrentOrder($order);
 
     /**
      * Return the expectations director for the given method
      *
-     * @param  string $method
-     * @return void
+     * @param string $method
+     *
+     * @return null|ExpectationDirector
      */
     public function mockery_setExpectationsFor($method, ExpectationDirector $director);
 
     /**
      * Set ordering for a group
      *
-     * @param  string $group
-     * @param  int    $order
+     * @param string $group
+     * @param int    $order
+     *
      * @return void
      */
     public function mockery_setGroup($group, $order);
@@ -148,20 +156,21 @@ interface LegacyMockInterface
     /**
      * Validate the current mock's ordering
      *
-     * @param  string $method
-     * @param  int    $order
-     * @return void
+     * @param string $method
+     * @param int    $order
      *
      * @throws Exception
+     *
+     * @return void
      */
     public function mockery_validateOrder($method, $order);
 
     /**
      * Iterate across all expectation directors and validate each
      *
-     * @return void
-     *
      * @throws Throwable
+     *
+     * @return void
      */
     public function mockery_verify();
 
@@ -169,12 +178,12 @@ interface LegacyMockInterface
      * Allows additional methods to be mocked that do not explicitly exist on mocked class
      *
      * @param  string $method the method name to be mocked
-     * @return static
+     * @return self
      */
     public function shouldAllowMockingMethod($method);
 
     /**
-     * @return static
+     * @return self
      */
     public function shouldAllowMockingProtectedMethods();
 
@@ -183,56 +192,67 @@ interface LegacyMockInterface
      *
      * @deprecated since 1.4.0. Please use makePartial() instead.
      *
-     * @return static
+     * @return self
      */
     public function shouldDeferMissing();
 
     /**
-     * @return VerificationDirector
+     * @return self
      */
     public function shouldHaveBeenCalled();
 
     /**
-     * @param  string                                                        $method
-     * @param  null|array<mixed>|Closure                                     $args
-     * @return ($method is null ? HigherOrderMessage : VerificationDirector)
+     * @template TMixed
+     * @param string                     $method
+     * @param null|array<TMixed>|Closure $args
+     *
+     * @return self
      */
     public function shouldHaveReceived($method, $args = null);
 
     /**
      * Set mock to ignore unexpected methods and return Undefined class
      *
-     * @param  null|mixed $returnValue the default return value for calls to missing functions on this mock
-     * @return static
+     * @template TReturnValue
+     *
+     * @param null|TReturnValue $returnValue the default return value for calls to missing functions on this mock
+     *
+     * @return self
      */
     public function shouldIgnoreMissing($returnValue = null);
 
     /**
-     * @param  null|array<mixed> $args (optional)
-     * @return void
+     * @template TMixed
+     * @param null|array<TMixed> $args (optional)
+     *
+     * @return self
      */
     public function shouldNotHaveBeenCalled(?array $args = null);
 
     /**
-     * @param  null|string                                   $method
-     * @param  null|array<mixed>|Closure                     $args
-     * @return ($method is null ? HigherOrderMessage : void)
+     * @template TMixed
+     * @param string                     $method
+     * @param null|array<TMixed>|Closure $args
+     *
+     * @return self
      */
     public function shouldNotHaveReceived($method, $args = null);
 
     /**
      * Shortcut method for setting an expectation that a method should not be called.
      *
-     * @param  string|array<string,mixed>                                  ...$methodNames one or many methods that are expected not to be called in this mock
-     * @return ($methodNames is list{} ? HigherOrderMessage : Expectation)
+     * @param string ...$methodNames one or many methods that are expected not to be called in this mock
+     *
+     * @return Expectation|ExpectationInterface|HigherOrderMessage
      */
     public function shouldNotReceive(...$methodNames);
 
     /**
      * Set expected method calls
      *
-     * @param  string|array<string,mixed>                                  ...$methodNames one or many methods that are expected to be called in this mock
-     * @return ($methodNames is list{} ? HigherOrderMessage : Expectation)
+     * @param string ...$methodNames one or many methods that are expected to be called in this mock
+     *
+     * @return Expectation|ExpectationInterface|HigherOrderMessage
      */
     public function shouldReceive(...$methodNames);
 }

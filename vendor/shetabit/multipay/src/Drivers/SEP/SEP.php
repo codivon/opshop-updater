@@ -11,29 +11,16 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class SEP extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * SEP HTTP Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * SEP constructor.
@@ -41,7 +28,7 @@ class SEP extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -58,12 +45,12 @@ class SEP extends Driver
      * @throws PurchaseFailedException
      * @throws \SoapFault
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $data = [
             'action' => 'token',
             'TerminalId' => $this->settings->terminalId,
-            'Amount' => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'Amount' => $this->convertAmountToRial($this->invoice->getAmount()),
             'ResNum' => $this->invoice->getUuid(),
             'RedirectUrl' => $this->settings->callbackUrl,
             'CellNumber' => $this->invoice->getDetail('mobile') ?? '',
@@ -82,7 +69,7 @@ class SEP extends Driver
 
         $responseStatus = $response->getStatusCode();
 
-        if ($responseStatus != 200) { // if something has done in a wrong way
+        if ($responseStatus !== 200) { // if something has done in a wrong way
             $this->purchaseFailed(0);
         }
 
@@ -127,7 +114,7 @@ class SEP extends Driver
     public function verify(): ReceiptInterface
     {
         $status = (int)Request::input('Status');
-        if ($status != 2) {
+        if ($status !== 2) {
             $this->purchaseFailed($status);
         }
 
@@ -147,7 +134,7 @@ class SEP extends Driver
             ]
         );
 
-        if ($response->getStatusCode() != 200) {
+        if ($response->getStatusCode() !== 200) {
             $this->notVerified(0);
         }
 
@@ -160,7 +147,7 @@ class SEP extends Driver
 
         $transactionDetail = $responseData['TransactionDetail'];
 
-        $verifiedAmount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1);
+        $verifiedAmount = $this->convertAmountToRial($this->invoice->getAmount());
         if ($verifiedAmount !== $transactionDetail['AffectiveAmount']) {
             $this->notVerified(-107);
         }
@@ -184,7 +171,7 @@ class SEP extends Driver
             // between variable name in docs and actual returned values.
             'Amount' => $transactionDetail['OrginalAmount'],
         ]);
-        
+
         return $receipt;
     }
 
@@ -193,7 +180,7 @@ class SEP extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('saman', $referenceId);
     }
@@ -205,7 +192,7 @@ class SEP extends Driver
      *
      * @throws PurchaseFailedException
      */
-    protected function purchaseFailed($status)
+    protected function purchaseFailed(int|string|null $status) : never
     {
         $translations = [
             1 => ' تراکنش توسط خریدار لغو شده است.',
@@ -233,7 +220,7 @@ class SEP extends Driver
      *
      * @throws InvalidPaymentException
      */
-    private function notVerified($status): void
+    private function notVerified(int|string|null $status): void
     {
         $translations = [
             -2 => ' تراکنش یافت نشد.',

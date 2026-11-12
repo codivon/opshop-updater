@@ -13,34 +13,20 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Zibal extends Driver
 {
-    /**
-     * @var \GuzzleHttp\Client
-     */
-    public $client;
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
+    use HasIranCurrency;
 
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
-
+    public Client $client;
     /**
      * Zibal constructor.
      * Construct the class with the relevant settings.
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -54,7 +40,7 @@ class Zibal extends Driver
      *
      * @throws \GuzzleHttp\Exception\GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $mobile = $this->invoice->getDetail('phone')
             ?? $this->invoice->getDetail('cellphone')
@@ -67,7 +53,7 @@ class Zibal extends Driver
         $data = [
             'callbackUrl' => $this->settings->callbackUrl,
             'merchant' => $this->settings->merchantId,
-            'amount' => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1),
+            'amount' => $this->convertAmountToRial($this->invoice->getAmount()),
             'description' => $this->invoice->getDetail('description') ?? $this->settings->description,
             'mobile' => $mobile,
             'orderId' => $orderId
@@ -101,6 +87,9 @@ class Zibal extends Driver
                     RequestOptions::BODY => json_encode($data),
                     RequestOptions::HEADERS => [
                         'Content-Type' => 'application/json',
+                        ...(($this->settings->referer ?? null) === null ? [] : [
+                            'Referer' => $this->settings->referer,
+                        ]),
                     ],
                     RequestOptions::HTTP_ERRORS => false,
                 ]
@@ -108,14 +97,15 @@ class Zibal extends Driver
 
 
         $body = json_decode($response->getBody()->getContents(), true);
-
-        if ($response->getStatusCode() != 200) {
+        if ($response->getStatusCode() !== 200) {
             // connection error
             $message = $body['message'] ?? 'خطا در هنگام درخواست برای پرداخت رخ داده است.';
             throw new PurchaseFailedException($message, (int) $response->getStatusCode());
-        } elseif ($body['result'] != 100) {
+        }
+
+        if ($body['result'] != 100) {
             // gateway errors
-            throw new PurchaseFailedException($this->translateStatus($body['result']) ?? $body['message'], $body['result']);
+            throw new PurchaseFailedException($this->translateStatus($body['result']), $body['result']);
         }
 
         $this->invoice->transactionId($body['trackId']);
@@ -140,7 +130,6 @@ class Zibal extends Driver
     /**
      * Verify payment
      *
-     * @return mixed|void
      *
      * @throws InvalidPaymentException
      * @throws \GuzzleHttp\Exception\GuzzleException
@@ -167,30 +156,34 @@ class Zibal extends Driver
                 RequestOptions::HEADERS => [
                     'Accept' => 'application/json',
                     'Content-Type' => 'application/json',
+                    ...(($this->settings->referer ?? null) === null ? [] : [
+                        'Referer' => $this->settings->referer,
+                    ]),
                 ],
                 RequestOptions::HTTP_ERRORS => false,
             ]
         );
 
         $body = json_decode($response->getBody()->getContents(), true);
-
-        if ($response->getStatusCode() != 200) {
+        if ($response->getStatusCode() !== 200) {
             // connection error
             $message = $body['message'] ?? 'خطا در هنگام وریفای تراکنش رخ داده است.';
-            throw new PurchaseFailedException($message, (int) $response->getStatusCode());
-        } elseif ($body['result'] == 201) {
+            throw new InvalidPaymentException($message, (int) $response->getStatusCode());
+        }
+        if ($body['result'] == 201) {
             // transaction has been verified before
-
-            throw new PreviouslyVerifiedException($this->translateStatus($body['result']) ?? $body['message'], $body['result']);
-        } elseif ($body['result'] != 100) {
-            // gateway errors
-            throw new PurchaseFailedException($this->translateStatus($body['result']) ?? $body['message'], $body['result']);
+            throw new PreviouslyVerifiedException($this->translateStatus($body['result']), $body['result']);
         }
 
-        return (new Receipt('Zibal', $body['refNumber']))->detail($body);
+        if ($body['result'] != 100) {
+            // gateway errors
+            throw new InvalidPaymentException($this->translateStatus($body['result']), $body['result']);
+        }
+
+        return new Receipt('Zibal', $body['refNumber'])->detail($body);
     }
 
-    private function translateStatus($status): string
+    private function translateStatus(int|string|null $status): string
     {
         $translations = [
             -2 => 'خطای داخلی',

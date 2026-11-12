@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Mockery (https://docs.mockery.io/en/stable/)
+ * Mockery (https://docs.mockery.io/)
  *
  * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @see       https://github.com/mockery/mockery for the canonical source repository
+ * @license https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
+ * @link https://github.com/mockery/mockery for the canonical source repository
  */
 
 namespace Mockery;
@@ -23,13 +23,10 @@ class HigherOrderMessage
     private $method;
 
     /**
-     * @var MockInterface
+     * @var LegacyMockInterface|MockInterface
      */
     private $mock;
 
-    /**
-     * @param string $method
-     */
     public function __construct(MockInterface $mock, $method)
     {
         $this->mock = $mock;
@@ -37,13 +34,14 @@ class HigherOrderMessage
     }
 
     /**
-     * @param  string                                              $method
-     * @param  array<mixed>                                        $args
+     * @param string $method
+     * @param array  $args
+     *
      * @return Expectation|ExpectationInterface|HigherOrderMessage
      */
     public function __call($method, $args)
     {
-        if ('shouldNotHaveReceived' === $this->method) {
+        if ($this->method === 'shouldNotHaveReceived') {
             return $this->mock->{$this->method}($method, $args);
         }
 

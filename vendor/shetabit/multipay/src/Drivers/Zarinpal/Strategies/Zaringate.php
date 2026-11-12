@@ -10,23 +10,12 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 use SoapClient;
 
 class Zaringate extends Driver
 {
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    use HasIranCurrency;
 
     /**
      * Zarinpal constructor.
@@ -34,7 +23,7 @@ class Zaringate extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -48,7 +37,7 @@ class Zaringate extends Driver
      * @throws PurchaseFailedException
      * @throws \SoapFault
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         if (!empty($this->invoice->getDetails()['description'])) {
             $description = $this->invoice->getDetails()['description'];
@@ -58,7 +47,7 @@ class Zaringate extends Driver
 
         $mobile = empty($this->invoice->getDetails()['mobile']) ? '' : $this->invoice->getDetails()['mobile'];
         $email = empty($this->invoice->getDetails()['email']) ? '' : $this->invoice->getDetails()['email'];
-        $amount = $this->invoice->getAmount() / ($this->settings->currency == 'T' ? 1 : 10); // convert to toman
+        $amount = $this->convertAmountToRial($this->invoice->getAmount());
 
         $data = [
             'MerchantID' => $this->settings->merchantId,
@@ -106,13 +95,13 @@ class Zaringate extends Driver
      */
     public function verify() : ReceiptInterface
     {
-        $amount = $this->invoice->getAmount() / ($this->settings->currency == 'T' ? 1 : 10); // convert to toman
+        $amount = $this->convertAmountToToman($this->invoice->getAmount());
         $authority = $this->invoice->getTransactionId() ?? Request::input('Authority');
 
         $data = [
             'MerchantID' => $this->settings->merchantId,
             'Authority' => $authority,
-            'Amount' => $amount, // convert to toman
+            'Amount' => $amount,
         ];
 
         $client = new SoapClient($this->getVerificationUrl(), ['encoding' => 'UTF-8']);
@@ -131,7 +120,7 @@ class Zaringate extends Driver
      *
      * @param $referenceId
      */
-    public function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    public function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('zarinpal', $referenceId);
     }
@@ -164,10 +153,8 @@ class Zaringate extends Driver
      * Convert status to a readable message.
      *
      * @param $status
-     *
-     * @return mixed|string
      */
-    private function translateStatus($status): string
+    private function translateStatus(int|string|null $status): string
     {
         $translations = [
             '100' => 'تراکنش با موفقیت انجام گردید',

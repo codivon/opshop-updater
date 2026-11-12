@@ -162,7 +162,7 @@ final class Differ
         }
 
         // if either input or output is a single line without breaks than no warning should be raised
-        if (count($newLineBreaks) === 1 || count($oldLineBreaks) === 1) {
+        if (['' => true] === $newLineBreaks || ['' => true] === $oldLineBreaks) {
             return false;
         }
 
@@ -182,7 +182,7 @@ final class Differ
         return false;
     }
 
-    private function getLinebreak(int|string $line): string
+    private function getLinebreak($line): string
     {
         if (!is_string($line)) {
             return '';

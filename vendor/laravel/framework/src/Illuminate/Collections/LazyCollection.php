@@ -15,6 +15,7 @@ use InvalidArgumentException;
 use IteratorAggregate;
 use stdClass;
 use Traversable;
+use ValueError;
 
 /**
  * @template TKey of array-key
@@ -462,7 +463,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
      *
      * @template TFirstDefault
      *
-     * @param  (callable(TValue): bool)|null  $callback
+     * @param  (callable(TValue, TKey): bool)|null  $callback
      * @param  TFirstDefault|(\Closure(): TFirstDefault)  $default
      * @return TValue|TFirstDefault
      */
@@ -767,8 +768,8 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
     /**
      * Get the values of a given key.
      *
-     * @param  string|array<array-key, string>  $value
-     * @param  string|null  $key
+     * @param  \Closure|string|int|array<array-key, string>|null  $value
+     * @param  \Closure|string|null  $key
      * @return static<array-key, mixed>
      */
     public function pluck($value, $key = null)
@@ -890,9 +891,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
 
             foreach ($this as $key) {
                 if (! $values->valid()) {
-                    trigger_error($errorMessage, E_USER_WARNING);
-
-                    break;
+                    throw new ValueError($errorMessage);
                 }
 
                 yield $key => $values->current();
@@ -901,7 +900,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
             }
 
             if ($values->valid()) {
-                trigger_error($errorMessage, E_USER_WARNING);
+                throw new ValueError($errorMessage);
             }
         });
     }
@@ -946,7 +945,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
     /**
      * Get the items with the specified keys.
      *
-     * @param  \Illuminate\Support\Enumerable<array-key, TKey>|array<array-key, TKey>|string  $keys
+     * @param  \Illuminate\Support\Enumerable<array-key, TKey>|array<array-key, TKey>|string|null  $keys
      * @return static
      */
     public function only($keys)
@@ -981,7 +980,7 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
     /**
      * Select specific values from the items within the collection.
      *
-     * @param  \Illuminate\Support\Enumerable<array-key, TKey>|array<array-key, TKey>|string  $keys
+     * @param  \Illuminate\Support\Enumerable<array-key, TKey>|array<array-key, TKey>|string|null  $keys
      * @return static
      */
     public function select($keys)
@@ -1574,8 +1573,10 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
                     $position = ($position + 1) % $limit;
                 }
 
-                for ($i = 0, $end = min($limit, count($ringBuffer)); $i < $end; $i++) {
-                    $pointer = ($position + $i) % $limit;
+                $ringBufferCount = count($ringBuffer);
+
+                for ($i = 0, $end = min($limit, $ringBufferCount); $i < $end; $i++) {
+                    $pointer = $ringBufferCount < $limit ? $i : ($position + $i) % $limit;
                     yield $ringBuffer[$pointer][0] => $ringBuffer[$pointer][1];
                 }
             });
@@ -1911,9 +1912,9 @@ class LazyCollection implements CanBeEscapedWhenCastToString, Enumerable
     /**
      * Explode the "value" and "key" arguments passed to "pluck".
      *
-     * @param  string|string[]  $value
-     * @param  string|string[]|null  $key
-     * @return array{string[],string[]|null}
+     * @param  \Closure|string|int|string[]|null  $value
+     * @param  \Closure|string|string[]|null  $key
+     * @return array{\Closure|string[]|int|null, \Closure|string[]|null}
      */
     protected function explodePluckParameters($value, $key)
     {

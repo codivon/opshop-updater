@@ -39,9 +39,8 @@ final class Iterator extends FilterIterator
     private array $prefixes;
 
     /**
-     * @param \Iterator<int, SplFileInfo> $iterator
-     * @param list<string>                $suffixes
-     * @param list<string>                $prefixes
+     * @param list<string> $suffixes
+     * @param list<string> $prefixes
      */
     public function __construct(string $basePath, \Iterator $iterator, array $suffixes = [], array $prefixes = [])
     {

@@ -9,18 +9,13 @@
  */
 namespace SebastianBergmann\FileIterator;
 
-use const DIRECTORY_SEPARATOR;
-use function array_map;
 use function assert;
-use function rtrim;
 use function str_starts_with;
 use RecursiveDirectoryIterator;
 use RecursiveFilterIterator;
 use SplFileInfo;
 
 /**
- * @extends RecursiveFilterIterator<string, SplFileInfo, RecursiveDirectoryIterator>
- *
  * @internal This class is not covered by the backward compatibility promise for phpunit/php-file-iterator
  */
 final class ExcludeIterator extends RecursiveFilterIterator
@@ -37,10 +32,7 @@ final class ExcludeIterator extends RecursiveFilterIterator
     {
         parent::__construct($iterator);
 
-        $this->exclude = array_map(
-            static fn (string $path): string => rtrim($path, '/' . DIRECTORY_SEPARATOR),
-            $exclude,
-        );
+        $this->exclude = $exclude;
     }
 
     public function accept(): bool
@@ -56,7 +48,7 @@ final class ExcludeIterator extends RecursiveFilterIterator
         }
 
         foreach ($this->exclude as $exclude) {
-            if ($path === $exclude || str_starts_with($path, $exclude . DIRECTORY_SEPARATOR)) {
+            if (str_starts_with($path, $exclude)) {
                 return false;
             }
         }

@@ -182,9 +182,11 @@ final readonly class BigDecimal extends BigNumber
             throw InvalidArgumentException::cannotConvertFloat($value > 0 ? 'INF' : '-INF');
         }
 
+        // @codeCoverageIgnoreStart
         if (pack('E', 1.0) !== "\x3f\xf0\x00\x00\x00\x00\x00\x00") {
             throw PlatformException::unsupportedFloatFormat();
         }
+        // @codeCoverageIgnoreEnd
 
         if (PHP_INT_SIZE >= 8) {
             // 64-bit: extract the IEEE-754 bit pattern as a 64-bit integer.
@@ -1153,12 +1155,10 @@ final readonly class BigDecimal extends BigNumber
      */
     public function __unserialize(array $data): void
     {
-        /** @phpstan-ignore isset.initializedProperty */
         if (isset($this->value)) {
             throw new LogicException('__unserialize() is an internal function, it must not be called directly.');
         }
 
-        /** @phpstan-ignore deadCode.unreachable */
         $this->value = $data['value'];
         $this->scale = $data['scale'];
     }
@@ -1167,6 +1167,13 @@ final readonly class BigDecimal extends BigNumber
     protected static function from(BigNumber $number): static
     {
         return $number->toBigDecimal();
+    }
+
+    #[Override]
+    protected function digitCount(): int
+    {
+        // At least one integral digit is written: 0.001 counts 4 digits.
+        return max($this->getPrecision(), $this->scale + 1);
     }
 
     /**

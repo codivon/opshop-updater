@@ -9,9 +9,11 @@ use Shetabit\Multipay\Contracts\ReceiptInterface;
 use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Asanpardakht extends Driver
 {
+    use HasIranCurrency;
     const TokenURL = 'Token';
     const TimeURL = 'Time';
     const TranResultURL = 'TranResult';
@@ -22,31 +24,16 @@ class Asanpardakht extends Driver
     const ReverseURL = 'Reverse';
 
     /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
      * Response
      *
      * @var object
      */
-    protected $response;
 
     /**
      * PayGateTransactionId
      *
      */
-    protected $payGateTransactionId;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected string|int|null $payGateTransactionId = null;
 
     /**
      * Asanpardakht constructor.
@@ -54,7 +41,7 @@ class Asanpardakht extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object)$settings;
@@ -67,7 +54,7 @@ class Asanpardakht extends Driver
      *
      * @throws PurchaseFailedException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $this->invoice->uuid(crc32($this->invoice->getUuid()));
 
@@ -103,7 +90,6 @@ class Asanpardakht extends Driver
     /**
      * Verify payment
      *
-     * @return mixed|Receipt
      *
      * @throws PurchaseFailedException
      */
@@ -143,20 +129,19 @@ class Asanpardakht extends Driver
      *
      * @param $method
      * @param $url
-     * @param array $data
      */
-    protected function callApi(string $method, $url, $data = []): array
+    protected function callApi(string $method, string $url, array $data = []): array
     {
         $client = new Client(['base_uri' => $this->settings->apiRestPaymentUrl]);
 
         $response = $client->request($method, $url, [
-            "json" => $data,
-            "headers" => [
+            'json' => $data,
+            'headers' => [
                 'Content-Type' => 'application/json',
                 'usr' => $this->settings->username,
                 'pwd' => $this->settings->password
             ],
-            "http_errors" => false,
+            'http_errors' => false,
         ]);
 
         return [
@@ -170,7 +155,7 @@ class Asanpardakht extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('asanpardakht', $referenceId);
     }
@@ -190,10 +175,10 @@ class Asanpardakht extends Driver
             'serviceTypeId' => 1,
             'merchantConfigurationId' => $this->settings->merchantConfigID,
             'localInvoiceId' => $this->invoice->getUuid(),
-            'amountInRials' => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'amountInRials' => $this->convertAmountToRial($this->invoice->getAmount()),
             'localDate' => $this->getTime()['content'],
             'callbackURL' => $this->settings->callbackUrl . $query,
-            'paymentId' => "0",
+            'paymentId' => '0',
             'additionalData' => '',
         ]);
     }
@@ -273,48 +258,48 @@ class Asanpardakht extends Driver
      *
      * @throws PurchaseFailedException
      */
-    protected function purchaseFailed($status)
+    protected function purchaseFailed(int|string|null $status) : never
     {
         $translations = [
-            400 => "bad request",
-            401 => "unauthorized. probably wrong or unsent header(s)",
-            471 => "identity not trusted to proceed",
-            472 => "no records found",
-            473 => "invalid merchant username or password",
-            474 => "invalid incoming request machine ip. check response body to see your actual public IP address",
-            475 => "invoice identifier is not a number",
-            476 => "request amount is not a number",
-            477 => "request local date length is invalid",
-            478 => "request local date is not in valid format",
-            479 => "invalid service type id",
-            480 => "invalid payer id",
-            481 => "incorrect settlement description format",
-            482 => "settlement slices does not match total amount",
-            483 => "unregistered iban",
-            484 => "internal error for other reasons",
-            485 => "invalid local date",
-            486 => "amount not in range",
-            487 => "service not found or not available for merchant",
-            488 => "invalid default callback",
-            489 => "duplicate local invoice id",
-            490 => "merchant disabled or misconfigured",
-            491 => "too many settlement destinations",
-            492 => "unprocessable request",
-            493 => "error processing special request for other reasons like business restrictions",
-            494 => "invalid payment_id for governmental payment",
-            495 => "invalid referenceId in additionalData",
-            496 => "invalid json in additionalData",
-            497 => "invalid payment_id location",
-            571 => "misconfiguration OR not yet processed",
-            572 => "misconfiguration OR transaction status undetermined",
-            573 => "misconfiguraed valid ips for configuration OR unable to request for verification due to an internal error",
-            574 => "internal error in uthorization",
-            575 => "no valid ibans found for merchant",
-            576 => "internal error",
-            577 => "internal error",
-            578 => "no default sharing is defined for merchant",
-            579 => "cant submit ibans with default sharing endpoint",
-            580 => "error processing special request"
+            400 => 'bad request',
+            401 => 'unauthorized. probably wrong or unsent header(s)',
+            471 => 'identity not trusted to proceed',
+            472 => 'no records found',
+            473 => 'invalid merchant username or password',
+            474 => 'invalid incoming request machine ip. check response body to see your actual public IP address',
+            475 => 'invoice identifier is not a number',
+            476 => 'request amount is not a number',
+            477 => 'request local date length is invalid',
+            478 => 'request local date is not in valid format',
+            479 => 'invalid service type id',
+            480 => 'invalid payer id',
+            481 => 'incorrect settlement description format',
+            482 => 'settlement slices does not match total amount',
+            483 => 'unregistered iban',
+            484 => 'internal error for other reasons',
+            485 => 'invalid local date',
+            486 => 'amount not in range',
+            487 => 'service not found or not available for merchant',
+            488 => 'invalid default callback',
+            489 => 'duplicate local invoice id',
+            490 => 'merchant disabled or misconfigured',
+            491 => 'too many settlement destinations',
+            492 => 'unprocessable request',
+            493 => 'error processing special request for other reasons like business restrictions',
+            494 => 'invalid payment_id for governmental payment',
+            495 => 'invalid referenceId in additionalData',
+            496 => 'invalid json in additionalData',
+            497 => 'invalid payment_id location',
+            571 => 'misconfiguration OR not yet processed',
+            572 => 'misconfiguration OR transaction status undetermined',
+            573 => 'misconfiguraed valid ips for configuration OR unable to request for verification due to an internal error',
+            574 => 'internal error in uthorization',
+            575 => 'no valid ibans found for merchant',
+            576 => 'internal error',
+            577 => 'internal error',
+            578 => 'no default sharing is defined for merchant',
+            579 => 'cant submit ibans with default sharing endpoint',
+            580 => 'error processing special request'
         ];
 
         if (array_key_exists($status, $translations)) {

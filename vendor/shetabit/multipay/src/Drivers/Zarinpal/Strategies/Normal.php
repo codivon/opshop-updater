@@ -11,29 +11,16 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Normal extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * HTTP Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Zarinpal constructor.
@@ -41,7 +28,7 @@ class Normal extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -56,9 +43,9 @@ class Normal extends Driver
      * @throws PurchaseFailedException
      * @throws \SoapFault
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
-        $amount = $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1); // convert to rial
+        $amount = $this->convertAmountToRial($this->invoice->getAmount());
 
         if (!empty($this->invoice->getDetails()['description'])) {
             $description = $this->invoice->getDetails()['description'];
@@ -67,12 +54,12 @@ class Normal extends Driver
         }
 
         $data = [
-            "merchant_id" => $this->settings->merchantId,
-            "amount" => $amount,
-            "currency" => 'IRR',
-            "callback_url" => $this->settings->callbackUrl,
-            "description" => $description,
-            "metadata" => $this->metadata(),
+            'merchant_id' => $this->settings->merchantId,
+            'amount' => $amount,
+            'currency' => 'IRR',
+            'callback_url' => $this->settings->callbackUrl,
+            'description' => $description,
+            'metadata' => $this->metadata(),
         ];
         if (isset($this->settings->wages)) {
             $data['wages'] = $this->settings->wages;
@@ -84,22 +71,22 @@ class Normal extends Driver
                 'POST',
                 $this->settings->apiPurchaseUrl,
                 [
-                    "json" => $data,
-                    "headers" => [
+                    'json' => $data,
+                    'headers' => [
                         'Content-Type' => 'application/json',
                     ],
-                    "http_errors" => false,
+                    'http_errors' => false,
                 ]
             );
 
         $result = json_decode($response->getBody()->getContents(), true);
 
-        if (!empty($result['errors']) || empty($result['data']) || $result['data']['code'] != 100) {
-            $bodyResponse = $result['errors']['code'];
+        if (!empty($result['errors']) || ($result['data']['code'] ?? null) != 100) {
+            $bodyResponse = $result['errors']['code'] ?? $result['data']['code'] ?? 0;
             throw new PurchaseFailedException($this->translateStatus($bodyResponse), $bodyResponse);
         }
 
-        $this->invoice->transactionId($result['data']["authority"]);
+        $this->invoice->transactionId($result['data']['authority']);
 
         // return the transaction's id
         return $this->invoice->getTransactionId();
@@ -127,9 +114,9 @@ class Normal extends Driver
     {
         $authority = $this->invoice->getTransactionId() ?? Request::input('Authority');
         $data = [
-            "merchant_id" => $this->settings->merchantId,
-            "authority" => $authority,
-            "amount" => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'merchant_id' => $this->settings->merchantId,
+            'authority' => $authority,
+            'amount' => $this->convertAmountToRial($this->invoice->getAmount()),
         ];
 
         $response = $this->client->request(
@@ -137,18 +124,18 @@ class Normal extends Driver
             $this->getVerificationUrl(),
             [
                 'json' => $data,
-                "headers" => [
+                'headers' => [
                     'Content-Type' => 'application/json',
                 ],
-                "http_errors" => false,
+                'http_errors' => false,
             ]
         );
 
         $result = json_decode($response->getBody()->getContents(), true);
 
         if (empty($result['data']) || !isset($result['data']['ref_id']) || ($result['data']['code'] != 100 && $result['data']['code'] != 101)) {
-            $bodyResponse = $result['errors']['code'];
-            throw new InvalidPaymentException($this->translateStatus($bodyResponse), $bodyResponse);
+            $bodyResponse = ($result['errors']['code'] ?? $result['data']['code']) ?? '';
+            throw new InvalidPaymentException($this->translateStatus($bodyResponse), $bodyResponse ?: null);
         }
 
         $refId = $result['data']['ref_id'];
@@ -173,7 +160,7 @@ class Normal extends Driver
      *
      * @param $referenceId
      */
-    public function createReceipt($referenceId): \Shetabit\Multipay\Receipt
+    public function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('zarinpal', $referenceId);
     }
@@ -206,10 +193,8 @@ class Normal extends Driver
      * Convert status to a readable message.
      *
      * @param $status
-     *
-     * @return mixed|string
      */
-    private function translateStatus($status): string
+    private function translateStatus(int|string|null $status): string
     {
         $translations = [
             '100' => 'تراکنش با موفقیت انجام گردید',
@@ -253,6 +238,6 @@ class Normal extends Driver
             $metadata['email'] = $this->invoice->getDetails()['email'];
         }
 
-        return array_merge($this->invoice->getDetails() ?? [], $metadata);
+        return array_merge($this->invoice->getDetails(), $metadata);
     }
 }

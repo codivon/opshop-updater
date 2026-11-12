@@ -11,29 +11,16 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
 
 class Omidpay extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Sadad Client.
-     *
-     * @var object
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Sadad constructor.
@@ -41,7 +28,7 @@ class Omidpay extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -65,16 +52,16 @@ class Omidpay extends Driver
             'TransType' => 'EN_GOODS',
             'ReserveNum' => $this->invoice->getUuid(),
             'MerchantId' => $this->settings->merchantId,
-            'Amount' => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'Amount' => $this->convertAmountToRial($this->invoice->getAmount()),
             'RedirectUrl' => $this->settings->callbackUrl,
         ];
 
         $response = $this->client->request(
-            "POST",
+            'POST',
             $this->settings->apiGenerateTokenUrl,
             [
                 'json' => $data,
-                "headers" => [
+                'headers' => [
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json',
                     'User-Agent' => '',
@@ -84,8 +71,8 @@ class Omidpay extends Driver
 
         $responseStatus = $response->getStatusCode();
 
-        if ($responseStatus != 200) {
-            throw new PurchaseFailedException($this->translateStatus("unknown_error"));
+        if ($responseStatus !== 200) {
+            throw new PurchaseFailedException($this->translateStatus('unknown_error'));
         }
 
         $jsonBody = $response->getBody()->getContents();
@@ -127,10 +114,10 @@ class Omidpay extends Driver
         $refNum = Request::input('RefNum');
 
         $response = $this->client->request(
-            "POST",
+            'POST',
             $this->settings->apiVerificationUrl,
             [
-                "json" => [
+                'json' => [
                     'WSContext' => [
                         'UserId' => $this->settings->username,
                         'Password' => $this->settings->password,
@@ -138,7 +125,7 @@ class Omidpay extends Driver
                     'Token' => $token,
                     'RefNum' => $refNum
                 ],
-                "headers" => [
+                'headers' => [
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json',
                     'User-Agent' => '',
@@ -161,24 +148,22 @@ class Omidpay extends Driver
      *
      * @param $referenceId
      */
-    protected function createReceipt($referenceId): Receipt
+    protected function createReceipt(string|int $referenceId): Receipt
     {
         return new Receipt('omidpay', $referenceId);
     }
 
     private function isSucceed(string $status): bool
     {
-        return $status === "erSucceed";
+        return $status === 'erSucceed';
     }
 
     /**
      * Convert status to a readable message.
      *
      * @param $status
-     *
-     * @return mixed|string
      */
-    private function translateStatus($status): string
+    private function translateStatus(int|string|null $status): string
     {
         $translations = [
             'erSucceed' => 'سرویس با موفقیت اجراء شد.',

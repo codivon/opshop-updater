@@ -19,8 +19,6 @@ use RecursiveFilterIterator;
 use RecursiveIterator;
 
 /**
- * @extends RecursiveFilterIterator<int, Test, RecursiveIterator<int, Test>>
- *
  * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
  *
  * @internal This class is not covered by the backward compatibility promise for PHPUnit

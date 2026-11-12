@@ -11,27 +11,17 @@ use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
+use Shetabit\Multipay\Traits\HasIranCurrency;
+use SoapClient;
 
 class Sizpay extends Driver
 {
+    use HasIranCurrency;
+
     /**
      * Nextpay Client.
      */
-    protected \GuzzleHttp\Client $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
+    protected Client $client;
 
     /**
      * Nextpay constructor.
@@ -39,7 +29,7 @@ class Sizpay extends Driver
      *
      * @param $settings
      */
-    public function __construct(Invoice $invoice, $settings)
+    public function __construct(Invoice $invoice, array|object $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
@@ -54,15 +44,15 @@ class Sizpay extends Driver
      * @throws PurchaseFailedException
      * @throws \SoapFault
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
-        $client = new \SoapClient($this->settings->apiPurchaseUrl);
+        $client = new SoapClient($this->settings->apiPurchaseUrl);
         $response = $client->GetToken2([
             'MerchantID' => $this->settings->merchantId,
             'TerminalID' => $this->settings->terminal,
             'UserName' => $this->settings->username,
             'Password' => $this->settings->password,
-            'Amount' => $this->invoice->getAmount() * ($this->settings->currency == 'T' ? 10 : 1), // convert to rial
+            'Amount' => $this->convertAmountToRial($this->invoice->getAmount()),
             'OrderID' => time(),
             'ReturnURL' => $this->settings->callbackUrl,
             'InvoiceNo' => time(),
@@ -128,7 +118,7 @@ class Sizpay extends Driver
             'SignData'    => $this->settings->SignData
         ];
 
-        $client = new \SoapClient($this->settings->apiVerificationUrl);
+        $client = new SoapClient($this->settings->apiVerificationUrl);
         $response = $client->Confirm2($data)->Confirm2Result;
         $result = json_decode($response);
 
@@ -145,7 +135,7 @@ class Sizpay extends Driver
      *
      * @param $resCode
      */
-    protected function createReceipt($resCode): \Shetabit\Multipay\Receipt
+    protected function createReceipt(string|int $resCode): Receipt
     {
         return new Receipt('sizpay', $resCode);
     }
