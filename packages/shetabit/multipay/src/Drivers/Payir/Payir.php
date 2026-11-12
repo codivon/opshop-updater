@@ -3,50 +3,41 @@
 namespace Shetabit\Multipay\Drivers\Payir;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Shetabit\Multipay\Abstracts\Driver;
+use Shetabit\Multipay\Contracts\ReceiptInterface;
 use Shetabit\Multipay\Exceptions\InvalidPaymentException;
 use Shetabit\Multipay\Exceptions\PurchaseFailedException;
-use Shetabit\Multipay\Contracts\ReceiptInterface;
 use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
 
+/**
+ * درگاه پی‌آیر — از override لوکال پروژه (در shetabit/multipay v3.6.0 upstream موجود نیست)
+ * سازگار با کدبیس v3.6.0: پراپرتی‌های $invoice/$settings از والدِ typed ارث می‌رسند
+ * و purchase() امضای بازگشتی abstract را دارد.
+ */
 class Payir extends Driver
 {
     /**
      * Payir Client.
      *
-     * @var object
+     * @var Client
      */
     protected $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
 
     /**
      * Payir constructor.
      * Construct the class with the relevant settings.
      *
-     * @param Invoice $invoice
-     * @param $settings
+     * @param  array|object  $settings
      */
     public function __construct(Invoice $invoice, $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
-        $this->client = new Client();
+        $this->client = new Client;
     }
 
     /**
@@ -62,33 +53,32 @@ class Payir extends Driver
     /**
      * Purchase Invoice.
      *
-     * @return string
      *
      * @throws PurchaseFailedException
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $mobile = $this->extractDetails('mobile');
         $description = $this->extractDetails('description');
         $validCardNumber = $this->extractDetails('validCardNumber');
 
-        $data = array(
+        $data = [
             'api' => $this->settings->merchantId,
             'amount' => ($this->invoice->getAmount() * 10), // convert rial to toman
             'redirect' => $this->settings->callbackUrl,
             'mobile' => $mobile,
             'description' => $description,
             'factorNumber' => $this->invoice->getUuid(),
-            'validCardNumber' => $validCardNumber
-        );
+            'validCardNumber' => $validCardNumber,
+        ];
 
         $response = $this->client->request(
             'POST',
             $this->settings->apiPurchaseUrl,
             [
-                "form_params" => $data,
-                "http_errors" => false,
+                'form_params' => $data,
+                'http_errors' => false,
             ]
         );
         $body = json_decode($response->getBody()->getContents(), true);
@@ -106,12 +96,10 @@ class Payir extends Driver
 
     /**
      * Pay the Invoice
-     *
-     * @return RedirectionForm
      */
     public function pay(): RedirectionForm
     {
-        $payUrl = $this->settings->apiPaymentUrl . $this->invoice->getTransactionId();
+        $payUrl = $this->settings->apiPaymentUrl.$this->invoice->getTransactionId();
 
         return $this->redirectWithForm($payUrl, [], 'GET');
     }
@@ -119,24 +107,23 @@ class Payir extends Driver
     /**
      * Verify payment
      *
-     * @return ReceiptInterface
      *
      * @throws InvalidPaymentException
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     public function verify(): ReceiptInterface
     {
         $data = [
             'api' => $this->settings->merchantId,
-            'token'  => $this->invoice->getTransactionId() ?? Request::input('token'),
+            'token' => $this->invoice->getTransactionId() ?? Request::input('token'),
         ];
 
         $response = $this->client->request(
             'POST',
             $this->settings->apiVerificationUrl,
             [
-                "form_params" => $data,
-                "http_errors" => false,
+                'form_params' => $data,
+                'http_errors' => false,
             ]
         );
         $body = json_decode($response->getBody()->getContents(), true);
@@ -155,7 +142,6 @@ class Payir extends Driver
     /**
      * Generate the payment's receipt
      *
-     * @param $referenceId
      *
      * @return Receipt
      */
@@ -169,13 +155,12 @@ class Payir extends Driver
     /**
      * Trigger an exception
      *
-     * @param $status
      *
      * @throws InvalidPaymentException
      */
     private function notVerified($status)
     {
-        $translations = array(
+        $translations = [
             0 => 'درحال حاضر درگاه بانکی قطع شده و مشکل بزودی برطرف می شود',
             -1 => 'API Key ارسال نمی شود',
             -2 => 'Token ارسال نمی شود',
@@ -203,7 +188,7 @@ class Payir extends Driver
             -24 => 'شماره کارت باید بصورت 16 رقمی، لاتین و چسبیده بهم باشد',
             -25 => 'امکان استفاده از سرویس در کشور مبدا شما وجود نداره',
             -26 => 'امکان انجام تراکنش برای این درگاه وجود ندارد',
-        );
+        ];
 
         if (array_key_exists($status, $translations)) {
             throw new InvalidPaymentException($translations[$status]);

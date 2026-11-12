@@ -12,10 +12,26 @@ use Illuminate\Support\Facades\URL;
 use RuntimeException;
 use Shetabit\Multipay\Exceptions\InvalidPaymentException;
 use Shetabit\Multipay\Invoice;
+use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Payment\Facade\Payment;
 
 class PaymentService
 {
+    /**
+     * گارد درایور: اگر هاست هنوز composer update را اجرا نکرده باشد (ارتقای
+     * shetabit/multipay به v3)، درایورِ درگاه ممکن است موجود نباشد — پیام واضح
+     * به‌جای fatal (catch هر جریان آن را به توست تبدیل می‌کند).
+     */
+    private function assertDriverExists(string $gateway): void
+    {
+        $driverClass = config("payment.map.{$gateway}");
+
+        if (! $driverClass || ! class_exists($driverClass)) {
+            throw new RuntimeException(
+                "درایور درگاه [{$gateway}] یافت نشد — پکیج پرداخت را روی هاست به‌روزرسانی کنید: composer update shetabit/payment shetabit/multipay"
+            );
+        }
+    }
 
     public function createPayment(PackagePurchase $purchase, ?string $gateway = null): array
     {
@@ -26,6 +42,7 @@ class PaymentService
         try {
             // 1️⃣ تنظیمات درگاه (پیش‌فرض: اولین درگاهِ فعال پنل)
             $gateway = $gateway ?? Gateway::where('is_active', true)->first()?->key ?? 'zarinpal';
+            $this->assertDriverExists($gateway);
             $gatewayConfigs = get_gateway_configs($gateway);
 
             // 2️⃣ آدرس کال‌بک درگاه: کاربر پس از پرداخت ابتدا به صفحه‌ی «نتیجه پرداخت» پنل
@@ -52,13 +69,13 @@ class PaymentService
                         // نکته: $driver در این نسخه آبجکتِ درایور است نه رشته → کلید درگاه را ذخیره می‌کنیم
                         $purchase->update([
                             'transaction_id' => $transactionId,
-                            'gateway'        => $gateway,
+                            'gateway' => $gateway,
                         ]);
 
                         Log::info('Purchase transaction created', [
-                            'purchase_id'   => $purchase->id,
+                            'purchase_id' => $purchase->id,
                             'transaction_id' => $transactionId,
-                            'gateway'       => $gateway,
+                            'gateway' => $gateway,
                         ]);
                     }
                 );
@@ -66,35 +83,35 @@ class PaymentService
             // 5️⃣ اجرای پرداخت و دریافت فرم/آدرس
             // نکته: در این نسخه شتابیت، pay() یک RedirectionForm برمی‌گرداند؛
             // متد getPaymentUrl() وجود ندارد (باگ قبلی: Call to undefined method).
-            /** @var \Shetabit\Multipay\RedirectionForm $form */
+            /** @var RedirectionForm $form */
             $form = $payment->pay();
 
             $paymentUrl = $this->resolvePaymentUrl($form, $purchase, $gateway);
 
-            if (!$paymentUrl) {
+            if (! $paymentUrl) {
                 throw new RuntimeException('دریافت آدرس پرداخت از درگاه ناموفق بود.');
             }
 
             // 6️⃣ آپدیت نهایی
             $purchase->update([
                 'payment_url' => $paymentUrl,
-                'status'      => 'pending',
+                'status' => 'pending',
             ]);
 
             return [
-                'payment_url'    => $paymentUrl,
+                'payment_url' => $paymentUrl,
                 'transaction_id' => (string) $purchase->transaction_id,
-                'amount'         => $purchase->amount,
-                'gateway'        => $purchase->gateway ?? $gateway,
+                'amount' => $purchase->amount,
+                'gateway' => $purchase->gateway ?? $gateway,
             ];
 
         } catch (\Exception $e) {
             Log::error('Payment creation failed', [
                 'purchase_id' => $purchase->id,
-                'error'       => $e->getMessage(),
-                'trace'       => $e->getTraceAsString(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
-            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: ' . $e->getMessage());
+            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: '.$e->getMessage());
         }
     }
 
@@ -110,6 +127,7 @@ class PaymentService
 
         try {
             $gateway = $gateway ?? Gateway::where('is_active', true)->first()?->key ?? 'zarinpal';
+            $this->assertDriverExists($gateway);
             $gatewayConfigs = get_gateway_configs($gateway);
 
             // کال‌بک درگاه همان مسیر مشترک پنل است؛ WebPaymentController تشخیص می‌دهد
@@ -133,44 +151,44 @@ class PaymentService
                     function ($driver, $transactionId) use ($order, $gateway) {
                         $order->update([
                             'transaction_id' => $transactionId,
-                            'gateway'        => $gateway,
+                            'gateway' => $gateway,
                         ]);
 
                         Log::info('Subscription transaction created', [
-                            'order_id'        => $order->id,
-                            'transaction_id'  => $transactionId,
-                            'gateway'         => $gateway,
+                            'order_id' => $order->id,
+                            'transaction_id' => $transactionId,
+                            'gateway' => $gateway,
                         ]);
                     }
                 );
 
-            /** @var \Shetabit\Multipay\RedirectionForm $form */
+            /** @var RedirectionForm $form */
             $form = $payment->pay();
 
             $paymentUrl = $this->resolveFormUrl($form, $order, $gateway, 'payment.form.subscription');
 
-            if (!$paymentUrl) {
+            if (! $paymentUrl) {
                 throw new RuntimeException('دریافت آدرس پرداخت از درگاه ناموفق بود.');
             }
 
             $order->update([
                 'payment_url' => $paymentUrl,
-                'status'      => SubscriptionOrder::STATUS_PENDING,
+                'status' => SubscriptionOrder::STATUS_PENDING,
             ]);
 
             return [
-                'payment_url'    => $paymentUrl,
+                'payment_url' => $paymentUrl,
                 'transaction_id' => (string) $order->transaction_id,
-                'amount'         => $order->final_amount,
-                'gateway'        => $order->gateway ?? $gateway,
+                'amount' => $order->final_amount,
+                'gateway' => $order->gateway ?? $gateway,
             ];
 
         } catch (\Exception $e) {
             Log::error('Subscription payment creation failed', [
                 'order_id' => $order->id,
-                'error'    => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
-            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: ' . $e->getMessage());
+            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: '.$e->getMessage());
         }
     }
 
@@ -186,6 +204,7 @@ class PaymentService
 
         try {
             $gateway = $gateway ?? Gateway::where('is_active', true)->first()?->key ?? 'zarinpal';
+            $this->assertDriverExists($gateway);
             $gatewayConfigs = get_gateway_configs($gateway);
 
             // کال‌بک درگاه همان مسیر مشترک پنل است؛ WebPaymentController تشخیص می‌دهد
@@ -208,44 +227,44 @@ class PaymentService
                     function ($driver, $transactionId) use ($purchase, $gateway) {
                         $purchase->update([
                             'transaction_id' => $transactionId,
-                            'gateway'        => $gateway,
+                            'gateway' => $gateway,
                         ]);
 
                         Log::info('Product purchase transaction created', [
-                            'purchase_id'    => $purchase->id,
+                            'purchase_id' => $purchase->id,
                             'transaction_id' => $transactionId,
-                            'gateway'        => $gateway,
+                            'gateway' => $gateway,
                         ]);
                     }
                 );
 
-            /** @var \Shetabit\Multipay\RedirectionForm $form */
+            /** @var RedirectionForm $form */
             $form = $payment->pay();
 
             $paymentUrl = $this->resolveFormUrl($form, $purchase, $gateway, 'payment.form.product');
 
-            if (!$paymentUrl) {
+            if (! $paymentUrl) {
                 throw new RuntimeException('دریافت آدرس پرداخت از درگاه ناموفق بود.');
             }
 
             $purchase->update([
                 'payment_url' => $paymentUrl,
-                'status'      => ProductPurchase::STATUS_PENDING,
+                'status' => ProductPurchase::STATUS_PENDING,
             ]);
 
             return [
-                'payment_url'    => $paymentUrl,
+                'payment_url' => $paymentUrl,
                 'transaction_id' => (string) $purchase->transaction_id,
-                'amount'         => $purchase->amount,
-                'gateway'        => $purchase->gateway ?? $gateway,
+                'amount' => $purchase->amount,
+                'gateway' => $purchase->gateway ?? $gateway,
             ];
 
         } catch (\Exception $e) {
             Log::error('Product payment creation failed', [
                 'purchase_id' => $purchase->id,
-                'error'       => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
-            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: ' . $e->getMessage());
+            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: '.$e->getMessage());
         }
     }
 
@@ -261,6 +280,7 @@ class PaymentService
 
         try {
             $gateway = $gateway ?? Gateway::where('is_active', true)->first()?->key ?? 'zarinpal';
+            $this->assertDriverExists($gateway);
             $gatewayConfigs = get_gateway_configs($gateway);
 
             // کال‌بک درگاه همان مسیر مشترک پنل است؛ WebPaymentController تشخیص می‌دهد
@@ -284,44 +304,44 @@ class PaymentService
                     function ($driver, $transactionId) use ($purchase, $gateway) {
                         $purchase->update([
                             'transaction_id' => $transactionId,
-                            'gateway'        => $gateway,
+                            'gateway' => $gateway,
                         ]);
 
                         Log::info('Template purchase transaction created', [
-                            'purchase_id'    => $purchase->id,
+                            'purchase_id' => $purchase->id,
                             'transaction_id' => $transactionId,
-                            'gateway'        => $gateway,
+                            'gateway' => $gateway,
                         ]);
                     }
                 );
 
-            /** @var \Shetabit\Multipay\RedirectionForm $form */
+            /** @var RedirectionForm $form */
             $form = $payment->pay();
 
             $paymentUrl = $this->resolveFormUrl($form, $purchase, $gateway, 'payment.form.template');
 
-            if (!$paymentUrl) {
+            if (! $paymentUrl) {
                 throw new RuntimeException('دریافت آدرس پرداخت از درگاه ناموفق بود.');
             }
 
             $purchase->update([
                 'payment_url' => $paymentUrl,
-                'status'      => TemplatePurchase::STATUS_PENDING,
+                'status' => TemplatePurchase::STATUS_PENDING,
             ]);
 
             return [
-                'payment_url'    => $paymentUrl,
+                'payment_url' => $paymentUrl,
                 'transaction_id' => (string) $purchase->transaction_id,
-                'amount'         => $purchase->amount,
-                'gateway'        => $purchase->gateway ?? $gateway,
+                'amount' => $purchase->amount,
+                'gateway' => $purchase->gateway ?? $gateway,
             ];
 
         } catch (\Exception $e) {
             Log::error('Template payment creation failed', [
                 'purchase_id' => $purchase->id,
-                'error'       => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
-            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: ' . $e->getMessage());
+            throw new RuntimeException('ایجاد تراکنش پرداخت ناموفق بود: '.$e->getMessage());
         }
     }
 
@@ -336,19 +356,19 @@ class PaymentService
     {
         $order = SubscriptionOrder::where('transaction_id', $transactionId)->first();
 
-        if (!$order) {
+        if (! $order) {
             Log::warning('Subscription order not found for verification', ['transaction_id' => $transactionId]);
 
             return [
-                'paid'    => false,
+                'paid' => false,
                 'message' => 'سفارش اشتراک یافت نشد.',
             ];
         }
 
         if ($order->isPaid()) {
             return [
-                'paid'    => true,
-                'order'   => $order,
+                'paid' => true,
+                'order' => $order,
                 'message' => 'این تراکنش قبلاً تأیید شده است.',
             ];
         }
@@ -367,14 +387,14 @@ class PaymentService
             $order->markAsPaid($gateway);
 
             Log::info('Subscription payment verified', [
-                'order_id'        => $order->id,
-                'transaction_id'  => $transactionId,
-                'gateway'         => $gateway,
+                'order_id' => $order->id,
+                'transaction_id' => $transactionId,
+                'gateway' => $gateway,
             ]);
 
             return [
-                'paid'    => true,
-                'order'   => $order,
+                'paid' => true,
+                'order' => $order,
                 'message' => 'پرداخت اشتراک با موفقیت تأیید شد؛ در انتظار تأیید مدیر.',
             ];
 
@@ -383,14 +403,14 @@ class PaymentService
 
             Log::error('Invalid subscription payment', [
                 'transaction_id' => $transactionId,
-                'order_id'       => $order->id,
-                'error'          => $e->getMessage(),
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
             ]);
 
             return [
-                'paid'  => false,
+                'paid' => false,
                 'order' => $order,
-                'message' => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+                'message' => 'تأیید پرداخت ناموفق بود: '.$e->getMessage(),
             ];
 
         } catch (\Exception $e) {
@@ -398,14 +418,14 @@ class PaymentService
 
             Log::error('Subscription payment verification exception', [
                 'transaction_id' => $transactionId,
-                'order_id'       => $order->id,
-                'error'          => $e->getMessage(),
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
             ]);
 
             return [
-                'paid'  => false,
+                'paid' => false,
                 'order' => $order,
-                'message' => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+                'message' => 'تأیید پرداخت ناموفق بود: '.$e->getMessage(),
             ];
         }
     }
@@ -421,7 +441,7 @@ class PaymentService
      *    امضادار payment/form/{purchase} روی پنل اشاره می‌کند؛ مرورگر آنجا فرم را
      *    رندر می‌کند و خودکار به درگاه POST می‌شود. (برای local صفحه شبیه‌ساز درگاه رندر می‌شود.)
      */
-    private function resolvePaymentUrl(\Shetabit\Multipay\RedirectionForm $form, PackagePurchase $purchase, string $gateway): string
+    private function resolvePaymentUrl(RedirectionForm $form, PackagePurchase $purchase, string $gateway): string
     {
         return $this->resolveFormUrl($form, $purchase, $gateway, 'payment.form');
     }
@@ -431,7 +451,7 @@ class PaymentService
      *  ۱) درایورهای URL‌محور (GET بدون ورودی) → اکشن فرم
      *  ۲) درایورهای فرم‌محور POST → HTML فرم در meta + مسیر امضادار (۳۰ دقیقه)
      */
-    private function resolveFormUrl(\Shetabit\Multipay\RedirectionForm $form, PackagePurchase|SubscriptionOrder|ProductPurchase|TemplatePurchase $payable, string $gateway, string $routeName): string
+    private function resolveFormUrl(RedirectionForm $form, PackagePurchase|SubscriptionOrder|ProductPurchase|TemplatePurchase $payable, string $gateway, string $routeName): string
     {
         $action = trim((string) $form->getAction());
         $method = strtoupper((string) $form->getMethod());
@@ -454,9 +474,9 @@ class PaymentService
             now()->addMinutes(30),
             [match (true) {
                 $payable instanceof SubscriptionOrder => 'order',
-                $payable instanceof ProductPurchase   => 'productPurchase',
-                $payable instanceof TemplatePurchase  => 'templatePurchase',
-                default                               => 'purchase',
+                $payable instanceof ProductPurchase => 'productPurchase',
+                $payable instanceof TemplatePurchase => 'templatePurchase',
+                default => 'purchase',
             } => $payable->id]
         );
     }
@@ -471,20 +491,20 @@ class PaymentService
     {
         $purchase = ProductPurchase::where('transaction_id', $transactionId)->first();
 
-        if (!$purchase) {
+        if (! $purchase) {
             Log::warning('Product purchase not found for verification', ['transaction_id' => $transactionId]);
 
             return [
-                'paid'    => false,
+                'paid' => false,
                 'message' => 'تراکنش محصول یافت نشد.',
             ];
         }
 
         if ($purchase->isPaid()) {
             return [
-                'paid'      => true,
-                'purchase'  => $purchase,
-                'message'   => 'این تراکنش قبلاً تأیید شده است.',
+                'paid' => true,
+                'purchase' => $purchase,
+                'message' => 'این تراکنش قبلاً تأیید شده است.',
             ];
         }
 
@@ -501,15 +521,15 @@ class PaymentService
             $purchase->markAsPaid($gateway);
 
             Log::info('Product payment verified', [
-                'purchase_id'    => $purchase->id,
+                'purchase_id' => $purchase->id,
                 'transaction_id' => $transactionId,
-                'gateway'        => $gateway,
+                'gateway' => $gateway,
             ]);
 
             return [
-                'paid'      => true,
-                'purchase'  => $purchase,
-                'message'   => 'پرداخت با موفقیت تأیید شد.',
+                'paid' => true,
+                'purchase' => $purchase,
+                'message' => 'پرداخت با موفقیت تأیید شد.',
             ];
 
         } catch (InvalidPaymentException $e) {
@@ -517,14 +537,14 @@ class PaymentService
 
             Log::error('Invalid product payment', [
                 'transaction_id' => $transactionId,
-                'purchase_id'    => $purchase->id,
-                'error'          => $e->getMessage(),
+                'purchase_id' => $purchase->id,
+                'error' => $e->getMessage(),
             ]);
 
             return [
-                'paid'     => false,
+                'paid' => false,
                 'purchase' => $purchase,
-                'message'  => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+                'message' => 'تأیید پرداخت ناموفق بود: '.$e->getMessage(),
             ];
 
         } catch (\Exception $e) {
@@ -532,14 +552,14 @@ class PaymentService
 
             Log::error('Product payment verification exception', [
                 'transaction_id' => $transactionId,
-                'purchase_id'    => $purchase->id,
-                'error'          => $e->getMessage(),
+                'purchase_id' => $purchase->id,
+                'error' => $e->getMessage(),
             ]);
 
             return [
-                'paid'     => false,
+                'paid' => false,
                 'purchase' => $purchase,
-                'message'  => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+                'message' => 'تأیید پرداخت ناموفق بود: '.$e->getMessage(),
             ];
         }
     }
@@ -554,20 +574,20 @@ class PaymentService
     {
         $purchase = TemplatePurchase::where('transaction_id', $transactionId)->first();
 
-        if (!$purchase) {
+        if (! $purchase) {
             Log::warning('Template purchase not found for verification', ['transaction_id' => $transactionId]);
 
             return [
-                'paid'    => false,
+                'paid' => false,
                 'message' => 'تراکنش قالب یافت نشد.',
             ];
         }
 
         if ($purchase->isPaid()) {
             return [
-                'paid'      => true,
-                'purchase'  => $purchase,
-                'message'   => 'این تراکنش قبلاً تأیید شده است.',
+                'paid' => true,
+                'purchase' => $purchase,
+                'message' => 'این تراکنش قبلاً تأیید شده است.',
             ];
         }
 
@@ -584,15 +604,15 @@ class PaymentService
             $purchase->markAsPaid($gateway);
 
             Log::info('Template payment verified', [
-                'purchase_id'    => $purchase->id,
+                'purchase_id' => $purchase->id,
                 'transaction_id' => $transactionId,
-                'gateway'        => $gateway,
+                'gateway' => $gateway,
             ]);
 
             return [
-                'paid'      => true,
-                'purchase'  => $purchase,
-                'message'   => 'پرداخت با موفقیت تأیید شد.',
+                'paid' => true,
+                'purchase' => $purchase,
+                'message' => 'پرداخت با موفقیت تأیید شد.',
             ];
 
         } catch (InvalidPaymentException $e) {
@@ -600,14 +620,14 @@ class PaymentService
 
             Log::error('Invalid template payment', [
                 'transaction_id' => $transactionId,
-                'purchase_id'    => $purchase->id,
-                'error'          => $e->getMessage(),
+                'purchase_id' => $purchase->id,
+                'error' => $e->getMessage(),
             ]);
 
             return [
-                'paid'     => false,
+                'paid' => false,
                 'purchase' => $purchase,
-                'message'  => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+                'message' => 'تأیید پرداخت ناموفق بود: '.$e->getMessage(),
             ];
 
         } catch (\Exception $e) {
@@ -615,14 +635,14 @@ class PaymentService
 
             Log::error('Template payment verification exception', [
                 'transaction_id' => $transactionId,
-                'purchase_id'    => $purchase->id,
-                'error'          => $e->getMessage(),
+                'purchase_id' => $purchase->id,
+                'error' => $e->getMessage(),
             ]);
 
             return [
-                'paid'     => false,
+                'paid' => false,
                 'purchase' => $purchase,
-                'message'  => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+                'message' => 'تأیید پرداخت ناموفق بود: '.$e->getMessage(),
             ];
         }
     }
@@ -637,10 +657,11 @@ class PaymentService
         // 1️⃣ پیدا کردن خرید بر اساس transaction_id
         $purchase = PackagePurchase::where('transaction_id', $transactionId)->first();
 
-        if (!$purchase) {
+        if (! $purchase) {
             Log::warning('Purchase not found for verification', ['transaction_id' => $transactionId]);
+
             return [
-                'paid'    => false,
+                'paid' => false,
                 'message' => 'تراکنش یافت نشد.',
             ];
         }
@@ -648,12 +669,13 @@ class PaymentService
         // 2️⃣ اگر قبلاً پرداخت شده
         if ($purchase->isPaid()) {
             Log::info('Purchase already verified', ['purchase_id' => $purchase->id]);
+
             return [
-                'paid'         => true,
-                'license_key'  => $purchase->license?->license_key,
-                'expires_at'   => $purchase->license?->expires_at?->toDateTimeString(),
-                'message'      => 'این تراکنش قبلاً تأیید شده است.',
-                'purchase_id'  => $purchase->id,
+                'paid' => true,
+                'license_key' => $purchase->license?->license_key,
+                'expires_at' => $purchase->license?->expires_at?->toDateTimeString(),
+                'message' => 'این تراکنش قبلاً تأیید شده است.',
+                'purchase_id' => $purchase->id,
             ];
         }
 
@@ -677,9 +699,9 @@ class PaymentService
             $purchase->markAsPaid($gateway);
 
             Log::info('Payment verified successfully', [
-                'purchase_id'    => $purchase->id,
+                'purchase_id' => $purchase->id,
                 'transaction_id' => $transactionId,
-                'gateway'        => $gateway,
+                'gateway' => $gateway,
             ]);
 
             // 6️⃣ صدور لایسنس
@@ -692,23 +714,23 @@ class PaymentService
                     );
 
                 return [
-                    'paid'          => true,
-                    'license_key'   => $license->license_key,
-                    'expires_at'    => $license->expires_at?->toDateTimeString(),
+                    'paid' => true,
+                    'license_key' => $license->license_key,
+                    'expires_at' => $license->expires_at?->toDateTimeString(),
                     'transaction_id' => $transactionId,
-                    'gateway'       => $gateway,
-                    'message'       => 'پرداخت با موفقیت تأیید شد.',
-                    'purchase_id'   => $purchase->id,
+                    'gateway' => $gateway,
+                    'message' => 'پرداخت با موفقیت تأیید شد.',
+                    'purchase_id' => $purchase->id,
                 ];
 
             } catch (\Exception $e) {
                 Log::error('License issuance failed after payment', [
                     'purchase_id' => $purchase->id,
-                    'error'       => $e->getMessage(),
+                    'error' => $e->getMessage(),
                 ]);
 
                 return [
-                    'paid'    => true,
+                    'paid' => true,
                     'message' => 'پرداخت تأیید شد اما صدور لایسنس با خطا مواجه شد. لطفاً با پشتیبانی تماس بگیرید.',
                     'purchase_id' => $purchase->id,
                 ];
@@ -720,14 +742,14 @@ class PaymentService
 
             Log::error('Invalid payment exception', [
                 'transaction_id' => $transactionId,
-                'purchase_id'    => $purchase->id ?? null,
-                'error'          => $e->getMessage(),
-                'code'           => $e->getCode(),
+                'purchase_id' => $purchase->id ?? null,
+                'error' => $e->getMessage(),
+                'code' => $e->getCode(),
             ]);
 
             return [
-                'paid'    => false,
-                'message' => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+                'paid' => false,
+                'message' => 'تأیید پرداخت ناموفق بود: '.$e->getMessage(),
             ];
 
         } catch (\Exception $e) {
@@ -736,14 +758,14 @@ class PaymentService
 
             Log::error('Payment verification exception', [
                 'transaction_id' => $transactionId,
-                'purchase_id'    => $purchase->id ?? null,
-                'error'          => $e->getMessage(),
-                'trace'          => $e->getTraceAsString(),
+                'purchase_id' => $purchase->id ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [
-                'paid'    => false,
-                'message' => 'تأیید پرداخت ناموفق بود: ' . $e->getMessage(),
+                'paid' => false,
+                'message' => 'تأیید پرداخت ناموفق بود: '.$e->getMessage(),
             ];
         }
     }
@@ -756,7 +778,7 @@ class PaymentService
         $route = $customRoute ?? config('packages.payment.callback_route', 'admin.packages.payment.callback');
 
         return URL::signedRoute($route, [
-            'purchase_id'    => $purchase->id,
+            'purchase_id' => $purchase->id,
             'transaction_id' => $purchase->transaction_id ?? 'pending',
         ]);
     }
@@ -768,30 +790,30 @@ class PaymentService
     {
         if ($purchase->isPaid()) {
             return [
-                'status'      => 'paid',
-                'message'     => 'پرداخت انجام شده است.',
+                'status' => 'paid',
+                'message' => 'پرداخت انجام شده است.',
                 'license_key' => $purchase->license?->license_key,
-                'expires_at'  => $purchase->license?->expires_at?->toDateTimeString(),
+                'expires_at' => $purchase->license?->expires_at?->toDateTimeString(),
             ];
         }
 
         if ($purchase->status === 'failed') {
             return [
-                'status'  => 'failed',
+                'status' => 'failed',
                 'message' => 'پرداخت ناموفق بوده است.',
             ];
         }
 
         if ($purchase->status === 'pending') {
             return [
-                'status'      => 'pending',
-                'message'     => 'پرداخت در انتظار تأیید است.',
+                'status' => 'pending',
+                'message' => 'پرداخت در انتظار تأیید است.',
                 'payment_url' => $purchase->payment_url,
             ];
         }
 
         return [
-            'status'  => 'unknown',
+            'status' => 'unknown',
             'message' => 'وضعیت پرداخت نامشخص است.',
         ];
     }

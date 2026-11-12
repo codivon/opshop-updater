@@ -289,6 +289,7 @@ return [
             'apiPaymentUrl' => 'https://sep.shaparak.ir/payment.aspx',
             'apiVerificationUrl' => 'https://sep.shaparak.ir/payments/referencepayment.asmx?WSDL',
             'merchantId' => '',
+            'password' => '', // رمز پذیرنده سامان (در صورتی که در پنل سامان فعال کرده باشید)
             'callbackUrl' => '',
             'description' => 'payment using saman',
             'currency' => 'T', // Can be R, T (Rial, Toman)

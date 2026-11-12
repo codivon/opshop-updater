@@ -2,9 +2,12 @@
 
 namespace App\Services\Payments;
 
+use Shetabit\Multipay\Contracts\ReceiptInterface;
 use Shetabit\Multipay\Drivers\Saman\Saman as BaseSaman;
-use Shetabit\Multipay\Invoice;
+use Shetabit\Multipay\Exceptions\InvalidPaymentException;
 use Shetabit\Multipay\Receipt;
+use Shetabit\Multipay\RedirectionForm;
+use Shetabit\Multipay\Request;
 
 /**
  * درایور سامان با WSDL لوکال‌کش‌شده
@@ -25,7 +28,7 @@ class SamanCached extends BaseSaman
      */
     private function soapClient(string $wsdlUrl): \SoapClient
     {
-        $localWsdl = app(WsdlCache::class)->resolve($wsdlUrl, 'saman-' . md5($wsdlUrl));
+        $localWsdl = app(WsdlCache::class)->resolve($wsdlUrl, 'saman-'.md5($wsdlUrl));
 
         // کانتکست HTTP: TLS + پروکسی شاپرک (در صورت تنظیم)
         $httpContext = [];
@@ -41,21 +44,21 @@ class SamanCached extends BaseSaman
 
         try {
             return new \SoapClient($localWsdl, [
-                'encoding'           => 'UTF-8',
-                'cache_wsdl'         => WSDL_CACHE_DISK,   // کش دیسک (سرعت + مقاومت)
+                'encoding' => 'UTF-8',
+                'cache_wsdl' => WSDL_CACHE_DISK,   // کش دیسک (سرعت + مقاومت)
                 'connection_timeout' => 25,
-                'stream_context'     => stream_context_create([
+                'stream_context' => stream_context_create([
                     'http' => $httpContext,
-                    'ssl'  => [
-                        'ciphers'           => 'DEFAULT:!DH',
-                        'verify_peer'       => true,
-                        'verify_host'       => 2,
-                        'SNI_enabled'       => true,
-                        'crypto_method'     => STREAM_CRYPTO_METHOD_TLS_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
+                    'ssl' => [
+                        'ciphers' => 'DEFAULT:!DH',
+                        'verify_peer' => true,
+                        'verify_host' => 2,
+                        'SNI_enabled' => true,
+                        'crypto_method' => STREAM_CRYPTO_METHOD_TLS_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
                     ],
                 ]),
-                'exceptions'         => true,
-                'trace'              => false,
+                'exceptions' => true,
+                'trace' => false,
             ]);
         } catch (\SoapFault $e) {
             // اگر با فایل لوکال هم نشد → پیام راهنمای فارسی با ریشه خطا
@@ -65,21 +68,21 @@ class SamanCached extends BaseSaman
 
             throw new \SoapFault(
                 $e->faultcode ?? 'WSDL',
-                'خطای اتصال به درگاه سامان: ' . $e->getMessage() . $hint
+                'خطای اتصال به درگاه سامان: '.$e->getMessage().$hint
             );
         }
     }
 
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $data = [
             'MID' => $this->settings->merchantId,
             'ResNum' => $this->invoice->getUuid(),
             'Amount' => $this->invoice->getAmount() * 10, // convert to rial
-            'CellNumber' => ''
+            'CellNumber' => '',
         ];
 
-        if (!empty($this->invoice->getDetails()['mobile'])) {
+        if (! empty($this->invoice->getDetails()['mobile'])) {
             $data['CellNumber'] = $this->invoice->getDetails()['mobile'];
         }
 
@@ -100,15 +103,15 @@ class SamanCached extends BaseSaman
         return $this->invoice->getTransactionId();
     }
 
-    public function pay(): \Shetabit\Multipay\RedirectionForm
+    public function pay(): RedirectionForm
     {
         return parent::pay();
     }
 
-    public function verify(): \Shetabit\Multipay\Contracts\ReceiptInterface
+    public function verify(): ReceiptInterface
     {
         $data = [
-            'RefNum' => \Shetabit\Multipay\Request::input('RefNum'),
+            'RefNum' => Request::input('RefNum'),
             'merchantId' => $this->settings->merchantId,
         ];
 
@@ -122,10 +125,10 @@ class SamanCached extends BaseSaman
 
         $receipt = new Receipt('saman', $data['RefNum']);
         $receipt->detail([
-            'traceNo' => \Shetabit\Multipay\Request::input('TraceNo'),
-            'referenceNo' => \Shetabit\Multipay\Request::input('RRN'),
-            'transactionId' => \Shetabit\Multipay\Request::input('RefNum'),
-            'cardNo' => \Shetabit\Multipay\Request::input('SecurePan'),
+            'traceNo' => Request::input('TraceNo'),
+            'referenceNo' => Request::input('RRN'),
+            'transactionId' => Request::input('RefNum'),
+            'cardNo' => Request::input('SecurePan'),
         ]);
 
         return $receipt;
@@ -135,13 +138,13 @@ class SamanCached extends BaseSaman
     private function notVerified($status)
     {
         $translations = [
-            -1  => 'خطا در پردازش اطلاعات ارسالی (مشکل در یکی از ورودی‌ها و ناموفق بودن فراخوانی متد برگشت تراکنش)',
-            -3  => 'ورودی‌ها حاوی کاراکترهای غیرمجاز می‌باشند.',
-            -4  => 'کلمه عبور یا کد فروشنده اشتباه است (Merchant Authentication Failed)',
-            -6  => 'سند قبال برگشت کامل یافته است. یا خارج از زمان ۳۰ دقیقه ارسال شده است.',
-            -7  => 'رسید دیجیتالی تهی است.',
-            -8  => 'طول ورودی‌ها بیشتر از حد مجاز است.',
-            -9  => 'وجود کاراکترهای غیرمجاز در مبلغ برگشتی.',
+            -1 => 'خطا در پردازش اطلاعات ارسالی (مشکل در یکی از ورودی‌ها و ناموفق بودن فراخوانی متد برگشت تراکنش)',
+            -3 => 'ورودی‌ها حاوی کاراکترهای غیرمجاز می‌باشند.',
+            -4 => 'کلمه عبور یا کد فروشنده اشتباه است (Merchant Authentication Failed)',
+            -6 => 'سند قبال برگشت کامل یافته است. یا خارج از زمان ۳۰ دقیقه ارسال شده است.',
+            -7 => 'رسید دیجیتالی تهی است.',
+            -8 => 'طول ورودی‌ها بیشتر از حد مجاز است.',
+            -9 => 'وجود کاراکترهای غیرمجاز در مبلغ برگشتی.',
             -10 => 'رسید دیجیتالی به صورت Base64 نیست (حاوی کاراکترهای غیرمجاز است)',
             -11 => 'طول ورودی‌ها کمتر از حد مجاز است.',
             -12 => 'مبلغ برگشتی منفی است.',
@@ -153,8 +156,8 @@ class SamanCached extends BaseSaman
             -18 => 'IP Address فروشنده نامعتبر است و یا رمز تابع بازگشتی (reverseTransaction) اشتباه است.',
         ];
 
-        $message = $translations[$status] ?? ('خطای نامشخص در تأیید تراکنش سامان — کد: ' . $status);
+        $message = $translations[$status] ?? ('خطای نامشخص در تأیید تراکنش سامان — کد: '.$status);
 
-        throw new \Shetabit\Multipay\Exceptions\InvalidPaymentException($message);
+        throw new InvalidPaymentException($message);
     }
 }

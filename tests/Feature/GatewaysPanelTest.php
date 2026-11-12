@@ -9,7 +9,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Shetabit\Multipay\Abstracts\Driver;
+use Shetabit\Multipay\Constants\IranCurrency;
 use Shetabit\Multipay\Drivers\Novinopay\Novinopay;
+use Shetabit\Multipay\Drivers\Saman\Saman;
 use Shetabit\Multipay\Exceptions\PreviouslyVerifiedException;
 use Tests\TestCase;
 
@@ -17,7 +19,8 @@ use Tests\TestCase;
  * پنل درگاه‌های پرداخت (/admin/settings/gateways):
  * - همهٔ درگاه‌های پشتیبانی‌شده (۱۷ کلید) در صفحه ساخته و نمایش داده می‌شوند
  * - درگاه‌های جدید (novinopay / parsian / pasargad / asanpardakht) با فیلدهای پیکربندی درست
- * - نوین‌پی از درایور رسمی پورت‌شدهٔ shetabit/multipay v3.6.0 استفاده می‌کند (نه هک سپرده)
+ * - نوین‌پی از درایور رسمی upstream shetabit/multipay v3.6.0 استفاده می‌کند (پکیج ارتقا یافته به v7)
+ * - درایورهای idpay/payir/walleta از override لوکال (در upstream موجود نیستند/حذف شده‌اند)
  * - ذخیرهٔ فرم پنل مقادیر جدید را در gateway_configs می‌نویسد
  * - get_gateway_configs کلیدهای هر درگاه را به درایور پرداخت تزریق می‌کند
  * - فهرست عمودی (لیست زیر هم) — کارت‌های ردیفی به‌جای گرید چندستونه
@@ -160,7 +163,7 @@ class GatewaysPanelTest extends TestCase
             Shetabit\Multipay\Drivers\Sepordeh\Sepordeh::class,
             get_parent_class($map['novinopay'])
         );
-        // استثنای تراکنشِ قبلاً تأییدشده (وارد شده از نسخهٔ رسمی) موجود باشد
+        // استثنای تراکنشِ قبلاً تأییدشده از upstream موجود باشد
         $this->assertTrue(class_exists(PreviouslyVerifiedException::class));
 
         // درایورهای درخواست‌شدهٔ کاربر همگی در map موجود باشند
@@ -168,6 +171,28 @@ class GatewaysPanelTest extends TestCase
             $this->assertArrayHasKey($key, $map, "درایور {$key} در map پرداخت نیست");
             $this->assertTrue(class_exists($map[$key]));
         }
+    }
+
+    public function test_upgraded_multipay_v3_drivers_resolve(): void
+    {
+        $map = config('payment.map');
+
+        // درایورهای upstream نسخهٔ ۳٫۶ (قبلاً در نسخهٔ قدیم نبودند یا از vendor قدیمی می‌آمدند)
+        foreach (['toman', 'saman', 'sep'] as $key) {
+            $this->assertArrayHasKey($key, $map);
+            $this->assertTrue(class_exists($map[$key]), "درایور {$key} پس از ارتقا به multipay v3.6.0 پیدا نشد");
+        }
+
+        // درایورهای override لوکال (در upstream v3.6.0 نیستند/حذف شده‌اند) — باید از packages/shetabit بیایند
+        foreach (['idpay', 'payir', 'walleta'] as $key) {
+            $this->assertTrue(class_exists($map[$key]), "درایور override {$key} پیدا نشد");
+            $reflection = new \ReflectionClass($map[$key]);
+            $this->assertStringContainsString('packages'.DIRECTORY_SEPARATOR.'shetabit', $reflection->getFileName(), "{$key} باید از override لوکال باشد");
+        }
+
+        // درایورهای سفارشی App با کلاس‌های typed نسخهٔ ۳ سازگارند
+        $this->assertTrue(is_subclass_of($map['saman'], Saman::class));
+        $this->assertTrue(is_subclass_of($map['sep'], Driver::class));
     }
 
     public function test_pasargad_payment_config_has_rest_base_url(): void
@@ -188,7 +213,12 @@ class GatewaysPanelTest extends TestCase
 
         $this->assertSame('https://novinopay.com/merchant/invoices/add', $driver['apiPurchaseUrl']);
         $this->assertSame('https://novinopay.com/merchant/invoices/verify', $driver['apiVerificationUrl']);
-        $this->assertSame('T', $driver['currency']);
+        // v3.6.0: currency در زمان اجرا به enum IranCurrency تبدیل می‌شود (Toman → ضریب ۱۰)
+        $this->assertInstanceOf(IranCurrency::class, $driver['currency']);
+        $this->assertSame(10, $driver['currency']->ratio());
+        // در فایل خام کانفیگ همچنان رشتهٔ R/T است (config:cache با var_export نمی‌تواند enum را serialize کند)
+        $raw = require config_path('payment.php');
+        $this->assertSame('T', $raw['drivers']['novinopay']['currency']);
         // کلیدهای الگوی سپردهٔ کهنه (دو مرحله‌ای) و mode دیگر نباشند — درایور رسمی payment_url را از پاسخ می‌گیرد
         $this->assertArrayNotHasKey('apiPaymentUrl', $driver);
         $this->assertArrayNotHasKey('apiDirectPaymentUrl', $driver);

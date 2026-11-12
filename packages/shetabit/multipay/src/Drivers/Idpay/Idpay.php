@@ -3,86 +3,76 @@
 namespace Shetabit\Multipay\Drivers\Idpay;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use Shetabit\Multipay\Abstracts\Driver;
+use Shetabit\Multipay\Contracts\ReceiptInterface;
 use Shetabit\Multipay\Exceptions\InvalidPaymentException;
 use Shetabit\Multipay\Exceptions\PurchaseFailedException;
-use Shetabit\Multipay\Contracts\ReceiptInterface;
 use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 use Shetabit\Multipay\Request;
 
+/**
+ * درگاه idpay — از override لوکال پروژه (در shetabit/multipay v3.6.0 upstream موجود نیست)
+ * سازگار با کدبیس v3.6.0: پراپرتی‌های $invoice/$settings از والدِ typed ارث می‌رسند
+ * و purchase() امضای بازگشتی abstract را دارد.
+ */
 class Idpay extends Driver
 {
     /**
      * Idpay Client.
      *
-     * @var object
+     * @var Client
      */
     protected $client;
-
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
-    /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
 
     /**
      * Idpay constructor.
      * Construct the class with the relevant settings.
      *
-     * @param Invoice $invoice
-     * @param $settings
+     * @param  array|object  $settings
      */
     public function __construct(Invoice $invoice, $settings)
     {
         $this->invoice($invoice);
         $this->settings = (object) $settings;
-        $this->client = new Client();
+        $this->client = new Client;
     }
 
     /**
      * Purchase Invoice.
      *
-     * @return string
      *
      * @throws PurchaseFailedException
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $details = $this->invoice->getDetails();
 
         $phone = null;
-        if (!empty($details['phone'])) {
+        if (! empty($details['phone'])) {
             $phone = $details['phone'];
-        } elseif (!empty($details['mobile'])) {
+        } elseif (! empty($details['mobile'])) {
             $phone = $details['mobile'];
         }
 
         $mail = null;
-        if (!empty($details['mail'])) {
+        if (! empty($details['mail'])) {
             $mail = $details['mail'];
-        } elseif (!empty($details['email'])) {
+        } elseif (! empty($details['email'])) {
             $mail = $details['email'];
         }
 
         $desc = $this->settings->description;
-        if (!empty($details['desc'])) {
+        if (! empty($details['desc'])) {
             $desc = $details['desc'];
-        } elseif (!empty($details['description'])) {
+        } elseif (! empty($details['description'])) {
             $desc = $details['description'];
         }
 
-        $data = array(
+        $data = [
             'order_id' => $this->invoice->getUuid(),
             'amount' => $this->invoice->getAmount() * 10,
             'name' => $details['name'] ?? null,
@@ -91,7 +81,7 @@ class Idpay extends Driver
             'desc' => $desc,
             'callback' => $this->settings->callbackUrl,
             'reseller' => $details['reseller'] ?? null,
-        );
+        ];
 
         $response = $this
             ->client
@@ -99,13 +89,13 @@ class Idpay extends Driver
                 'POST',
                 $this->settings->apiPurchaseUrl,
                 [
-                    "json" => $data,
-                    "headers" => [
+                    'json' => $data,
+                    'headers' => [
                         'X-API-KEY' => $this->settings->merchantId,
                         'Content-Type' => 'application/json',
                         'X-SANDBOX' => (int) $this->settings->sandbox,
                     ],
-                    "http_errors" => false,
+                    'http_errors' => false,
                 ]
             );
 
@@ -124,15 +114,13 @@ class Idpay extends Driver
 
     /**
      * Pay the Invoice
-     *
-     * @return RedirectionForm
      */
-    public function pay() : RedirectionForm
+    public function pay(): RedirectionForm
     {
         $apiUrl = $this->settings->apiPaymentUrl;
 
         // use sandbox url if we are in sandbox mode
-        if (!empty($this->settings->sandbox)) {
+        if (! empty($this->settings->sandbox)) {
             $apiUrl = $this->settings->apiSandboxPaymentUrl;
         }
 
@@ -147,9 +135,9 @@ class Idpay extends Driver
      * @return mixed|void
      *
      * @throws InvalidPaymentException
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
-    public function verify() : ReceiptInterface
+    public function verify(): ReceiptInterface
     {
         $data = [
             'id' => $this->invoice->getTransactionId() ?? Request::input('id'),
@@ -161,12 +149,12 @@ class Idpay extends Driver
             $this->settings->apiVerificationUrl,
             [
                 'json' => $data,
-                "headers" => [
+                'headers' => [
                     'X-API-KEY' => $this->settings->merchantId,
                     'Content-Type' => 'application/json',
                     'X-SANDBOX' => (int) $this->settings->sandbox,
                 ],
-                "http_errors" => false,
+                'http_errors' => false,
             ]
         );
         $body = json_decode($response->getBody()->getContents(), true);
@@ -183,7 +171,6 @@ class Idpay extends Driver
     /**
      * Generate the payment's receipt
      *
-     * @param $referenceId
      *
      * @return Receipt
      */
@@ -197,41 +184,40 @@ class Idpay extends Driver
     /**
      * Trigger an exception
      *
-     * @param $status
      *
      * @throws InvalidPaymentException
      */
     private function notVerified($status)
     {
-        $translations = array(
-            "1" => "پرداخت انجام نشده است.",
-            "2" => "پرداخت ناموفق بوده است.",
-            "3" => "خطا رخ داده است.",
-            "4" => "بلوکه شده.",
-            "5" => "برگشت به پرداخت کننده.",
-            "6" => "برگشت خورده سیستمی.",
-            "10" => "در انتظار تایید پرداخت.",
-            "100" => "پرداخت تایید شده است.",
-            "101" => "پرداخت قبلا تایید شده است.",
-            "200" => "به دریافت کننده واریز شد.",
-            "11" => "کاربر مسدود شده است.",
-            "12" => "API Key یافت نشد.",
-            "13" => "درخواست شما از {ip} ارسال شده است. این IP با IP های ثبت شده در وب سرویس همخوانی ندارد.",
-            "14" => "وب سرویس تایید نشده است.",
-            "21" => "حساب بانکی متصل به وب سرویس تایید نشده است.",
-            "31" => "کد تراکنش id نباید خالی باشد.",
-            "32" => "شماره سفارش order_id نباید خالی باشد.",
-            "33" => "مبلغ amount نباید خالی باشد.",
-            "34" => "مبلغ amount باید بیشتر از {min-amount} ریال باشد.",
-            "35" => "مبلغ amount باید کمتر از {max-amount} ریال باشد.",
-            "36" => "مبلغ amount بیشتر از حد مجاز است.",
-            "37" => "آدرس بازگشت callback نباید خالی باشد.",
-            "38" => "درخواست شما از آدرس {domain} ارسال شده است. دامنه آدرس بازگشت callback با آدرس ثبت شده در وب سرویس همخوانی ندارد.",
-            "51" => "تراکنش ایجاد نشد.",
-            "52" => "استعلام نتیجه ای نداشت.",
-            "53" => "تایید پرداخت امکان پذیر نیست.",
-            "54" => "مدت زمان تایید پرداخت سپری شده است.",
-        );
+        $translations = [
+            '1' => 'پرداخت انجام نشده است.',
+            '2' => 'پرداخت ناموفق بوده است.',
+            '3' => 'خطا رخ داده است.',
+            '4' => 'بلوکه شده.',
+            '5' => 'برگشت به پرداخت کننده.',
+            '6' => 'برگشت خورده سیستمی.',
+            '10' => 'در انتظار تایید پرداخت.',
+            '100' => 'پرداخت تایید شده است.',
+            '101' => 'پرداخت قبلا تایید شده است.',
+            '200' => 'به دریافت کننده واریز شد.',
+            '11' => 'کاربر مسدود شده است.',
+            '12' => 'API Key یافت نشد.',
+            '13' => 'درخواست شما از {ip} ارسال شده است. این IP با IP های ثبت شده در وب سرویس همخوانی ندارد.',
+            '14' => 'وب سرویس تایید نشده است.',
+            '21' => 'حساب بانکی متصل به وب سرویس تایید نشده است.',
+            '31' => 'کد تراکنش id نباید خالی باشد.',
+            '32' => 'شماره سفارش order_id نباید خالی باشد.',
+            '33' => 'مبلغ amount نباید خالی باشد.',
+            '34' => 'مبلغ amount باید بیشتر از {min-amount} ریال باشد.',
+            '35' => 'مبلغ amount باید کمتر از {max-amount} ریال باشد.',
+            '36' => 'مبلغ amount بیشتر از حد مجاز است.',
+            '37' => 'آدرس بازگشت callback نباید خالی باشد.',
+            '38' => 'درخواست شما از آدرس {domain} ارسال شده است. دامنه آدرس بازگشت callback با آدرس ثبت شده در وب سرویس همخوانی ندارد.',
+            '51' => 'تراکنش ایجاد نشد.',
+            '52' => 'استعلام نتیجه ای نداشت.',
+            '53' => 'تایید پرداخت امکان پذیر نیست.',
+            '54' => 'مدت زمان تایید پرداخت سپری شده است.',
+        ];
         if (array_key_exists($status, $translations)) {
             throw new InvalidPaymentException($translations[$status]);
         } else {

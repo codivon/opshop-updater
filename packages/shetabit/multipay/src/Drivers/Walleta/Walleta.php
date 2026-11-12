@@ -4,21 +4,19 @@ namespace Shetabit\Multipay\Drivers\Walleta;
 
 use GuzzleHttp\Client;
 use Shetabit\Multipay\Abstracts\Driver;
-use Shetabit\Multipay\Exceptions\PurchaseFailedException;
 use Shetabit\Multipay\Contracts\ReceiptInterface;
+use Shetabit\Multipay\Exceptions\PurchaseFailedException;
 use Shetabit\Multipay\Invoice;
 use Shetabit\Multipay\Receipt;
 use Shetabit\Multipay\RedirectionForm;
 
+/**
+ * درگاه والِتا — از override لوکال پروژه (در shetabit/multipay v3.6.0 upstream حذف شده)
+ * سازگار با کدبیس v3.6.0: پراپرتی‌های $invoice/$settings از والدِ typed ارث می‌رسند
+ * و purchase() امضای بازگشتی abstract را دارد.
+ */
 class Walleta extends Driver
 {
-    /**
-     * Invoice
-     *
-     * @var Invoice
-     */
-    protected $invoice;
-
     /**
      * Response
      *
@@ -27,37 +25,28 @@ class Walleta extends Driver
     protected $response;
 
     /**
-     * Driver settings
-     *
-     * @var object
-     */
-    protected $settings;
-
-    /**
      * Walleta constructor.
      * Construct the class with the relevant settings.
      *
-     * @param Invoice $invoice
-     * @param $settings
+     * @param  array|object  $settings
      */
     public function __construct(Invoice $invoice, $settings)
     {
         $this->invoice($invoice);
-        $this->settings = (object)$settings;
+        $this->settings = (object) $settings;
     }
 
     /**
-     * Purchase Invoice.09214125578
+     * Purchase Invoice.
      *
-     * @return string
      *
      * @throws PurchaseFailedException
      */
-    public function purchase()
+    public function purchase(): string|int|null
     {
         $result = $this->token();
 
-        if (!isset($result['status_code']) or $result['status_code'] != 200) {
+        if (! isset($result['status_code']) or $result['status_code'] != 200) {
             $this->purchaseFailed($result['content']['type']);
         }
 
@@ -69,12 +58,10 @@ class Walleta extends Driver
 
     /**
      * Pay the Invoice
-     *
-     * @return RedirectionForm
      */
     public function pay(): RedirectionForm
     {
-        return $this->redirectWithForm($this->settings->apiPaymentUrl . $this->invoice->getTransactionId(), [], 'GET');
+        return $this->redirectWithForm($this->settings->apiPaymentUrl.$this->invoice->getTransactionId(), [], 'GET');
     }
 
     /**
@@ -88,7 +75,7 @@ class Walleta extends Driver
     {
         $result = $this->verifyTransaction();
 
-        if (!isset($result['status_code']) or $result['status_code'] != 200) {
+        if (! isset($result['status_code']) or $result['status_code'] != 200) {
             $this->purchaseFailed($result['content']['type']);
         }
 
@@ -100,35 +87,28 @@ class Walleta extends Driver
     /**
      * send request to Walleta
      *
-     * @param $method
-     * @param $url
-     * @param array $data
-     * @return array
+     * @param  array  $data
      */
     protected function callApi($method, $url, $data = []): array
     {
-        $client = new Client();
+        $client = new Client;
 
         $response = $client->request($method, $url, [
-            "json" => $data,
-            "headers" => [
+            'json' => $data,
+            'headers' => [
                 'Content-Type' => 'application/json',
             ],
-            "http_errors" => false,
+            'http_errors' => false,
         ]);
 
         return [
             'status_code' => $response->getStatusCode(),
-            'content' => json_decode($response->getBody()->getContents(), true)
+            'content' => json_decode($response->getBody()->getContents(), true),
         ];
     }
 
     /**
      * Generate the payment's receipt
-     *
-     * @param $referenceId
-     *
-     * @return Receipt
      */
     protected function createReceipt($referenceId): Receipt
     {
@@ -139,8 +119,6 @@ class Walleta extends Driver
 
     /**
      * call create token request
-     *
-     * @return array
      */
     public function token(): array
     {
@@ -160,8 +138,6 @@ class Walleta extends Driver
 
     /**
      * call verift transaction request
-     *
-     * @return array
      */
     public function verifyTransaction(): array
     {
@@ -175,8 +151,6 @@ class Walleta extends Driver
 
     /**
      * get Items for
-     *
-     *
      */
     private function getItems()
     {
@@ -198,23 +172,21 @@ class Walleta extends Driver
         return $this->invoice->getDetails()['items'];
     }
 
-
     /**
      * Trigger an exception
      *
-     * @param $status
      *
      * @throws PurchaseFailedException
      */
     protected function purchaseFailed($status)
     {
         $translations = [
-            "server_error" => "یک خطای داخلی رخ داده است.",
-            "ip_address_error" => "آدرس IP پذیرنده صحیح نیست.",
-            "validation_error" => "اطلاعات ارسال شده صحیح نیست.",
-            "merchant_error" => "کد پذیرنده معتبر نیست.",
-            "payment_token_error" => "شناسه پرداخت معتبر نیست.",
-            "invoice_amount_error" => "مبلغ تراکنش با مبلغ پرداخت شده مطابقت ندارد.",
+            'server_error' => 'یک خطای داخلی رخ داده است.',
+            'ip_address_error' => 'آدرس IP پذیرنده صحیح نیست.',
+            'validation_error' => 'اطلاعات ارسال شده صحیح نیست.',
+            'merchant_error' => 'کد پذیرنده معتبر نیست.',
+            'payment_token_error' => 'شناسه پرداخت معتبر نیست.',
+            'invoice_amount_error' => 'مبلغ تراکنش با مبلغ پرداخت شده مطابقت ندارد.',
         ];
 
         if (array_key_exists($status, $translations)) {
