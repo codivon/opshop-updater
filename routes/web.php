@@ -193,6 +193,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
 Route::prefix('admin')->name('admin.')->middleware(['auth', EnsureAdminRole::class])->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
 
+    // نمای کامل فروشگاه — پکیج‌ها + محصولات + لایسنس‌ها با جزئیات کامل در یک صفحه
+    Route::get('inventory', App\Livewire\Inventory\Index::class)->name('inventory');
+
     // پروفایل مدیر (ویرایش نام/ایمیل + تغییر رمز عبور)
     Route::get('profile', Profile::class)->name('profile');
 

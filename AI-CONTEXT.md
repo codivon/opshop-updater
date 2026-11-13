@@ -281,6 +281,9 @@ checkout در `Shop\PackageShow::buy()`: کد آپدیت → Customer → گار
 17. **`latestVersion()` رابطه است** — `$package->latestVersion()` خودِ HasOne را برمی‌گرداند (truthy!)؛ همیشه `->first()` صدا بزنید. باگ API verifyPayment همین بود (TypeError در createDownloadToken).
 18. **رکورد pending یتیم**: اگر `createPayment` بعد از `PackagePurchase::create` شکست بخورد، رکورد pending می‌ماند → در purchase API حالا `$purchase->delete()` در catch.
 
+19. **دو جدول لایسنس = تداخل شناسه**: `admin.licenses.show` (Livewire `Licenses\Show`) فقط `PackageLicense` می‌بیند — لینک‌دادن `TemplateLicense` به آن یعنی نمایش **لایسنس اشتباه** (id بین `package_licenses` و `template_licenses` مشترک است ولی دو جدول جدا!). لایسنس قالب فقط از طریق صفحهٔ لایسنس‌ها (`admin.licenses.index` با `?type=template&search=KEY`) مدیریت می‌شود — «نمای کامل فروشگاه» (`/admin/inventory`, Livewire `Inventory\Index`) همین قرارداد را رعایت می‌کند.
+20. **کپچای خودمیزبان در E2E**: پاسخ با `en_num` نرمال‌سازی می‌شود (ارقام لاتین هم اوکی)؛ تلهٔ زمان ≥۲ ثانیه بین ساخت سؤال و پاسخ؛ هر `verify()` سؤال را مصرف و نو می‌سازد؛ تصویر سؤال در `/captcha/image` از سشن می‌آید — خواندن با curl باید با کوکی **`laravel-session`** (با خط تیره!) مرورگر انجام شود وگرنه سؤالِ سشن دیگری می‌بینید و پاسخ «نادرست» می‌شود؛ فرم ورود مدیر فیلد honeypot `website` دارد که باید خالی بماند.
+
 
 ---
 

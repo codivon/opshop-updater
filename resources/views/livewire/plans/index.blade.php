@@ -155,15 +155,18 @@
                                     {{ fa_num($plan->paid_orders_count) }}
                                 </td>
                                 <td>
-                                    @if($plan->features && count($plan->features))
-                                        <span class="me-1 inline-flex items-center gap-1 text-xs text-zinc-400" title="{{ implode(' · ', $plan->features) }}">
-                                            <x-icon name="list-checks" class="size-3.5" />
-                                            {{ fa_num(count($plan->features)) }} قابلیت
-                                        </span>
-                                    @endif
-                                    <x-badge variant="{{ $plan->is_active ? 'success' : 'neutral' }}" class="mt-1">
-                                        {{ $plan->is_active ? 'فعال' : 'غیرفعال' }}
-                                    </x-badge>
+                                    {{-- مقادیر وضعیت زیر هم (درخواست کاربر) — تعداد قابلیت‌ها + بج فعال/غیرفعال --}}
+                                    <div class="flex flex-col items-start gap-1.5">
+                                        @if($plan->features && count($plan->features))
+                                            <span class="inline-flex items-center gap-1 text-xs text-zinc-400" title="{{ implode(' · ', $plan->features) }}">
+                                                <x-icon name="list-checks" class="size-3.5" />
+                                                {{ fa_num(count($plan->features)) }} قابلیت
+                                            </span>
+                                        @endif
+                                        <x-badge variant="{{ $plan->is_active ? 'success' : 'neutral' }}">
+                                            {{ $plan->is_active ? 'فعال' : 'غیرفعال' }}
+                                        </x-badge>
+                                    </div>
                                 </td>
                                 <td>
                                     {{-- دکمه‌های عملیات زیر هم (درخواست کاربر) --}}

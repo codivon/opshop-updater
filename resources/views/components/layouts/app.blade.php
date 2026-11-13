@@ -24,6 +24,7 @@
         [
             'label' => 'فروشگاه',
             'items' => [
+                ['route' => 'admin.inventory', 'title' => 'نمای کامل فروشگاه', 'icon' => 'layers', 'match' => ['admin.inventory']],
                 ['route' => 'admin.products.index', 'title' => 'محصولات (پروژه‌ها)', 'icon' => 'rocket', 'match' => ['admin.products*']],
                 ['route' => 'admin.templates.index', 'title' => 'قالب‌ها', 'icon' => 'layout-template', 'match' => ['admin.templates*']],
                 ['route' => 'admin.categories.index', 'title' => 'دسته‌بندی‌ها', 'icon' => 'tag', 'match' => ['admin.categories*']],
