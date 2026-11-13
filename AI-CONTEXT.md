@@ -85,6 +85,7 @@ php artisan serve          # http://localhost:8000
 - **فوتر فروشگاه**: جریان عادی سند (چسبیده به محتوا) — نه `mt-auto`/ویوپورت‌پین. `main` در لایه `pb-8` دارد؛ صفحات با `py` خودشان → `pt`.
 - **تست‌ها**: `tests/Concerns/MakesShopData` (هلپر دیتا) + ۵۷ تست/۱۷۹ assertion روی خرید (محصول/پکیج/اشتراک)، کوپن، دیدگاه، CRUD ادمین — `php artisan test` باید کاملاً سبز بماند. `tests/TestCase.php` سراسری `RefreshDatabase` دارد.
 - ⚠️ گاتچاهای رفع‌شده توسط تست: مسیر رایگان محصول `sales_count` را دستی زیاد می‌کند (از markAsPaid عبور نمی‌کند)؛ نرمال‌سازی کد تخفیف **قبل از** validate (یکتایی case-insensitive)؛ `PackagePricingPlan::final_price` با `discount_price=0` دیگر رایگان حساب نمی‌شود (فقط تخفیف ۰< و <قیمت معتبر است).
+- ⚠️ «قیمت نمایشی پکیج» در فروشگاه (کارت + فیلتر رایگان/پولی + مرتب‌سازی) = ارزان‌ترین **طرح پولی** (final_price>۰) وگرنه `default_price`؛ طرح‌های رایگان (مثل «طرح آغازین») پکیج را رایگان جلوه **نمی‌دهند** — «رایگان» فقط وقتی `is_free` یا (بدون طرح پولی و `default_price≤0`) — پیاده‌سازی: partial کارت `livewire.shop.partials.package-card` + SQL `PackagesIndex::packageEffectivePriceSql()` (هردو هم‌ساز با صفحهٔ تک‌پکیج).
 - ⚠️ تست‌ها با SQLite درون‌حافظه (`:memory:` از phpunit.xml) اجرا می‌شوند؛ مسیر درگاه واقعی (شِتابیت) در تست شبیه‌سازی نمی‌شود — شکست درگاه باید بدون سفارش یتیم باشد (تست شده).
 
 ---
