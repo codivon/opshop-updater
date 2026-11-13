@@ -88,19 +88,25 @@ class PackagesIndex extends Component
     {
         $plan = $this->currentCustomer?->activePlanSubscription()?->plan;
 
-        if (!$plan) {
+        if (! $plan) {
             return [];
         }
 
         return $plan->packages->pluck('id')->values()->all();
     }
 
-    /** عبارت SQL «قیمت مؤثر» پکیج (برای فیلتر و مرتب‌سازی در دیتابیس) */
+    /** عبارت SQL «قیمت مؤثر» پکیج (برای فیلتر و مرتب‌سازی در دیتابیس)
+     *
+     * فقط طرح‌های «پولی» (مبلغ نهایی > ۰) ملاک است؛ طرح‌های رایگان (مثل «طرح آغازین»)
+     * نباید کل پکیج را در فیلتر/مرتب‌سازی رایگان جلوه دهند — هم‌ساز با منطق کارت فروشگاه.
+     */
     private function packageEffectivePriceSql(): string
     {
-        return "CASE WHEN packages.is_free = 1 THEN 0 ELSE COALESCE("
-            . "(SELECT MIN(COALESCE(pp.discount_price, pp.price)) FROM package_pricing_plans pp WHERE pp.package_id = packages.id AND pp.is_active = 1), "
-            . "packages.default_price, 0) END";
+        // مبلغ نهایی هر طرح: تخفیفِ معتبر (>۰ و <قیمت) وگرنه خودِ قیمت
+        $final = 'CASE WHEN COALESCE(pp.discount_price, 0) > 0 AND pp.discount_price < pp.price THEN pp.discount_price ELSE pp.price END';
+        $paidMin = "(SELECT MIN({$final}) FROM package_pricing_plans pp WHERE pp.package_id = packages.id AND pp.is_active = 1 AND {$final} > 0)";
+
+        return "CASE WHEN packages.is_free = 1 THEN 0 ELSE COALESCE({$paidMin}, packages.default_price, 0) END";
     }
 
     #[Computed]
@@ -109,7 +115,7 @@ class PackagesIndex extends Component
         $effective = $this->packageEffectivePriceSql();
 
         return Package::query()
-            ->with(['latestVersion:id,package_id,version', 'activePricingPlans', 'categoryModel:id,name'])
+            ->with(['latestVersion:id,package_id,version', 'activePricingPlans', 'categoryModel:id,name', 'project:id,name'])
             ->withCount(['licenses' => fn ($q) => $q->where('status', 'active')])
             ->where('status', Package::STATUS_ACTIVE)
             ->when($this->search, fn ($q) => $q->where(fn ($w) => $w
@@ -141,11 +147,11 @@ class PackagesIndex extends Component
     public function getSortOptionsProperty(): array
     {
         return [
-            'newest'    => 'جدیدترین',
-            'oldest'    => 'قدیمی‌ترین',
-            'cheap'     => 'ارزان‌ترین',
+            'newest' => 'جدیدترین',
+            'oldest' => 'قدیمی‌ترین',
+            'cheap' => 'ارزان‌ترین',
             'expensive' => 'گران‌ترین',
-            'popular'   => 'محبوب‌ترین',
+            'popular' => 'محبوب‌ترین',
         ];
     }
 

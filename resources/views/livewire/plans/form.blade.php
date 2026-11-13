@@ -149,6 +149,7 @@
                                 </div>
                                 {{-- پکیج‌های اختصاصی این مدت --}}
                                 <div>
+                                    @php($durAddedIds = collect($row['packages'] ?? [])->pluck('package_id')->map(fn ($v) => (string) $v)->all())
                                     <p class="mb-1 text-xs font-bold text-zinc-600 dark:text-zinc-300">پکیج‌های این مدت + مدت دسترسی رایگان</p>
                                     <div class="space-y-1.5">
                                         @foreach($row['packages'] ?? [] as $j => $prow)
@@ -156,7 +157,13 @@
                                                 <select wire:model="formDurations.{{ $i }}.packages.{{ $j }}.package_id" class="input min-w-32 flex-1" aria-label="پکیج این مدت">
                                                     <option value="">انتخاب پکیج…</option>
                                                     @foreach($this->packages as $package)
-                                                        <option value="{{ $package->id }}">{{ $package->name }}</option>
+                                                        {{-- پکیجی که در همین مدت ردیف دیگری دارد، انتخاب‌شدنش غیرممکن است (غیر از مقدار همین ردیف)؛
+                                                             برای مدت‌های دیگر آزاد است — تداخلی وجود ندارد --}}
+                                                        @if((string) $package->id !== (string) ($prow['package_id'] ?? '') && in_array((string) $package->id, $durAddedIds))
+                                                            <option value="{{ $package->id }}" disabled>{{ $package->name }} — در همین مدت اضافه شده</option>
+                                                        @else
+                                                            <option value="{{ $package->id }}">{{ $package->name }}</option>
+                                                        @endif
                                                     @endforeach
                                                 </select>
                                                 <input type="number" wire:model="formDurations.{{ $i }}.packages.{{ $j }}.free_months" min="0" max="120"
@@ -176,7 +183,13 @@
                                             <select wire:model="formDurations.{{ $i }}.packageToAdd" class="input min-w-32 flex-1" aria-label="افزودن پکیج به این مدت">
                                                 <option value="">افزودن پکیج…</option>
                                                 @foreach($this->packages as $package)
-                                                    <option value="{{ $package->id }}">{{ $package->name }}</option>
+                                                    {{-- پکیجِ اضافه‌شده به همین مدت دیگر قابل انتخاب نیست؛
+                                                         در مدت‌های دیگر همچنان آزاد است --}}
+                                                    @if(in_array((string) $package->id, $durAddedIds))
+                                                        <option value="{{ $package->id }}" disabled>{{ $package->name }} — قبلاً در این مدت اضافه شده</option>
+                                                    @else
+                                                        <option value="{{ $package->id }}">{{ $package->name }}</option>
+                                                    @endif
                                                 @endforeach
                                             </select>
                                             <button type="button" wire:click="addDurationPackage({{ $i }})"

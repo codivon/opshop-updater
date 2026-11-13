@@ -27,7 +27,8 @@
     @if($this->records->count())
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             @foreach($this->records as $package)
-                @include('livewire.shop.partials.package-card', ['package' => $package, 'isCovered' => in_array($package->id, $this->coveredPackageIds)])
+                {{-- showProject: نام پروژهٔ هدف پکیج روی کارت (درخواست کاربر) --}}
+                @include('livewire.shop.partials.package-card', ['package' => $package, 'isCovered' => in_array($package->id, $this->coveredPackageIds), 'showProject' => true])
             @endforeach
         </div>
 

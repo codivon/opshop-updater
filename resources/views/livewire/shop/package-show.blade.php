@@ -49,6 +49,16 @@
                         <p class="whitespace-pre-line text-sm leading-7 text-zinc-500 dark:text-zinc-400">{{ $package->short_description }}</p>
                     @endif
 
+                    {{-- پروژهٔ هدف: این پکیج روی این پروژه نصب و اجرا می‌شود --}}
+                    @if($package->project)
+                        <div class="flex items-center gap-2 rounded-xl bg-brand-50 px-3.5 py-2.5 ring-1 ring-brand-100 dark:bg-brand-500/10 dark:ring-brand-500/20" title="پروژهٔ هدف این پکیج">
+                            <x-icon name="rocket" class="size-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                            <p class="text-xs leading-5 text-brand-800 dark:text-brand-200">
+                                این پکیج روی پروژهٔ <span class="font-black">{{ $package->project->name }}</span> نصب و اجرا می‌شود.
+                            </p>
+                        </div>
+                    @endif
+
                     <div class="mt-auto flex flex-wrap items-end justify-between gap-3 border-t border-zinc-100 pt-4 dark:border-zinc-800">
                         @php($prices = $this->plans->filter(fn ($p) => $p->final_price > 0)->map->final_price)
                         @if($package->is_free || ($prices->isNotEmpty() ? $prices->min() : $package->default_price) <= 0)

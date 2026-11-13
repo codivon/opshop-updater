@@ -92,23 +92,18 @@
                                            wire:model.live="selectedIds" value="{{ $plan->id }}" />
                                 </td>
                                 <td>
+                                    {{-- فقط عنوان طرح (درخواست کاربر — بدون شناسه و توضیحات) --}}
                                     <div class="flex items-center gap-2">
                                         <x-icon name="crown" class="size-4 shrink-0 text-amber-500" />
-                                        <div class="min-w-0">
-                                            <p class="truncate text-sm font-bold text-zinc-800 dark:text-zinc-100">{{ $plan->name }}</p>
-                                            <p class="truncate text-xs text-zinc-400" dir="ltr">{{ $plan->slug }}</p>
-                                        </div>
+                                        <span class="text-sm font-bold text-zinc-800 dark:text-zinc-100">{{ $plan->name }}</span>
                                     </div>
-                                    @if($plan->description)
-                                        <p class="mt-1 max-w-xs truncate text-xs text-zinc-500 dark:text-zinc-400">{{ \Illuminate\Support\Str::limit($plan->description, 60) }}</p>
-                                    @endif
                                 </td>
-                                <td class="whitespace-nowrap">
+                                <td>
                                     @if($plan->durations->where('is_active', true)->isNotEmpty())
-                                        {{-- چندگزینه‌ای: چیپ هر مدت + قیمت نهایی آن --}}
-                                        <div class="flex max-w-xs flex-wrap items-center gap-1">
+                                        {{-- چندگزینه‌ای: چیپ هر مدت + قیمت نهایی آن — همه زیر هم (درخواست کاربر) --}}
+                                        <div class="flex flex-col items-start gap-1.5">
                                             @foreach($plan->durations->filter(fn ($d) => $d->is_active)->take(4) as $duration)
-                                                <span class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2 py-0.5 text-[11px] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                                                <span class="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2 py-1 text-[11px] font-bold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
                                                       title="{{ fa_num(money($duration->final_price)) }} تومان">
                                                     {{ $duration->duration_label }}
                                                     <span class="tabular-nums text-zinc-400">{{ $duration->final_price <= 0 ? 'رایگان' : fa_num(money($duration->final_price)) }}</span>
@@ -171,7 +166,8 @@
                                     </x-badge>
                                 </td>
                                 <td>
-                                    <div class="flex items-center justify-end gap-1">
+                                    {{-- دکمه‌های عملیات زیر هم (درخواست کاربر) --}}
+                                    <div class="flex flex-col items-end gap-1">
                                         <button type="button" wire:click="$dispatch('plan-form-open', { id: {{ $plan->id }} })"
                                                 class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                                                 title="ویرایش">

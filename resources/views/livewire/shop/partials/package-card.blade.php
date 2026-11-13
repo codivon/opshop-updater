@@ -1,7 +1,12 @@
-{{-- کارت پکیج فروشگاه — متغیرها: $package، $isCovered (اختیاری)، $showProject (اختیاری — نشان نام پروژه، صفحهٔ اصلی) --}}
+{{-- کارت پکیج فروشگاه — متغیرها: $package، $isCovered (اختیاری)، $showProject (اختیاری — نشان نام پروژه، صفحهٔ اصلی و فروشگاه) --}}
 @php($isCovered = $isCovered ?? false)
 @php($showProject = $showProject ?? false)
-@php($minPrice = $package->activePricingPlans->count() ? $package->activePricingPlans->min('final_price') : $package->default_price)
+{{-- قیمت نمایشی = ارزان‌ترین «طرحِ پولی» فعال؛ طرح‌های رایگان (مثل «طرح آغازین») نباید
+     کل پکیج را رایگان جلوه دهند — پکیج فقط وقتی رایگان است که نه طرح پولی داشته باشد و
+     نه قیمت پیش‌فرضش بیش از صفر باشد (هم‌ساز با منطق صفحهٔ تک‌پکیج) --}}
+@php($paidPrices = $package->activePricingPlans->filter(fn ($p) => $p->final_price > 0)->map->final_price)
+@php($isFreePkg = $package->is_free || ($paidPrices->isEmpty() && (int) $package->default_price <= 0))
+@php($minPrice = $paidPrices->isNotEmpty() ? $paidPrices->min() : $package->default_price)
 <a href="{{ route('shop.package', $package->slug) }}" wire:key="pkg-{{ $package->id }}" wire:navigate
    class="group flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-zinc-200/80 transition-all duration-200 hover:-translate-y-1 hover:shadow-card-lg dark:bg-zinc-900 dark:ring-zinc-700/60">
 
@@ -32,10 +37,10 @@
             </span>
         @endif
 
-        {{-- free / subscription badges --}}
-        @if($isCovered || $package->is_free || $minPrice <= 0)
+        {{-- free / subscription badges — «رایگان» فقط برای پکیج واقعاً رایگان --}}
+        @if($isCovered || $isFreePkg)
             <div class="absolute bottom-2 end-2 flex flex-col items-end gap-1">
-                @if($package->is_free || $minPrice <= 0)
+                @if($isFreePkg)
                     <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-black text-white shadow-sm">
                         <x-icon name="gift" class="size-3" /> رایگان
                     </span>
@@ -72,10 +77,11 @@
                     <span class="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
                         <x-icon name="crown" class="size-3.5" /> رایگان با اشتراک
                     </span>
-                @elseif($package->is_free || $minPrice <= 0)
+                @elseif($isFreePkg)
                     <span class="text-emerald-600 dark:text-emerald-400">رایگان</span>
                 @else
-                    {{ money($minPrice) }}
+                    {{-- چند طرح پولی → «از» + ارزان‌ترین (ارزان‌ترین طرح پولی) --}}
+                    @if($paidPrices->count() > 1)<span class="text-[10px] font-medium text-zinc-400">از </span>@endif{{ money($minPrice) }}
                 @endif
             </span>
             <span class="inline-flex items-center gap-1 text-xs font-bold text-brand-600 transition-all group-hover:gap-2 dark:text-brand-400">
