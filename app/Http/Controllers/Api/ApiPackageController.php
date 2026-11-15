@@ -471,17 +471,44 @@ class ApiPackageController extends Controller
                 ->where('customer_id', $customer->id)
                 ->first();
 
-            // لایسنی وجود ندارد → حکم امضاشدهٔ رد (نه خطای خام)
+            // لایسنس یافت نشد → «اول اشتراک، بعد لایسنس» (سخت‌سازی فاز ۲):
+            //   • اشتراکِ فعالِ طرح‌محور مشتری این پکیج را بپوشاند ⇒ لایسنسِ رایگان
+            //     صادر می‌شود (idempotent) و پاکت امضاشدهٔ معتبر برمی‌گردد — یعنی
+            //     نصبِ پکیج‌های «رایگانِ داخل اشتراک» بدون خریدِ تکی هم فعال می‌شود.
+            //   • در پوشش نباشد ⇒ حکم امضاشدهٔ رد — کلاینت پکیج را می‌بندد و باید
+            //     لایسنسِ تکیِ خود پکیج خریداری شود.
             if (!$license) {
-                $signed = $envelopeService->buildRejection(
-                    $customer,
-                    $package,
-                    (string) $request->license_key,
-                    'لایسنس متعلق به این مشتری نیست.',
-                    $requestDomain
-                );
+                $covering = $this->subscriptionService->activeSubscriptionCovering($customer, $package);
 
-                return response()->json($signed);
+                if ($covering) {
+                    // لایسنسِ فعالِ قبلی؟ (idempotent — هر چک لایسنس جدید صادر نشود)
+                    $license = $this->authService->getActiveLicense($customer, $slug);
+
+                    if (!$license) {
+                        // مدت رایگان از «پیکربندی مؤثرِ مدتِ خریداری‌شده» — نه صرفاً پکیج‌های سطح طرح (Task 66)
+                        $covered    = $covering->effectivePackages()->firstWhere('id', $package->id);
+                        $freeMonths = (int) ($covered?->pivot->free_months ?? 1);
+
+                        $license = $covering->order
+                            ? $this->subscriptionService->grantPackageAccess($customer, $package, $freeMonths, $covering->order)
+                            : $this->subscriptionService->grantFreeAccess(
+                                $customer,
+                                $package,
+                                $freeMonths,
+                                'صدور خودکار از طریق اشتراک فعال «' . ($covering->plan?->name ?? 'طرح اشتراک') . '» (verify-license).'
+                            );
+                    }
+                } else {
+                    $signed = $envelopeService->buildRejection(
+                        $customer,
+                        $package,
+                        (string) $request->license_key,
+                        'این پکیج نه لایسنس فعال دارد و نه با اشتراکِ فعال شما پوشش داده می‌شود. لایسنسِ پکیج را جداگانه خریداری کنید.',
+                        $requestDomain
+                    );
+
+                    return response()->json($signed);
+                }
             }
 
             $signed = $envelopeService->buildForLicense($license, $customer, $package, $requestDomain);
