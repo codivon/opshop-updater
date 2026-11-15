@@ -12,7 +12,9 @@ use App\Models\PackagePurchase;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Services\LicenseService;
+use App\Models\PackageVersion;
 use App\Services\PackageApiAuthService;
+use App\Services\PackageLicenseEnvelopeService;
 use App\Services\PaymentService;
 use App\Services\SubscriptionService;
 use App\Services\Sms\SmsManager;
@@ -440,16 +442,19 @@ class ApiPackageController extends Controller
 
     /* ===================================================================
      *  POST /api/v1/packages/{slug}/verify-license
-     *  بررسی اعتبار لایسنس
-     *  Body: { license_key }
-     *  Response: { valid, expires_at, days_remaining, version, download_token, signature }
+     *  بررسی اعتبار لایسنس — با «پاکت لایسنس امضاشده» (سخت‌سازی امنیتی فاز ۱)
+     *
+     *  قرارداد جدید:
+     *   • روی هر دو مسیر معتبر/نامعتبر، HTTP 200 + پاکت امضاشده (envelope + signature)
+     *     برمی‌گردد تا کلاینت حکم قطعیِ قابل‌راستی‌آزمایی داشته باشد.
+     *   • خطاهای احراز (توکن/دامنهٔ غلط) همچنان 4xx بدون پاکت — کلاینت این‌ها را
+     *     «رد قطعی سرور» می‌داند و پکیج می‌بندد.
+     *   • پاکت شامل اشتراکِ پوشش‌دهنده، grace_hours و check_interval_hours است؛
+     *     یعنی «دورهٔ مهلت قطع شدن» از سرور کنترل می‌شود نه از کلاینت.
+     *   • ضربان قلب (last_check_at/ip/domain) برای پایش ناهنجاری در پنل بازار ثبت می‌شود.
      * =================================================================== */
     public function verifyLicense(Request $request, string $slug): JsonResponse
     {
-        $request->validate([
-            'license_key' => 'required|string',
-        ]);
-
         try {
             $customer = $this->authService->authenticate($request);
 
@@ -458,50 +463,127 @@ class ApiPackageController extends Controller
                 return response()->json(['valid' => false, 'message' => 'پکیج یافت نشد.'], 404);
             }
 
+            $requestDomain = $request->header('X-Project-Url');
+            $envelopeService = app(PackageLicenseEnvelopeService::class);
+
             $license = \App\Models\PackageLicense::where('license_key', $request->license_key)
                 ->where('package_id', $package->id)
                 ->where('customer_id', $customer->id)
                 ->first();
 
+            // لایسنی وجود ندارد → حکم امضاشدهٔ رد (نه خطای خام)
             if (!$license) {
-                return response()->json([
-                    'valid'   => false,
-                    'message' => 'لایسنس متعلق به این مشتری نیست.',
-                ], 403);
+                $signed = $envelopeService->buildRejection(
+                    $customer,
+                    $package,
+                    (string) $request->license_key,
+                    'لایسنس متعلق به این مشتری نیست.',
+                    $requestDomain
+                );
+
+                return response()->json($signed);
             }
 
-            $result = $this->licenseService->verify($license);
+            $signed = $envelopeService->buildForLicense($license, $customer, $package, $requestDomain);
 
-            if (!$result['valid']) {
-                // اگه لایسنس منقضی شده و از طرح one-time بوده، پیام واضح بده
+            $envelope = $signed['envelope'];
+
+            // پیام راهنمای طرح‌های یک‌بار مصرف — در reason پاکت تزریق می‌شود
+            if (!$envelope['valid']) {
                 $plan = $license->purchase?->pricingPlan;
                 if ($plan && $plan->is_one_time) {
-                    return response()->json([
-                        'valid'        => false,
-                        'message'      => 'لایسنس این طرح (یک‌بار مصرف) منقضی شده است. این طرح قابل تمدید نیست. لطفاً طرح دیگری خریداری کنید.',
-                        'is_one_time'  => true,
-                        'expires_at'   => $result['expires_at'] ?? null,
-                    ]);
+                    $envelope['reason'] = 'لایسنس این طرح (یک‌بار مصرف) منقضی شده است. این طرح قابل تمدید نیست. لطفاً طرح دیگری خریداری کنید.';
+                    $envelope['is_one_time'] = true;
+                    $signed['envelope'] = $envelope;
+                    $signed['signature'] = $envelopeService->sign($envelope);
                 }
-                return response()->json($result);
             }
 
-            $latestVersion = $package->latestVersion()->first();
+            /*
+             * فیلدهای سطح بالا (سازگاری با کلاینت‌های فعلی):
+             *   • signature  = هش SHA-256 فایل ZIP (معنای قدیمی — کلاینت نصب با آن چک می‌کند)
+             *   • envelope + envelope_signature = پاکت امضاشدهٔ لایسنس (قرارداد جدید)
+             *   • valid/expires_at/version/download_token — mirror پاکت برای کلاینت‌های قدیمی
+             */
+            $response = [
+                'envelope'           => $envelope,
+                'envelope_signature' => $signed['signature'],
+            ];
 
-            if (!$latestVersion) {
-                return response()->json(['error' => 'نسخه فعالی برای این پکیج وجود ندارد.'], 422);
+            $response['valid']          = $envelope['valid'];
+            $response['expires_at']     = $envelope['expires_at'];
+            $response['days_remaining'] = $envelope['days_remaining'];
+            $response['is_unlimited']   = $envelope['is_unlimited'];
+            $response['message']        = $envelope['reason'];
+
+            if ($envelope['valid']) {
+                $latestVersion = $package->latestVersion()->first();
+
+                if ($latestVersion) {
+                    $response['version']        = $latestVersion->version;
+                    $response['signature']      = $latestVersion->file_hash; // معنای قدیمی: هش ZIP
+                    $response['zip_hash']       = $latestVersion->file_hash;
+                    $response['download_token'] = $this->createDownloadToken($license, $latestVersion, $customer);
+                }
             }
-            return response()->json([
-                'valid'         => true,
-                'expires_at'    => $result['expires_at'],
-                'days_remaining'=> $result['days_remaining'],
-                'is_unlimited'  => $result['is_unlimited'] ?? false,
-                'version'       => $latestVersion?->version,
-                'signature'     => $latestVersion?->file_hash,
-                'download_token' => $latestVersion
-                    ? $this->createDownloadToken($license, $latestVersion, $customer)
-                    : null,
-            ]);
+
+            // ضربان قلب — پایش ناهنجاری در بازار (هم‌زمان روی چند دامنه؟)
+            $envelopeService->heartbeat(
+                $license,
+                $requestDomain,
+                $request->ip()
+            );
+
+            return response()->json($response);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], exception_status($e, 500));
+        }
+    }
+
+    /* ===================================================================
+     *  GET /api/v1/packages/{slug}/manifest
+     *  مانیفست یکپارچگی فایل‌ها (module.lock) — سخت‌سازی امنیتی فاز ۱
+     *  Query: { version? }
+     *  Response: { manifest: {slug, version, file_hash, files: {path: sha256}}, signature }
+     *  فقط برای مشتری با لایسنس معتبر/اشتراک پوشش‌دهنده + دامنهٔ مجاز.
+     * =================================================================== */
+    public function manifest(Request $request, string $slug): JsonResponse
+    {
+        try {
+            $customer = $this->authService->authenticate($request);
+
+            $package = Package::where('slug', $slug)->first();
+            if (!$package) {
+                return response()->json(['error' => 'پکیج یافت نشد.'], 404);
+            }
+
+            // حق دانلود مانیفست = داشتن لایسنس معتبر یا پوشش اشتراک
+            $hasActiveLicense = \App\Models\PackageLicense::where('package_id', $package->id)
+                ->where('customer_id', $customer->id)
+                ->where('status', PackageLicense::STATUS_ACTIVE)
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->exists();
+
+            $coveringSubscription = $this->subscriptionService->activeSubscriptionCovering($customer, $package);
+
+            if (!$hasActiveLicense && !$coveringSubscription) {
+                return response()->json(['error' => 'لایسنس یا اشتراک فعالی برای این پکیج ندارید.'], 403);
+            }
+
+            $version = $request->filled('version')
+                ? $package->versions()->where('version', $request->version)->first()
+                : $package->latestVersion()->first();
+
+            if (!$version instanceof PackageVersion) {
+                return response()->json(['error' => 'نسخهٔ درخواستی یافت نشد.'], 404);
+            }
+
+            $envelopeService = app(PackageLicenseEnvelopeService::class);
+            $signed = $envelopeService->manifestForVersion($package, $version);
+
+            return response()->json($signed);
         } catch (RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], exception_status($e, 500));
         }

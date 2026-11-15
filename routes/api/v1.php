@@ -45,6 +45,9 @@ Route::prefix('v1')->name('api.')->middleware('throttle:120,1')->group(function 
         // --- لایسنس ---
         Route::post('/packages/{slug}/verify-license', [ApiPackageController::class, 'verifyLicense'])->name('verify-license');
 
+        // مانیفست یکپارچگی فایل‌ها (module.lock) — سخت‌سازی امنیتی فاز ۱
+        Route::get('/packages/{slug}/manifest', [ApiPackageController::class, 'manifest'])->name('manifest');
+
         // --- آپدیت ---
         Route::get('/packages/{slug}/check-update', [ApiPackageController::class, 'checkUpdate'])->name('check-update');
 

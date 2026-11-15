@@ -35,4 +35,21 @@ return [
         ],
     ],
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | پاکت لایسنس امضاشده (Signed License Envelope) — سخت‌سازی امنیتی فاز ۱
+    |--------------------------------------------------------------------------
+    | کلید خصوصی EC P-256 برای امضای پاکت لایسنس و مانیفست یکپارچگی فایل‌ها.
+    | کلید عمومیِ همان جفت‌کلید در کد کلاینت (پروژهٔ فروشگاه) جاسازی می‌شود.
+    | ساخت جفت‌کلید:
+    |   openssl ecparam -name prime256v1 -genkey -noout -out private.pem
+    |   openssl ec -in private.pem -pubout -out public.pem
+    */
+    'license_envelope' => [
+        'private_key'          => env('PACKAGE_LICENSE_SIGNING_KEY'),
+        'grace_hours'          => env('PACKAGE_LICENSE_GRACE_HOURS', 24),
+        'check_interval_hours' => env('PACKAGE_LICENSE_CHECK_INTERVAL_HOURS', 24),
+    ],
+
 ];
