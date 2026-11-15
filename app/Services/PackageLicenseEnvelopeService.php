@@ -63,7 +63,7 @@ class PackageLicenseEnvelopeService
      */
     public function sign(array $payload): string
     {
-        $privateKeyPem = (string) config('services.license_envelope.private_key', (string) env('PACKAGE_LICENSE_SIGNING_KEY', ''));
+        $privateKeyPem = $this->resolvePrivateKeyPem();
 
         if ($privateKeyPem === '') {
             throw new RuntimeException('کلید امضای لایسنس (PACKAGE_LICENSE_SIGNING_KEY) تنظیم نشده است.');
@@ -82,6 +82,45 @@ class PackageLicenseEnvelopeService
         }
 
         return base64_encode($signature);
+    }
+
+    /**
+     * خواندن کلید خصوصی از config/env با نرمال‌سازی فرمت.
+     *
+     * سه شکل مقدار در .env پذیرفته می‌شود:
+     *   1) PEM چندخطی داخل کوتیشن (dotenv چندخطی را ساپورت می‌کند)
+     *   2) PEM تک‌خطی با دنباله‌های literal \\n (مطابق .env.example)
+     *   3) همان مقدار به‌اشتباه در کوتیشن پیچیده‌شده
+     * همه به PEM استاندارد با newline واقعی تبدیل می‌شوند تا openssl بپذیرد.
+     */
+    private function resolvePrivateKeyPem(): string
+    {
+        $pem = (string) config('services.license_envelope.private_key', (string) env('PACKAGE_LICENSE_SIGNING_KEY', ''));
+
+        $pem = trim($pem);
+
+        if ($pem === '') {
+            return '';
+        }
+
+        // اگر به‌اشتباه کلاً داخل کوتیشن مانده باشد، جدا می‌کنیم
+        // کد کاراکترها: 34 = دابل‌کوتیشن (")، 39 = آپاستروف (')
+        if (strlen($pem) > 1) {
+            $first = ord($pem[0]);
+            $last  = ord($pem[strlen($pem) - 1]);
+
+            if (($first === 34 && $last === 34) || ($first === 39 && $last === 39)) {
+                $pem = substr($pem, 1, -1);
+                $pem = trim($pem);
+            }
+        }
+
+        // مقدار تک‌خطی .env: دنباله‌های literal \n / \r به newline واقعی تبدیل شوند
+        if (! str_contains($pem, "\n")) {
+            $pem = str_replace(['\\r\\n', '\\n', '\\r'], ["\r\n", "\n", "\n"], $pem);
+        }
+
+        return $pem;
     }
 
     /**
