@@ -66,9 +66,22 @@
 
             @if(!empty($status['public_key']))
                 <div>
-                    <p class="mb-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">کلید عمومی (برای جاسازی در کد کلاینت — فاز بعدی سخت‌سازی):</p>
+                    <p class="mb-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">کلید عمومی متناظر (برای بکاپ):</p>
                     <pre dir="ltr" class="max-h-40 overflow-y-auto rounded-xl bg-zinc-950 p-4 font-mono text-xs leading-5 text-emerald-300 ring-1 ring-zinc-800">{{ $status['public_key'] }}</pre>
                 </div>
+
+                @if(!empty($status['shop_env_value']))
+                    <div>
+                        <p class="mb-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                            برای فروشگاه (shop-pro-laravel-13) — این خط را در <span dir="ltr" class="font-mono">.env</span> فروشگاه بگذارید تا امضاهای این سرور تأیید شوند:
+                        </p>
+                        <x-code-block label=".env فروشگاه — PACKAGE_LICENSE_PUBLIC_KEY" :code="$status['shop_env_value']" />
+                        <p class="mt-1.5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                            بعد از گذاشتن این خط، <span dir="ltr" class="font-mono">bootstrap/cache/config.php</span> را حذف کنید (یا از دکمهٔ پاک‌سازی کش پایین صفحه استفاده کنید اگر پنل فروشگاه را دارید).
+                            بدون این خط، اگر کلید این سرور تعویض شده باشد، پکیج‌های نصب‌شده در فروشگاه بسته می‌شوند.
+                        </p>
+                    </div>
+                @endif
             @endif
         </div>
     </x-card>
@@ -90,10 +103,13 @@
     @else
         <x-card title="تعویض کلید (rotation)" subtitle="کلید فعلی فعال است — تعویض فقط برای موارد نشت/تراشهٔ امنیتی لازم است.">
             <div class="space-y-4">
-                <div class="flex items-center gap-3 rounded-xl bg-amber-50 p-4 text-amber-700 ring-1 ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20">
+                <div class="flex items-center gap-3 rounded-xl bg-red-50 p-4 text-red-700 ring-1 ring-red-600/10 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-400/20">
                     <x-icon name="alert-triangle" class="size-6 shrink-0" />
                     <p class="text-sm leading-6">
-                        با تعویض کلید، همهٔ پاکت‌های امضاشدهٔ قبلی بی‌اعتبار می‌شوند. تا قبل از فاز ۲ (راستی‌آزمایی سمت فروشگاه) این عملیات هیچ کلاینتی را نمی‌شکند؛ بعد از فاز ۲، تعویض کلید یعنی باید کلید عمومی جدید در فروشگاه‌ها هم جاسازی شود.
+                        فروشگاه‌های متصل با کلید عمومی امضا را راستی‌آزمایی می‌کنند؛ اگر کلید این سرور عوض شود و کلید عمومیِ جدید در
+                        <span dir="ltr" class="font-mono">.env</span> فروشگاه (<span dir="ltr" class="font-mono">PACKAGE_LICENSE_PUBLIC_KEY</span>) ثبت نشده باشد،
+                        <strong>همهٔ پکیج‌های نصب‌شده در فروشگاه بسته می‌شوند</strong> (خطای «امضای پاسخ سرور معتبر نیست» و «مانیفست یکپارچگی یافت نشد»).
+                        ترتیب امن: اول خطِ کلید عمومی را از همین صفحه کپی و در فروشگاه ثبت کنید، بعد این‌جا کلید را تعویض کنید.
                     </p>
                 </div>
                 <x-btn variant="secondary" icon="refresh-cw" wire:click="$set('confirmRotate', true)">تعویض کلید</x-btn>
@@ -108,7 +124,7 @@
 
     {{-- کلید عمومی تازه‌ساخته --}}
     @if($lastPublicKey)
-        <x-card title="کلید عمومی تازه‌ساخته — همین حالا بکاپ کنید" subtitle="این کلید عمومی را در جای امن ذخیره کنید؛ در فاز بعدی سخت‌سازی در کد فروشگاه جاسازی می‌شود.">
+        <x-card title="کلید عمومی تازه‌ساخته — همین حالا بکاپ کنید" subtitle="این کلید عمومی را در جای امن ذخیره کنید و خط .env فروشگاه را ثبت کنید.">
             <div class="space-y-3">
                 <div class="flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
                     <x-badge variant="success" icon="check">ثبت شد</x-badge>
@@ -117,6 +133,14 @@
                     @endif
                 </div>
                 <pre dir="ltr" class="max-h-40 overflow-y-auto rounded-xl bg-zinc-950 p-4 font-mono text-xs leading-5 text-emerald-300 ring-1 ring-zinc-800">{{ $lastPublicKey }}</pre>
+                @if($lastShopEnvValue)
+                    <div>
+                        <p class="mb-1.5 text-xs font-semibold text-red-600 dark:text-red-400">
+                            گام بعدی الزامی: این خط را در <span dir="ltr" class="font-mono">.env</span> فروشگاه ثبت کنید (بعد از آن bootstrap/cache/config.php را حذف کنید):
+                        </p>
+                        <x-code-block label=".env فروشگاه — PACKAGE_LICENSE_PUBLIC_KEY" :code="$lastShopEnvValue" />
+                    </div>
+                @endif
                 <p class="text-xs text-zinc-500 dark:text-zinc-400">کلید خصوصی هرگز نمایش داده نمی‌شود — در .env باقی می‌ماند؛ از آن بکاپ امن نگه دارید.</p>
             </div>
         </x-card>
@@ -144,7 +168,10 @@
             <div class="space-y-4">
                 <div class="flex items-center gap-3 rounded-xl bg-red-50 p-4 text-red-700 ring-1 ring-red-600/10 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-400/20">
                     <x-icon name="alert-triangle" class="size-6 shrink-0" />
-                    <p class="text-sm leading-6">کلید فعلی جایگزین می‌شود و پاکت‌های امضاشدهٔ قبلی بی‌اعتبار می‌شوند. کلید عمومی جدید را بکاپ کنید. ادامه می‌دهید؟</p>
+                    <div class="space-y-1 text-sm leading-6">
+                        <p>کلید فعلی جایگزین می‌شود و پاکت‌های امضاشدهٔ قبلی بی‌اعتبار می‌شوند.</p>
+                        <p class="font-bold">ترتیب امن: ۱) خطِ PACKAGE_LICENSE_PUBLIC_KEY را از همین صفحه کپی و در .env فروشگاه ثبت کنید ← ۲) بعد این‌جا کلید را تعویض کنید. اگر جاها برعکس شود، پکیج‌های فروشگاه تا ثبت کلید جدید بسته می‌مانند.</p>
+                    </div>
                 </div>
                 <div class="flex items-center justify-end gap-2">
                     <x-btn variant="secondary" wire:click="$set('confirmRotate', false)">انصراف</x-btn>

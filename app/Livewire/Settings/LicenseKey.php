@@ -32,6 +32,9 @@ class LicenseKey extends Component
 
     public ?string $lastFingerprint = null;
 
+    /** خطِ آمادهٔ .env برای فروشگاه — متناظر با کلید تازه‌ساخته */
+    public ?string $lastShopEnvValue = null;
+
     public bool $confirmGenerate = false;
 
     public bool $confirmRotate = false;
@@ -92,8 +95,9 @@ class LicenseKey extends Component
         $this->refreshStatus();
 
         if ($result['ok'] ?? false) {
-            $this->lastPublicKey   = $result['public_key'] ?? null;
-            $this->lastFingerprint = $result['fingerprint'] ?? null;
+            $this->lastPublicKey     = $result['public_key'] ?? null;
+            $this->lastFingerprint   = $result['fingerprint'] ?? null;
+            $this->lastShopEnvValue  = $result['shop_env_value'] ?? null;
 
             $message = (string) ($result['message'] ?? 'انجام شد.');
 

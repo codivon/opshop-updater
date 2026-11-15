@@ -31,7 +31,7 @@ class LicenseSigningKeyService
      * وضعیت جاری کلید.
      * state: missing (تنظیم نشده) | invalid (تنظیم اما نامعتبر) | ok (فعال)
      *
-     * @return array{state:string, fingerprint:?string, public_key:?string, env_exists:bool, env_writable:bool, config_cached:bool, grace_hours:int, check_interval_hours:int}
+     * @return array{state:string, fingerprint:?string, public_key:?string, shop_env_value:?string, env_exists:bool, env_writable:bool, config_cached:bool, grace_hours:int, check_interval_hours:int}
      */
     public function status(): array
     {
@@ -57,6 +57,7 @@ class LicenseSigningKeyService
             'state'                => $state,
             'fingerprint'          => $fingerprint,
             'public_key'           => $publicKey,
+            'shop_env_value'       => $publicKey !== '' ? self::shopEnvValue($publicKey) : null,
             'env_exists'           => is_file(base_path('.env')),
             'env_writable'         => is_file(base_path('.env')) ? is_writable(base_path('.env')) : is_writable(base_path()),
             'config_cached'        => is_file(base_path('bootstrap/cache/config.php')),
@@ -68,12 +69,12 @@ class LicenseSigningKeyService
     /**
      * ساخت جفت‌کلید و ثبت در .env — با $force برای تعویض کلید موجود.
      *
-     * @return array{ok:bool, message:string, public_key:?string, fingerprint:?string, config_cache_cleared:bool}
+     * @return array{ok:bool, message:string, public_key:?string, fingerprint:?string, shop_env_value:?string, config_cache_cleared:bool}
      */
     public function generate(bool $force = false): array
     {
         $fail = fn (string $message): array => [
-            'ok' => false, 'message' => $message, 'public_key' => null, 'fingerprint' => null, 'config_cache_cleared' => false,
+            'ok' => false, 'message' => $message, 'public_key' => null, 'fingerprint' => null, 'shop_env_value' => null, 'config_cache_cleared' => false,
         ];
 
         if (! extension_loaded('openssl')) {
@@ -144,10 +145,11 @@ class LicenseSigningKeyService
         return [
             'ok'                   => true,
             'message'              => $force
-                ? 'کلید با موفقیت تعویض شد — کلید عمومی جدید را بکاپ کنید.'
+                ? 'کلید با موفقیت تعویض شد — قبل از فعال‌شدنِ فروشگاه‌ها، کلید عمومی جدید را در .env هر فروشگاه (PACKAGE_LICENSE_PUBLIC_KEY) ثبت کنید.'
                 : 'کلید با موفقیت ساخته و در .env ثبت شد.',
             'public_key'           => $publicPem,
             'fingerprint'          => $this->fingerprint($publicPem),
+            'shop_env_value'       => self::shopEnvValue($publicPem),
             'config_cache_cleared' => $cacheCleared,
         ];
     }
@@ -169,6 +171,20 @@ class LicenseSigningKeyService
 
             return false;
         }
+    }
+
+    /**
+     * خطِ آمادهٔ .env برای فروشگاه (shop-pro-laravel-13) — کلید عمومیِ متناظر با
+     * کلید خصوصی این سرور، تک‌خطی با دنبالهٔ \n. مدیرِ فروشگاه این خط را در
+     * .env فروشگاه می‌گذارد و bootstrap/cache/config.php را حذف می‌کند؛ از آن
+     * پس امضاهای این سرور در فروشگاه تأیید می‌شوند. بدون این کار، تعویض کلید
+     * همهٔ پکیج‌های نصب‌شده را در فروشگاه می‌بندد (fail-closed).
+     */
+    public static function shopEnvValue(string $publicPem): string
+    {
+        $singleLine = str_replace("\n", '\\n', trim($publicPem));
+
+        return 'PACKAGE_LICENSE_PUBLIC_KEY="'.$singleLine.'"';
     }
 
     /* ------------------------------------------------------------------ */
