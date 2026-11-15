@@ -7,6 +7,9 @@
             <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">هر قابلیت را جداگانه فعال/غیرفعال و شخصی‌سازی کنید.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('admin.settings.license-key') }}" wire:navigate>
+                <x-btn variant="secondary" icon="key">کلید امضای لایسنس</x-btn>
+            </a>
             <a href="{{ route('admin.settings.index') }}" wire:navigate>
                 <x-btn variant="secondary" icon="settings">تنظیمات عمومی</x-btn>
             </a>

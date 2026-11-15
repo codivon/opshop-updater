@@ -10,6 +10,9 @@
             <a href="{{ route('admin.settings.gateways') }}" wire:navigate>
                 <x-btn variant="secondary" icon="credit-card">مدیریت درگاه‌های پرداخت</x-btn>
             </a>
+            <a href="{{ route('admin.settings.license-key') }}" wire:navigate>
+                <x-btn variant="secondary" icon="key">کلید امضای لایسنس</x-btn>
+            </a>
             <x-btn variant="secondary" icon="refresh-cw" wire:click="$set('confirmCache', true)">پاک‌سازی کش</x-btn>
             <x-btn variant="secondary" icon="zap" wire:click="$set('confirmOptimize', true)">بهینه‌سازی</x-btn>
         </div>

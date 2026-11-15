@@ -1,4 +1,20 @@
 <div class="space-y-6">
+    {{-- هشدار کلید امضای لایسنس — رفع خطای «نصب پکیج ناموفق بود: کلید امضای لایسنس تنظیم نشده است» --}}
+    @if($licenseKeyMissing)
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 p-4 ring-1 ring-red-600/20 dark:bg-red-500/10 dark:ring-red-400/30">
+            <div class="flex items-center gap-3">
+                <x-icon name="shield-alert" class="size-6 shrink-0 text-red-600 dark:text-red-400" />
+                <p class="text-sm leading-6 text-red-800 dark:text-red-200">
+                    کلید امضای لایسنس (PACKAGE_LICENSE_SIGNING_KEY) تنظیم نشده یا نامعتبر است —
+                    نصب و بروزرسانی پکیج‌ها در فروشگاه‌ها با خطای 500 شکست می‌خورد.
+                </p>
+            </div>
+            <a href="{{ route('admin.settings.license-key') }}" wire:navigate>
+                <x-btn variant="secondary" icon="key">مدیریت کلید</x-btn>
+            </a>
+        </div>
+    @endif
+
     {{-- welcome --}}
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div>

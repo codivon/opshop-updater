@@ -18,6 +18,7 @@ use App\Models\TemplatePurchase;
 use App\Models\Update;
 use App\Models\User;
 use App\Services\LicenseService;
+use App\Services\LicenseSigningKeyService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -27,6 +28,9 @@ use Livewire\Component;
 #[\Livewire\Attributes\Title('داشبورد')]
 class Dashboard extends Component
 {
+    /** هشدار کلید امضای لایسنس — بدون این کلید نصب/بروزرسانی پکیج در فروشگاه‌ها با 500 شکست می‌خورد */
+    public bool $licenseKeyMissing = false;
+
     public function mount(): void
     {
         // همگام‌سازی وضعیت لایسنس‌های گذشته از تاریخ انقضا (active → expired)
@@ -40,6 +44,9 @@ class Dashboard extends Component
             ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
             ->whereRaw("COALESCE(expires_at, end_date) < ?", [now()])
             ->update(['status' => 'expired']);
+
+        // هشدار داشبورد: کلید امضای لایسنس تنظیم/معتبر نیست؟ (منبع حقیقت: فایل .env)
+        $this->licenseKeyMissing = app(LicenseSigningKeyService::class)->status()['state'] !== 'ok';
     }
 
     public function render()

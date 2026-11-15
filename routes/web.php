@@ -249,6 +249,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', EnsureAdminRole::cla
     Route::get('settings/gateways', Gateways::class)->name('settings.gateways');
     Route::get('settings/security', Security::class)->name('settings.security');
 
+    // کلید امضای لایسنس: ساخت/تعویض EC P-256 از پنل — بدون نیاز به شِل (هاست اشتراکی)
+    Route::get('settings/license-key', App\Livewire\Settings\LicenseKey::class)->name('settings.license-key');
+
     // تنظیمات برنامه‌نویس: محیط/دیباگ (.env)، کش‌ها، بهینه‌سازی و مایگریشن‌های در انتظار
     Route::get('settings/developer', Developer::class)->name('settings.developer');
     Route::get('users', App\Livewire\Users\Index::class)->name('users.index');
