@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Front;
 use App\Http\Controllers\Controller;
 use App\Models\PackagePurchase;
 use App\Models\SubscriptionOrder;
+use App\Services\LicenseSigningKeyService;
 use App\Services\PaymentService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
@@ -30,6 +31,37 @@ class PaymentReturnController extends Controller
         private SubscriptionService $subscriptionService
     ) {}
 
+    /**
+     * جعبهٔ «کلید عمومی راستی‌آزمایی لایسنس» برای صفحهٔ نتیجهٔ پرداخت — فقط در وضعیت پرداخت موفق.
+     *
+     * درخواست کاربر: بعد از خرید موفق، کلید عمومی به کاربر نمایش داده شود با یادآوریِ
+     * «برای همهٔ پکیج‌ها و همهٔ مشتری‌ها مشترک است». کلید عمومی راز نیست و نمایشش بی‌خطر است؛
+     * کلید خصوصی سرور (LicenseSigningKeyService) هرگز از این متد عبور نمی‌کند.
+     * مقدار shop_env_value همان خطِ تک‌خطیِ آمادهٔ فروشگاه است (PACKAGE_LICENSE_PUBLIC_KEY="...")
+     * که می‌توان آن را یک‌جا در فیلدِ هم‌نامِ پنل فروشگاه (تنظیمات برنامه‌نویس ← تب آپدیت‌کننده)
+     * یا .env فروشگاه چسباند.
+     *
+     * @return array{env_line:string, public_key:string, fingerprint:string}|null
+     */
+    private function licenseKeyBox(): ?array
+    {
+        try {
+            $status = app(LicenseSigningKeyService::class)->status();
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if (($status['state'] ?? '') !== 'ok' || empty($status['shop_env_value'])) {
+            return null;
+        }
+
+        return [
+            'env_line'    => (string) $status['shop_env_value'],
+            'public_key'  => (string) ($status['public_key'] ?? ''),
+            'fingerprint' => (string) ($status['fingerprint'] ?? ''),
+        ];
+    }
+
     public function show(Request $request, PackagePurchase $purchase)
     {
         $purchase->load([
@@ -49,14 +81,15 @@ class PaymentReturnController extends Controller
         [$returnUrl, $returnHost, $isInternal] = $this->resolveReturnTarget($request, $purchase);
 
         return view('payment.return', [
-            'purchase'    => $purchase,
-            'status'      => $purchase->status, // paid | failed | pending
-            'message'     => $this->statusMessage($purchase),
-            'gatewayName' => config("general.supported_gateways.{$purchase->gateway}") ?? $purchase->gateway,
-            'returnUrl'   => $returnUrl,
-            'returnHost'  => $returnHost,
-            'isInternal'  => $isInternal,
-            'seconds'     => 10,
+            'purchase'       => $purchase,
+            'status'         => $purchase->status, // paid | failed | pending
+            'message'        => $this->statusMessage($purchase),
+            'gatewayName'    => config("general.supported_gateways.{$purchase->gateway}") ?? $purchase->gateway,
+            'licenseKeyBox'  => $purchase->isPaid() ? $this->licenseKeyBox() : null,
+            'returnUrl'      => $returnUrl,
+            'returnHost'     => $returnHost,
+            'isInternal'     => $isInternal,
+            'seconds'        => 10,
         ]);
     }
 
@@ -134,16 +167,17 @@ class PaymentReturnController extends Controller
         $planDuration = $months === null ? null : ($months === 0 ? 'نامحدود' : fa_num($months) . ' ماه');
 
         return view('payment.return-subscription', [
-            'order'         => $order,
-            'status'        => $order->status, // paid | failed | pending
-            'message'       => $this->subscriptionStatusMessage($order),
-            'gatewayName'   => config("general.supported_gateways.{$order->gateway}") ?? $order->gateway,
-            'planDuration'  => $planDuration,
-            'packagesCount' => count($order->meta['plan']['packages'] ?? []),
-            'returnUrl'     => $returnUrl,
-            'returnHost'    => $returnHost,
-            'isInternal'    => $isInternal,
-            'seconds'       => 10,
+            'order'          => $order,
+            'status'         => $order->status, // paid | failed | pending
+            'message'        => $this->subscriptionStatusMessage($order),
+            'gatewayName'    => config("general.supported_gateways.{$order->gateway}") ?? $order->gateway,
+            'planDuration'   => $planDuration,
+            'packagesCount'  => count($order->meta['plan']['packages'] ?? []),
+            'licenseKeyBox'  => $order->isPaid() ? $this->licenseKeyBox() : null,
+            'returnUrl'      => $returnUrl,
+            'returnHost'     => $returnHost,
+            'isInternal'     => $isInternal,
+            'seconds'        => 10,
         ]);
     }
 

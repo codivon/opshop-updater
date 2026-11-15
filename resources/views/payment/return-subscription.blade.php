@@ -131,6 +131,62 @@
         .row.amount .k, .row.amount .v { color: var(--accent-2); }
         .row.amount .v { font-size: 15px; }
 
+        /* ---- کلید عمومی راستی‌آزمایی (پرداخت موفق) ---- */
+        .keybox {
+            margin-top: 16px; text-align: start;
+            background: var(--chip);
+            border: 1px solid var(--chip-border);
+            border-radius: 16px;
+            padding: 13px 14px;
+            animation: card-in .55s cubic-bezier(.22, .9, .34, 1) both;
+            animation-delay: .12s;
+        }
+        .kb-head { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 800; }
+        .kb-head svg { width: 15px; height: 15px; color: var(--accent-2); flex-shrink: 0; }
+        .kb-badge {
+            margin-inline-start: auto;
+            font-size: 9.5px; font-weight: 700;
+            color: var(--accent-2);
+            background: color-mix(in srgb, var(--accent) 13%, transparent);
+            border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+            padding: 2px 8px; border-radius: 999px;
+            white-space: nowrap;
+        }
+        .kb-note { margin-top: 7px; font-size: 11px; line-height: 1.85; color: var(--muted); }
+        .kb-note b { color: var(--text); font-weight: 700; }
+        .kb-note.kb-how { margin-top: 5px; }
+        .kb-value {
+            margin-top: 9px;
+            display: flex; align-items: stretch; gap: 8px;
+            background: rgba(0,0,0,.28);
+            border: 1px solid var(--chip-border);
+            border-radius: 12px;
+            padding: 9px 11px;
+        }
+        .kb-text {
+            flex: 1; min-width: 0; max-height: 96px; overflow-y: auto;
+            direction: ltr; text-align: left;
+            font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+            font-size: 10px; line-height: 1.7;
+            color: var(--text);
+            word-break: break-all;
+            user-select: all;
+        }
+        .kb-text::-webkit-scrollbar { width: 6px; }
+        .kb-text::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
+        .kb-value .copy-btn { align-self: center; width: 30px; height: 30px; }
+        .kb-value .copy-btn svg { width: 14px; height: 14px; }
+        .kb-fp {
+            margin-top: 8px;
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+            font-size: 10.5px; color: var(--muted);
+        }
+        .kb-fp b {
+            color: var(--accent-2);
+            font-family: ui-monospace, Consolas, monospace;
+            direction: ltr; font-weight: 600; letter-spacing: .5px;
+        }
+
         /* ---- دکمه کپی ---- */
         .copy-btn {
             display: inline-flex; align-items: center; justify-content: center;
@@ -327,6 +383,40 @@
                 </div>
             @endif
         </section>
+
+        {{-- ============ کلید عمومی راستی‌آزمایی (فقط پرداخت موفق — درخواست کاربر) ============ --}}
+        @if ($status === \App\Models\SubscriptionOrder::STATUS_PAID && $licenseKeyBox)
+            <section class="keybox" aria-label="کلید عمومی راستی‌آزمایی لایسنس">
+                <div class="kb-head">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+                    <span>کلید عمومی راستی‌آزمایی لایسنس</span>
+                    <span class="kb-badge">برای همهٔ پکیج‌ها مشترک است</span>
+                </div>
+                <p class="kb-note">
+                    اشتراک همهٔ پکیج‌ها را یک‌جا فعال می‌کند؛ برای فعال‌شدن‌شان همین یک کلیدِ <b>«عمومی»</b> کافی است —
+                    <b>برای همهٔ پکیج‌ها، اشتراک‌ها و مشتری‌ها یکی است</b> و راز محسوب نمی‌شود.
+                    کلید خصوصیِ سرور هرگز نمایش داده نمی‌شود.
+                </p>
+                <p class="kb-note kb-how">
+                    در پنل فروشگاه: <b>تنظیمات برنامه‌نویس ← تب «آپدیت‌کننده» ← «کلید عمومی راستی‌آزمایی لایسنس»</b>
+                    مقدار زیر را کامل بچسبانید و ذخیره کنید (یا در فایل <b dir="ltr">.env</b> فروشگاه قرار دهید).
+                    اگر این مرحله انجام نشود، نصب و فعال‌سازی پکیج‌های اشتراک ممکن نمی‌شود.
+                </p>
+                <div class="kb-value">
+                    <div class="kb-text" dir="ltr" tabindex="0">{{ $licenseKeyBox['env_line'] }}</div>
+                    <button type="button" class="copy-btn" data-copy="{{ $licenseKeyBox['env_line'] }}" title="کپی کلید عمومی" aria-label="کپی کلید عمومی راستی‌آزمایی">
+                        <svg class="ic-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        <svg class="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                    </button>
+                </div>
+                @if ($licenseKeyBox['fingerprint'])
+                    <p class="kb-fp">
+                        <span>اثر انگشت کلید (SHA-256) — برای تطبیق با پنل فروشگاه:</span>
+                        <b>{{ $licenseKeyBox['fingerprint'] }}</b>
+                    </p>
+                @endif
+            </section>
+        @endif
 
         {{-- ============ شمارش معکوس ============ --}}
         <section class="countdown" id="countdown" aria-live="polite">
