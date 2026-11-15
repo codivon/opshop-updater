@@ -38,7 +38,7 @@ class PaymentReturnController extends Controller
      * «برای همهٔ پکیج‌ها و همهٔ مشتری‌ها مشترک است». کلید عمومی راز نیست و نمایشش بی‌خطر است؛
      * کلید خصوصی سرور (LicenseSigningKeyService) هرگز از این متد عبور نمی‌کند.
      * مقدار shop_env_value همان خطِ تک‌خطیِ آمادهٔ فروشگاه است (PACKAGE_LICENSE_PUBLIC_KEY="...")
-     * که می‌توان آن را یک‌جا در فیلدِ هم‌نامِ پنل فروشگاه (تنظیمات برنامه‌نویس ← تب آپدیت‌کننده)
+     * که می‌توان آن را یک‌جا در فیلدِ هم‌نامِ پنل فروشگاه (تنظیمات برنامه‌نویس ← تب تنظیمات دیگر، کنار فیلد کد آپدیت)
      * یا .env فروشگاه چسباند.
      *
      * @return array{env_line:string, public_key:string, fingerprint:string}|null
