@@ -20,6 +20,7 @@ use App\Services\SubscriptionService;
 use App\Services\Sms\SmsManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -597,6 +598,24 @@ class ApiPackageController extends Controller
 
             if (!$hasActiveLicense && !$coveringSubscription) {
                 return response()->json(['error' => 'لایسنس یا اشتراک فعالی برای این پکیج ندارید.'], 403);
+            }
+
+            /* ضد-توفان سمت بازار — فروشگاه‌هایی که هنوز backoff سمت خودشان را
+             * ندارند (نسخهٔ قدیمی) می‌توانند این endpoint را هر چند ثانیه بزنند؛
+             * برای هر مشتری+پکیج حداکثر یک مانیفست در ۳۰ ثانیه. جریان عادی
+             * (نصب/چک دوره‌ای با فاصلهٔ ساعت‌ها) هیچ‌وقت به این سقف نمی‌خورد. */
+            $throttleKey = 'packages_api.manifest_throttle.'.$customer->id.'.'.$slug;
+
+            try {
+                if (Cache::has($throttleKey)) {
+                    return response()->json([
+                        'error' => 'درخواست مانیفست بیش از حد مجاز است — حداکثر هر ۳۰ ثانیه یک‌بار. کمی بعد تلاش کنید.',
+                    ], 429);
+                }
+
+                Cache::put($throttleKey, 1, now()->addSeconds(30));
+            } catch (\Throwable $throttleError) {
+                // کش در دسترس نیست — محدودیت نرخ نادیده گرفته می‌شود، هرگز نمی‌شکند
             }
 
             // تطبیق نسخه: دقیق ← نرم (فاصله/پیشوند v/بزرگی‌حرف) ← خطای گویا با
