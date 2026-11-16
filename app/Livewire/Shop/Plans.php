@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Shop;
 
+use App\Livewire\Concerns\WithPaymentGuard;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Models\Gateway;
 use App\Models\Package;
+use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanDuration;
 use App\Services\SubscriptionService;
@@ -19,6 +21,7 @@ use RuntimeException;
 #[Title('طرح‌های اشتراک')]
 class Plans extends Component
 {
+    use WithPaymentGuard;
     use WithToasts;
 
     /** آیا مودال خرید باز است؟ */
@@ -46,10 +49,13 @@ class Plans extends Component
 
         // کد آپدیت معتبر قبلی (session) برای راحتی مشتری
         $this->updateCode = (string) (session('last_update_code') ?: session('shop_update_code', ''));
+
+        // کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات)
+        $this->initPaymentCaptcha();
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Computed                                                         */
+    /*  Computed */
     /* ---------------------------------------------------------------- */
 
     /** طرح‌های فعالِ دارای حداقل یک پکیج فعال، مرتب بر اساس ترتیب نمایش */
@@ -99,9 +105,9 @@ class Plans extends Component
         $plans = $this->plans;
 
         return [
-            'plans'    => $plans->count(),
+            'plans' => $plans->count(),
             'packages' => $plans->flatMap->packages->unique('id')->count(),
-            'free'     => $plans->filter(fn (SubscriptionPlan $plan) => $plan->final_price <= 0)->count(),
+            'free' => $plans->filter(fn (SubscriptionPlan $plan) => $plan->final_price <= 0)->count(),
         ];
     }
 
@@ -117,7 +123,7 @@ class Plans extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Actions                                                          */
+    /*  Actions */
     /* ---------------------------------------------------------------- */
 
     public function openCheckout(int $planId): void
@@ -125,12 +131,12 @@ class Plans extends Component
         /** @var SubscriptionPlan|null $plan */
         $plan = $this->plans->firstWhere('id', $planId);
 
-        if (!$plan) {
+        if (! $plan) {
             return;
         }
 
         // اگر مدتی انتخاب نشده، اولین گزینهٔ مدت فعال طرح پیش‌انتخاب می‌شود
-        if (!isset($this->selectedDurations[$planId]) && $plan->hasDurations()) {
+        if (! isset($this->selectedDurations[$planId]) && $plan->hasDurations()) {
             $first = $plan->durationOptions()->first();
 
             if ($first) {
@@ -148,7 +154,7 @@ class Plans extends Component
         /** @var SubscriptionPlan|null $plan */
         $plan = $this->plans->firstWhere('id', $planId);
 
-        if (!$plan || !$plan->durationOption($months)) {
+        if (! $plan || ! $plan->durationOption($months)) {
             return; // مدت نامعتبر نادیده گرفته می‌شود
         }
 
@@ -178,18 +184,25 @@ class Plans extends Component
             'updateCode.required' => 'کد آپدیت الزامی است.',
         ]);
 
+        // ---- کپچای فرم پرداخت (ضدربات) ----
+        if (! $this->verifyPaymentCaptcha()) {
+            return;
+        }
+
         // ---- مشتری ----
         $customer = Customer::query()
             ->where('update_code', trim($this->updateCode))
             ->first();
 
-        if (!$customer) {
+        if (! $customer) {
             $this->toast('کد آپدیت نامعتبر است.', 'error');
+
             return;
         }
 
         if ($customer->status !== 'active') {
             $this->toast('حساب این مشتری غیرفعال است.', 'error');
+
             return;
         }
 
@@ -197,8 +210,9 @@ class Plans extends Component
         /** @var SubscriptionPlan|null $plan */
         $plan = $this->plans->firstWhere('id', $planId);
 
-        if (!$plan) {
+        if (! $plan) {
             $this->toast('طرح انتخاب‌شده معتبر نیست.', 'error');
+
             return;
         }
 
@@ -206,8 +220,9 @@ class Plans extends Component
         /** @var SubscriptionPlanDuration|null $durationOption */
         $durationOption = $this->selectedDurationFor($plan);
 
-        if ($plan->hasDurations() && !$durationOption) {
+        if ($plan->hasDurations() && ! $durationOption) {
             $this->toast('یک مدت اعتبار برای این طرح انتخاب کنید.', 'error');
+
             return;
         }
 
@@ -217,8 +232,15 @@ class Plans extends Component
         $effectiveFinal = $durationOption ? $durationOption->final_price : $plan->final_price;
 
         // طرح پولی → انتخاب درگاه الزامی است
-        if ($effectiveFinal > 0 && ($this->gateway === '' || !$this->gateways->firstWhere('key', $this->gateway))) {
+        if ($effectiveFinal > 0 && ($this->gateway === '' || ! $this->gateways->firstWhere('key', $this->gateway))) {
             $this->toast('درگاه پرداخت فعالی تنظیم نشده است.', 'error');
+
+            return;
+        }
+
+        // ---- گارد IP ایران: پرداخت فقط از IP ایران (ضد فیلترشکن/VPN) ----
+        // فقط مسیر انتقال به درگاه؛ درخواست رایگانِ در انتظار تأیید مدیر باز می‌ماند
+        if ($effectiveFinal > 0 && ! $this->ensurePaymentIpAllowed()) {
             return;
         }
 
@@ -234,16 +256,18 @@ class Plans extends Component
             );
         } catch (RuntimeException $e) {
             $this->toast($e->getMessage(), 'error');
+
             return;
         } catch (\Throwable $e) {
             $this->toast($e->getMessage(), 'error');
+
             return;
         }
 
         // کد آپدیت را نگه می‌داریم تا بعد از رفت‌وبرگشت از درگاه هم در دسترس باشد
         $this->persistUpdateCode();
 
-        /** @var \App\Models\SubscriptionOrder $order */
+        /** @var SubscriptionOrder $order */
         $order = $result['order'];
 
         // ---- طرح رایگان/کوپنِ کامل: مستقیم به صفحه نتیجه سفارش (در انتظار تأیید مدیر) ----
@@ -260,7 +284,7 @@ class Plans extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Internals                                                        */
+    /*  Internals */
     /* ---------------------------------------------------------------- */
 
     /**

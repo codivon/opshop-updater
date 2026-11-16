@@ -20,87 +20,115 @@ class Features
     public const DEFAULTS = [
         /* -------------------- امنیت (گروه security) -------------------- */
 
-        // ربات‌گیر (کپچای خودمیزبان) — کلید اصلی + نصب روی هر نقطه
-        'sec_captcha_enabled'        => '1',
-        'sec_captcha_admin_login'    => '1',
+        // ربات‌گیر (کپچا) — کلید اصلی + نصب روی هر نقطه
+        'sec_captcha_enabled' => '1',
+        'sec_captcha_admin_login' => '1',
         'sec_captcha_admin_register' => '1',
         'sec_captcha_customer_login' => '1',
-        'sec_captcha_comments'       => '1',
-        'sec_captcha_contact'        => '1',
+        'sec_captcha_comments' => '1',
+        'sec_captcha_contact' => '1',
+        'sec_captcha_checkout' => '1',
         // تلهٔ زمان: پاسخ‌دادن زیر این ثانیه‌ها = ربات
-        'sec_captcha_min_seconds'    => '2',
+        'sec_captcha_min_seconds' => '2',
+
+        // درایور کپچای هر نقطه: image (تصویری حرف‌عددی) | math (ریاضی پیشرفته) | hcaptcha | turnstile
+        'sec_captcha_driver_admin_login' => 'math',
+        'sec_captcha_driver_admin_register' => 'math',
+        'sec_captcha_driver_customer_login' => 'math',
+        'sec_captcha_driver_comments' => 'math',
+        'sec_captcha_driver_contact' => 'math',
+        'sec_captcha_driver_checkout' => 'math',
+
+        // کلیدهای سرویس ابری (وقتی درایورِ یک نقطه روی hcaptcha/turnstile است)
+        'sec_captcha_hcaptcha_site' => '',
+        'sec_captcha_hcaptcha_secret' => '',
+        'sec_captcha_turnstile_site' => '',
+        'sec_captcha_turnstile_secret' => '',
+
+        // پیکربندی کپچای ریاضی پیشرفته — تعداد عملوند + عملیات مجاز
+        'sec_captcha_math_operands' => '2',
+        'sec_captcha_math_add' => '1',
+        'sec_captcha_math_mul' => '1',
+        'sec_captcha_math_sub' => '1',
 
         // هانی‌پات (فیلد مخفی website)
-        'sec_honeypot_enabled'       => '1',
+        'sec_honeypot_enabled' => '1',
+
+        // گارد IP پرداخت — پرداخت‌ها فقط از IP ایران (ضد فیلترشکن/VPN)
+        'sec_payment_ip_guard' => '1',
+        'sec_payment_ip_guard_strict' => '0',
 
         // قفل تلاش‌های ناموفق — max: سقف تلاش، decay: پنجرهٔ قفل (دقیقه)
-        'sec_lockout_enabled'        => '1',
-        'sec_lockout_admin_max'      => '5',
-        'sec_lockout_admin_decay'    => '15',
-        'sec_lockout_customer_max'   => '8',
+        'sec_lockout_enabled' => '1',
+        'sec_lockout_admin_max' => '5',
+        'sec_lockout_admin_decay' => '15',
+        'sec_lockout_customer_max' => '8',
         'sec_lockout_customer_decay' => '15',
-        'sec_lockout_comment_max'    => '5',
-        'sec_lockout_comment_decay'  => '10',
+        'sec_lockout_comment_max' => '5',
+        'sec_lockout_comment_decay' => '10',
 
         // فرم تماس (صفحهٔ اصلی فروشگاه)
-        'sec_lockout_contact_max'    => '5',
-        'sec_lockout_contact_decay'  => '10',
+        'sec_lockout_contact_max' => '5',
+        'sec_lockout_contact_decay' => '10',
 
         // هدرهای امنیتی
-        'sec_headers_enabled'        => '1',
-        'sec_headers_hsts'           => '1',
+        'sec_headers_enabled' => '1',
+        'sec_headers_hsts' => '1',
 
         // ورود دومرحله‌ای مدیر (کد یک‌بارمصرف)
-        'sec_2fa_enabled'            => '0',
-        'sec_2fa_channel'            => 'email', // email | sms | both
+        'sec_2fa_enabled' => '0',
+        'sec_2fa_channel' => 'email', // email | sms | both
 
         // نقش‌های مدیر (اجبار نقش admin برای ورود به پنل)
-        'sec_roles_enabled'          => '0',
+        'sec_roles_enabled' => '0',
 
         /* -------------------- امکانات (گروه features) -------------------- */
 
         // نوار اعلان فروشگاه
-        'feat_announcement_enabled'     => '0',
-        'feat_announcement_text'        => '',
-        'feat_announcement_bg'          => '#10b981',
-        'feat_announcement_color'       => '#ffffff',
-        'feat_announcement_link'        => '',
-        'feat_announcement_link_text'   => '',
+        'feat_announcement_enabled' => '0',
+        'feat_announcement_text' => '',
+        'feat_announcement_bg' => '#10b981',
+        'feat_announcement_color' => '#ffffff',
+        'feat_announcement_link' => '',
+        'feat_announcement_link_text' => '',
         'feat_announcement_dismissible' => '1',
 
         // حالت تعمیر و نگهداری
-        'feat_maintenance_enabled'  => '0',
-        'feat_maintenance_message'  => 'سایت موقتاً در حال بروزرسانی است؛ کمی دیگر دوباره سر بزنید.',
+        'feat_maintenance_enabled' => '0',
+        'feat_maintenance_message' => 'سایت موقتاً در حال بروزرسانی است؛ کمی دیگر دوباره سر بزنید.',
 
         // صفحهٔ عمومی تغییرات (changelog)
-        'feat_changelog_enabled'    => '1',
-        'feat_changelog_title'      => 'تغییرات و بروزرسانی‌ها',
+        'feat_changelog_enabled' => '1',
+        'feat_changelog_title' => 'تغییرات و بروزرسانی‌ها',
 
         // داشبورد — وضعیت لایسنس‌ها (آستانهٔ «در حال اتمام» به روز)
-        'feat_lic_expiry_days'      => '14',
+        'feat_lic_expiry_days' => '14',
 
         // داشبورد — وضعیت اشتراک‌ها (آستانهٔ «در حال اتمام» به روز)
-        'feat_sub_expiry_days'      => '14',
+        'feat_sub_expiry_days' => '14',
 
         // شخصی‌سازی فوتر فروشگاه (خالی = متن‌های پیش‌فرض)
-        'feat_footer_text'          => '',
-        'feat_footer_description'   => '',
-        'feat_social_telegram'      => '',
-        'feat_social_instagram'     => '',
-        'feat_social_whatsapp'      => '',
-        'feat_social_email'         => '',
+        'feat_footer_text' => '',
+        'feat_footer_description' => '',
+        'feat_social_telegram' => '',
+        'feat_social_instagram' => '',
+        'feat_social_whatsapp' => '',
+        'feat_social_email' => '',
 
         // اعلان پیامکی فروش به مدیر (per-area)
-        'notify_sale_package'       => '1',
-        'notify_sale_product'       => '1',
-        'notify_sale_template'      => '1',
-        'notify_sale_subscription'  => '1',
+        'notify_sale_package' => '1',
+        'notify_sale_product' => '1',
+        'notify_sale_template' => '1',
+        'notify_sale_subscription' => '1',
     ];
 
     /** کلیدهای بولی (در پنل به‌صورت toggle ذخیرهٔ 1/0 می‌شوند) */
     public const BOOL_KEYS = [
         'sec_captcha_enabled', 'sec_captcha_admin_login', 'sec_captcha_admin_register',
-        'sec_captcha_customer_login', 'sec_captcha_comments', 'sec_captcha_contact', 'sec_honeypot_enabled',
+        'sec_captcha_customer_login', 'sec_captcha_comments', 'sec_captcha_contact', 'sec_captcha_checkout',
+        'sec_captcha_math_add', 'sec_captcha_math_mul', 'sec_captcha_math_sub',
+        'sec_honeypot_enabled',
+        'sec_payment_ip_guard', 'sec_payment_ip_guard_strict',
         'sec_lockout_enabled', 'sec_headers_enabled', 'sec_headers_hsts',
         'sec_2fa_enabled', 'sec_roles_enabled',
         'feat_announcement_enabled', 'feat_announcement_dismissible',
@@ -117,7 +145,7 @@ class Features
     }
 
     /* --------------------------------------------------------------- */
-    /*  خواندن                                                          */
+    /*  خواندن */
     /* --------------------------------------------------------------- */
 
     protected static function raw(string $key): string
@@ -131,7 +159,7 @@ class Features
     }
 
     /* --------------------------------------------------------------- */
-    /*  امنیت                                                            */
+    /*  امنیت */
     /* --------------------------------------------------------------- */
 
     /** کلید اصلی ربات‌گیر */
@@ -142,11 +170,75 @@ class Features
 
     /**
      * آیا روی این نقطه کپچا فعال است؟
-     * $spot: admin_login | admin_register | customer_login | comments
+     * $spot: admin_login | admin_register | customer_login | comments | contact | checkout
      */
     public static function captcha(string $spot): bool
     {
         return self::captchaOn() && self::flag('sec_captcha_'.$spot);
+    }
+
+    /**
+     * درایور کپچای نقطه: image | math | hcaptcha | turnstile
+     * اگر درایور ابری انتخاب شده ولی کلید سایت/رمز آن خالی باشد،
+     * به‌صورت امن به «ریاضی پیشرفتهٔ خودمیزبان» فال‌بک می‌کنیم تا هیچ فرمی نگیرد.
+     */
+    public static function captchaDriver(string $spot): string
+    {
+        $driver = trim(self::raw('sec_captcha_driver_'.$spot));
+
+        if (! in_array($driver, ['image', 'math', 'hcaptcha', 'turnstile'], true)) {
+            return 'math';
+        }
+
+        if ($driver === 'hcaptcha' && (trim(self::raw('sec_captcha_hcaptcha_site')) === '' || trim(self::raw('sec_captcha_hcaptcha_secret')) === '')) {
+            return 'math';
+        }
+
+        if ($driver === 'turnstile' && (trim(self::raw('sec_captcha_turnstile_site')) === '' || trim(self::raw('sec_captcha_turnstile_secret')) === '')) {
+            return 'math';
+        }
+
+        return $driver;
+    }
+
+    /** پیکربندی کپچای ریاضی: [تعداد عملوند، عملیات مجاز] — عملیات از مجموعهٔ + × − */
+    public static function mathConfig(): array
+    {
+        $operands = max(2, min(5, (int) self::raw('sec_captcha_math_operands')));
+
+        $ops = [];
+
+        if (self::flag('sec_captcha_math_add')) {
+            $ops[] = '+';
+        }
+        if (self::flag('sec_captcha_math_mul')) {
+            $ops[] = '×';
+        }
+        if (self::flag('sec_captcha_math_sub')) {
+            $ops[] = '−';
+        }
+
+        return [$operands, $ops === [] ? ['+'] : $ops];
+    }
+
+    /** کلید «سایت» سرویس ابری کپچا برای رندر ویجت — driver: hcaptcha | turnstile */
+    public static function captchaCloudSite(string $driver): string
+    {
+        return $driver === 'hcaptcha'
+            ? trim(self::raw('sec_captcha_hcaptcha_site'))
+            : ($driver === 'turnstile' ? trim(self::raw('sec_captcha_turnstile_site')) : '');
+    }
+
+    /** گارد IP پرداخت (پرداخت فقط از IP ایران) روشن است؟ */
+    public static function paymentIpGuard(): bool
+    {
+        return self::flag('sec_payment_ip_guard');
+    }
+
+    /** حالت سخت‌گیرانه: وقتی سرویس تشخیص IP در دسترس نیست، پرداخت را ببند */
+    public static function paymentIpGuardStrict(): bool
+    {
+        return self::flag('sec_payment_ip_guard_strict');
     }
 
     public static function honeypot(): bool
@@ -168,12 +260,12 @@ class Features
     public static function lockoutConfig(string $spot): array
     {
         $key = match ($spot) {
-            'admin_login'    => 'admin',
+            'admin_login' => 'admin',
             'customer_login' => 'customer',
-            default          => $spot,
+            default => $spot,
         };
 
-        $max   = max(1, (int) self::raw('sec_lockout_'.$key.'_max'));
+        $max = max(1, (int) self::raw('sec_lockout_'.$key.'_max'));
         $decay = max(1, (int) self::raw('sec_lockout_'.$key.'_decay'));
 
         return self::lockout() ? [$max, $decay] : [1_000_000, 1];
@@ -208,7 +300,7 @@ class Features
     }
 
     /* --------------------------------------------------------------- */
-    /*  امکانات                                                          */
+    /*  امکانات */
     /* --------------------------------------------------------------- */
 
     public static function announcement(): bool
@@ -219,23 +311,23 @@ class Features
     /** داده‌های نوار اعلان فروشگاه (رنگ‌ها sanitize می‌شوند؛ متن escaped در ویو) */
     public static function announcementData(): array
     {
-        $text  = trim(self::raw('feat_announcement_text'));
-        $link  = trim(self::raw('feat_announcement_link'));
-        $bg    = self::hex(self::raw('feat_announcement_bg'), '#10b981');
+        $text = trim(self::raw('feat_announcement_text'));
+        $link = trim(self::raw('feat_announcement_link'));
+        $bg = self::hex(self::raw('feat_announcement_bg'), '#10b981');
         $color = self::hex(self::raw('feat_announcement_color'), '#ffffff');
 
         // تغییر متن/رنگ → هش جدید → نوار برای کسانی که بسته بودند دوباره پیدا می‌شود
         $hash = md5($text.'|'.$link.'|'.$bg.'|'.$color);
 
         return [
-            'enabled'     => self::announcement(),
-            'text'        => $text,
-            'link'        => $link,
-            'link_text'   => trim(self::raw('feat_announcement_link_text')),
-            'bg'          => $bg,
-            'color'       => $color,
+            'enabled' => self::announcement(),
+            'text' => $text,
+            'link' => $link,
+            'link_text' => trim(self::raw('feat_announcement_link_text')),
+            'bg' => $bg,
+            'color' => $color,
             'dismissible' => self::flag('feat_announcement_dismissible'),
-            'hash'        => $hash,
+            'hash' => $hash,
         ];
     }
 
@@ -278,9 +370,9 @@ class Features
         $links = [];
 
         $map = [
-            'telegram'  => ['icon' => 'send',           'title' => 'تلگرام'],
+            'telegram' => ['icon' => 'send',           'title' => 'تلگرام'],
             'instagram' => ['icon' => 'instagram',      'title' => 'اینستاگرام'],
-            'whatsapp'  => ['icon' => 'message-circle', 'title' => 'واتس‌اپ'],
+            'whatsapp' => ['icon' => 'message-circle', 'title' => 'واتس‌اپ'],
         ];
 
         foreach ($map as $key => $meta) {

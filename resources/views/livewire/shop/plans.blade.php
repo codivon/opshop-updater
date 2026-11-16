@@ -374,6 +374,11 @@
                     <x-input id="updateCode" wire:model="updateCode" icon="key" placeholder="کد آپدیت مشتری…" dir="ltr" class="text-start font-mono" />
                 </x-field>
 
+                {{-- کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات) --}}
+                @if(\App\Support\Features::captcha('checkout'))
+                    <x-captcha spot="checkout" wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+                @endif
+
                 {{-- ثبت درخواست --}}
                 <x-btn wire:click="buy({{ $checkoutPlan->id }})" :loading="true" :disabled="$buyDisabled"
                        icon="{{ $isFreePlan ? 'gift' : 'wallet' }}" class="w-full">
@@ -391,4 +396,7 @@
             </div>
         @endif
     </x-modal>
+
+    {{-- مودال هشدار فیلترشکن/VPN — گارد IP پرداخت --}}
+    <x-vpn-guard-modal wireModel="showVpnModal" retryMethod="buy" />
 </div>

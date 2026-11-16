@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Shop;
 
+use App\Livewire\Concerns\WithPaymentGuard;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\DiscountCode;
 use App\Models\Gateway;
@@ -22,8 +23,11 @@ use RuntimeException;
  *   - نام/تصویر پکیج، طرح انتخابی و مبلغ را می‌بیند
  *   - یکی از درگاه‌های فعال را انتخاب می‌کند
  *   - می‌تواند کد تخفیف وارد و اعمال کند (پیش‌نمایش لحظه‌ای مبلغ)
+ *   - کپچای فرم پرداخت را پاس می‌کند (ضدربات)
  *   - با «پرداخت» وارد درگاه می‌شود (تراکنش درگاه همین‌جا ساخته می‌شود تا مبلغ
  *     نهایی پس از کد تخفیف مبنای شارژ باشد)
+ *   - پرداخت فقط از IP ایران: اگر فیلترشکن/VPN فعال باشد، مودال هشدار زیبا نمایش
+ *     داده می‌شود و انتقال به درگاه انجام نمی‌شود (IranIpGuard)
  *   - با «انصراف» خرید لغو و به فروشگاه مبدأ بازمی‌گردد
  *
  *  مسیر با middleware('signed') محافظت شده است (لینک ۲۴ ساعته از API).
@@ -33,6 +37,7 @@ use RuntimeException;
 #[Title('تسویه سفارش')]
 class PackageCheckout extends Component
 {
+    use WithPaymentGuard;
     use WithToasts;
 
     public PackagePurchase $purchase;
@@ -79,10 +84,13 @@ class PackageCheckout extends Component
         $this->gatewayKey = (string) ($this->purchase->gateway
             ?: $this->gateways->first()?->key
             ?: '');
+
+        // کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات)
+        $this->initPaymentCaptcha();
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Computed                                                          */
+    /*  Computed */
     /* ------------------------------------------------------------------ */
 
     /** مبلغ پایه خرید = مبلغ نهایی طرح (پیش از کد تخفیف) */
@@ -136,7 +144,7 @@ class PackageCheckout extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Actions                                                           */
+    /*  Actions */
     /* ------------------------------------------------------------------ */
 
     /** اعمال/به‌روزرسانی کد تخفیف (پیش‌نمایش — هنگام پرداخت دوباره سروری resolve می‌شود) */
@@ -155,7 +163,7 @@ class PackageCheckout extends Component
 
         $result = $discountService->resolve($code, DiscountCode::CONTEXT_PACKAGE, $this->baseAmount);
 
-        if (!$result['ok']) {
+        if (! $result['ok']) {
             $this->appliedCode = null;
             $this->codeDiscount = 0;
             $this->codeMessage = $result['message'];
@@ -182,20 +190,26 @@ class PackageCheckout extends Component
     }
 
     /**
-     * شروع پرداخت: اعمال نهایی کد تخفیف روی رکورد خرید + ساخت تراکنش درگاه + ریدایرکت.
+     * شروع پرداخت: کپچا + گارد IP ایران + اعمال نهایی کد تخفیف روی رکورد خرید
+     * + ساخت تراکنش درگاه + ریدایرکت.
      */
     public function pay(PaymentService $paymentService, LicenseService $licenseService): mixed
     {
         $this->resetErrorBag();
         $this->pageError = null;
 
-        if (!$this->isPayable) {
+        if (! $this->isPayable) {
+            return null;
+        }
+
+        // ---- کپچای فرم پرداخت (ضدربات) ----
+        if (! $this->verifyPaymentCaptcha()) {
             return null;
         }
 
         $plan = $this->purchase->pricingPlan;
 
-        if (!$plan) {
+        if (! $plan) {
             $this->pageError = 'طرح قیمت‌گذاری این خرید یافت نشد.';
 
             return null;
@@ -214,7 +228,7 @@ class PackageCheckout extends Component
             $this->baseAmount
         );
 
-        if (!$result['ok']) {
+        if (! $result['ok']) {
             $this->appliedCode = null;
             $this->codeDiscount = 0;
             $this->codeMessage = $result['message'];
@@ -224,27 +238,27 @@ class PackageCheckout extends Component
             return null;
         }
 
-        $coupon   = $result['code'];
+        $coupon = $result['code'];
         $discount = (int) $result['discount'];
-        $final    = (int) $result['final'];
+        $final = (int) $result['final'];
 
         // ثبت تخفیف روی رکورد خرید — amount همان «مبلغ نهایی قابل پرداخت» است
         $this->purchase->update([
             'discount_code_id' => $coupon?->id,
-            'original_amount'  => $this->baseAmount,
-            'discount_amount'  => $discount,
-            'amount'           => $final,
+            'original_amount' => $this->baseAmount,
+            'discount_amount' => $discount,
+            'amount' => $final,
         ]);
 
         $this->purchase->refresh();
-        $this->appliedCode   = $coupon?->code;
-        $this->codeDiscount  = $discount;
+        $this->appliedCode = $coupon?->code;
+        $this->codeDiscount = $discount;
 
         // ---------- کد تخفیف کل مبلغ را پوشش داده → بدون درگاه، لایسنس فوری ----------
         if ($final <= 0) {
             $latestVersion = $this->purchase->package->latestVersion()->first();
 
-            if (!$latestVersion) {
+            if (! $latestVersion) {
                 $this->pageError = 'نسخه فعالی برای این پکیج وجود ندارد؛ لطفاً با پشتیبانی تماس بگیرید.';
 
                 return null;
@@ -256,6 +270,12 @@ class PackageCheckout extends Component
             $this->toast('کد تخفیف کل مبلغ را پوشش داد — لایسنس شما صادر شد.');
 
             return $this->redirect(route('payment.result', $this->purchase), navigate: false);
+        }
+
+        // ---------- گارد IP ایران: پرداخت فقط از IP ایران (ضد فیلترشکن/VPN) ----------
+        // فقط مسیرِ انتقال به درگاه — مسیر رایگان/کوپنِ کامل که به درگاه نمی‌رود، باز می‌ماند.
+        if (! $this->ensurePaymentIpAllowed()) {
+            return null;
         }
 
         // ---------- ادامه پرداخت در جریان (کاربر دکمه پرداخت درگاه را زده) ----------
@@ -288,7 +308,7 @@ class PackageCheckout extends Component
      */
     public function cancel(): mixed
     {
-        if (!$this->isPayable) {
+        if (! $this->isPayable) {
             return null;
         }
 
@@ -300,7 +320,7 @@ class PackageCheckout extends Component
             // بازگشت به فروشگاه مبدأ با نشان لغو (مطابق عرف درگاه‌ها)
             $separator = str_contains($callbackUrl, '?') ? '&' : '?';
 
-            return $this->redirect($callbackUrl . $separator . 'status=canceled', navigate: false);
+            return $this->redirect($callbackUrl.$separator.'status=canceled', navigate: false);
         }
 
         $this->toast('خرید لغو شد.', 'warning');
@@ -309,7 +329,7 @@ class PackageCheckout extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                           */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     private function redirectToGateway(string $url): mixed

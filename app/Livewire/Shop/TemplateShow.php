@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Shop;
 
+use App\Livewire\Concerns\WithPaymentGuard;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\DiscountCode;
 use App\Models\Gateway;
@@ -18,6 +19,7 @@ use Livewire\Component;
 #[Title('جزئیات قالب')]
 class TemplateShow extends Component
 {
+    use WithPaymentGuard;
     use WithToasts;
 
     public Template $template;
@@ -42,13 +44,16 @@ class TemplateShow extends Component
             ->where('status', Template::STATUS_ACTIVE)
             ->first();
 
-        if (!$template) {
+        if (! $template) {
             abort(404);
         }
 
         $this->template = $template;
         $this->gatewayKey = (string) (Gateway::query()->active()->orderBy('ordering')->first()?->key ?? '');
         $this->purchaseType = Template::PURCHASE_NORMAL;
+
+        // کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات)
+        $this->initPaymentCaptcha();
 
         // شمارش بازدید (هر بازدید کامل صفحه)
         $template->incrementViews();
@@ -78,7 +83,7 @@ class TemplateShow extends Component
     /** مقدار مجاز نوع خرید — ضد دستکاری کلاینت */
     public function updatedPurchaseType(string $value): void
     {
-        if (!in_array($value, [Template::PURCHASE_NORMAL, Template::PURCHASE_EXCLUSIVE], true)) {
+        if (! in_array($value, [Template::PURCHASE_NORMAL, Template::PURCHASE_EXCLUSIVE], true)) {
             $this->purchaseType = Template::PURCHASE_NORMAL;
         }
 
@@ -114,6 +119,7 @@ class TemplateShow extends Component
     {
         if ((int) $this->currentFinalPrice() <= 0) {
             $this->toast('برای این نوع خرید نیازی به کد تخفیف نیست.', 'warning');
+
             return;
         }
 
@@ -123,15 +129,17 @@ class TemplateShow extends Component
             (int) $this->currentFinalPrice()
         );
 
-        if (!$result['ok']) {
+        if (! $result['ok']) {
             $this->appliedCode = '';
             $this->toast($result['message'], 'error');
+
             return;
         }
 
         if ($result['code'] === null) {
             $this->appliedCode = '';
             $this->toast('ابتدا یک کد تخفیف وارد کنید.', 'warning');
+
             return;
         }
 
@@ -184,11 +192,13 @@ class TemplateShow extends Component
         if ($purchaseType === Template::PURCHASE_EXCLUSIVE) {
             if ($this->template->is_sold_exclusively) {
                 $this->toast('این قالب قبلاً به‌صورت اختصاصی واگذار شده و دیگر قابل خرید نیست.', 'error');
+
                 return;
             }
 
             if ((int) $this->template->exclusive_price <= 0) {
                 $this->toast('خرید اختصاصی برای این قالب فعال نشده است.', 'error');
+
                 return;
             }
         }
@@ -196,8 +206,9 @@ class TemplateShow extends Component
         // ---- نسخه ----
         $latestVersion = $this->template->latestVersion()->first();
 
-        if (!$latestVersion || !$latestVersion->hasFile()) {
+        if (! $latestVersion || ! $latestVersion->hasFile()) {
             $this->toast('فایل قابل دانلود برای این قالب هنوز آماده نیست. لطفاً بعداً تلاش کنید.', 'error');
+
             return;
         }
 
@@ -217,20 +228,21 @@ class TemplateShow extends Component
                 $baseAmount
             );
 
-            if (!$couponResult['ok']) {
+            if (! $couponResult['ok']) {
                 $this->appliedCode = '';
                 $this->toast($couponResult['message'], 'error');
+
                 return;
             }
 
-            /** @var \App\Models\DiscountCode|null $coupon */
-            $coupon          = $couponResult['code'];
-            $couponDiscount  = $couponResult['discount'];
-            $finalPrice      = $couponResult['final'];
+            /** @var DiscountCode|null $coupon */
+            $coupon = $couponResult['code'];
+            $couponDiscount = $couponResult['discount'];
+            $finalPrice = $couponResult['final'];
         } else {
-            $coupon         = null;
+            $coupon = null;
             $couponDiscount = 0;
-            $finalPrice     = 0;
+            $finalPrice = 0;
         }
 
         // ---- مسیر رایگان (قالب رایگان یا کد تخفیفِ پوشش‌دهنده‌ی کامل مبلغ) ----
@@ -238,19 +250,20 @@ class TemplateShow extends Component
             if ($purchaseType === Template::PURCHASE_EXCLUSIVE) {
                 // خرید اختصاصی رایگان بی‌معناست — واگذاری کامل حقوق بدون پول مجاز نیست
                 $this->toast('خرید اختصاصی باید با پرداخت کامل انجام شود؛ کد تخفیف کامل برای آن مجاز نیست.', 'error');
+
                 return;
             }
 
             $purchase = TemplatePurchase::create([
-                'template_id'      => $this->template->id,
-                'version_id'       => $latestVersion->id,
+                'template_id' => $this->template->id,
+                'version_id' => $latestVersion->id,
                 'discount_code_id' => $coupon?->id,
-                'original_amount'  => $baseAmount,
-                'amount'           => 0,
-                'discount_amount'  => $couponDiscount,
-                'purchase_type'    => $purchaseType,
-                'status'           => TemplatePurchase::STATUS_PAID,
-                'paid_at'          => now(),
+                'original_amount' => $baseAmount,
+                'amount' => 0,
+                'discount_amount' => $couponDiscount,
+                'purchase_type' => $purchaseType,
+                'status' => TemplatePurchase::STATUS_PAID,
+                'paid_at' => now(),
             ]);
 
             // مسیر رایگان از markAsPaid عبور نمی‌کند → شمارنده‌ها اینجا دستی:
@@ -266,23 +279,34 @@ class TemplateShow extends Component
             return;
         }
 
+        // ---- کپچای فرم پرداخت (ضدربات) — فقط مسیر پرداختِ واقعی ----
+        if (! $this->verifyPaymentCaptcha()) {
+            return;
+        }
+
+        // ---- گارد IP ایران: پرداخت فقط از IP ایران (ضد فیلترشکن/VPN) ----
+        if (! $this->ensurePaymentIpAllowed()) {
+            return;
+        }
+
         // ---- مسیر پرداخت ----
-        if ($this->gatewayKey === '' || !$this->gateways->firstWhere('key', $this->gatewayKey)) {
+        if ($this->gatewayKey === '' || ! $this->gateways->firstWhere('key', $this->gatewayKey)) {
             $this->toast('درگاه پرداخت فعالی تنظیم نشده است. لطفاً با پشتیبانی تماس بگیرید.', 'error');
+
             return;
         }
 
         $purchase = TemplatePurchase::create([
-            'template_id'      => $this->template->id,
-            'version_id'       => $latestVersion->id,
+            'template_id' => $this->template->id,
+            'version_id' => $latestVersion->id,
             'discount_code_id' => $coupon?->id,
-            'callback_url'     => route('payment.callback'),
-            'original_amount'  => $baseAmount,
-            'amount'           => $finalPrice,
-            'discount_amount'  => $couponDiscount,
-            'purchase_type'    => $purchaseType,
-            'gateway'          => $this->gatewayKey,
-            'status'           => TemplatePurchase::STATUS_PENDING,
+            'callback_url' => route('payment.callback'),
+            'original_amount' => $baseAmount,
+            'amount' => $finalPrice,
+            'discount_amount' => $couponDiscount,
+            'purchase_type' => $purchaseType,
+            'gateway' => $this->gatewayKey,
+            'status' => TemplatePurchase::STATUS_PENDING,
         ]);
 
         try {
@@ -291,6 +315,7 @@ class TemplateShow extends Component
             // رکورد pending یتیم را پاک کن (الگوی گاتچای پروژه)
             optional($purchase)->delete();
             $this->toast($e->getMessage(), 'error');
+
             return;
         }
 

@@ -25,9 +25,13 @@ class ContactForm extends Component
 
     /* ---- form ---- */
     public string $name = '';
+
     public string $phone = '';
+
     public string $email = '';
+
     public string $requestType = 'project';
+
     public string $message = '';
 
     /** پاسخ سؤال امنیتی (کپچای خودمیزبان) */
@@ -42,19 +46,19 @@ class ContactForm extends Component
         $customer = auth('customer')->user();
 
         if ($customer) {
-            $this->name  = (string) ($customer->name ?: '');
+            $this->name = (string) ($customer->name ?: '');
             $this->email = (string) ($customer->email ?: '');
         }
 
         if (Features::captcha('contact')) {
-            CaptchaService::fresh();
+            CaptchaService::fresh('contact');
         }
     }
 
     /** سؤال امنیتی جدید (دکمهٔ «سؤال دیگر» — بدون رفرش صفحه) */
     public function refreshCaptcha(): void
     {
-        CaptchaService::fresh();
+        CaptchaService::fresh('contact');
         $this->reset('captcha');
     }
 
@@ -77,23 +81,23 @@ class ContactForm extends Component
                     }
                 },
             ],
-            'email'       => ['nullable', 'email', 'max:190'],
+            'email' => ['nullable', 'email', 'max:190'],
             'requestType' => ['required', 'in:'.implode(',', array_keys(ContactMessage::TYPES))],
-            'message'     => ['required', 'string', 'min:10', 'max:5000'],
+            'message' => ['required', 'string', 'min:10', 'max:5000'],
         ];
     }
 
     protected $messages = [
-        'name.required'      => 'نام شما الزامی است.',
-        'name.max'           => 'نام حداکثر ۱۲۰ کاراکتر است.',
-        'phone.required'     => 'شماره موبایل الزامی است.',
-        'phone.max'          => 'شماره موبایل حداکثر ۲۰ کاراکتر است.',
-        'email.email'        => 'ایمیل معتبر نیست.',
+        'name.required' => 'نام شما الزامی است.',
+        'name.max' => 'نام حداکثر ۱۲۰ کاراکتر است.',
+        'phone.required' => 'شماره موبایل الزامی است.',
+        'phone.max' => 'شماره موبایل حداکثر ۲۰ کاراکتر است.',
+        'email.email' => 'ایمیل معتبر نیست.',
         'requestType.required' => 'نوع درخواست را انتخاب کنید.',
-        'requestType.in'     => 'نوع درخواست معتبر نیست.',
-        'message.required'   => 'توضیح درخواست الزامی است.',
-        'message.min'        => 'توضیح درخواست خیلی کوتاه است؛ کمی بیشتر بنویسید (حداقل ۱۰ کاراکتر).',
-        'message.max'        => 'توضیح درخواست حداکثر ۵٬۰۰۰ کاراکتر است.',
+        'requestType.in' => 'نوع درخواست معتبر نیست.',
+        'message.required' => 'توضیح درخواست الزامی است.',
+        'message.min' => 'توضیح درخواست خیلی کوتاه است؛ کمی بیشتر بنویسید (حداقل ۱۰ کاراکتر).',
+        'message.max' => 'توضیح درخواست حداکثر ۵٬۰۰۰ کاراکتر است.',
     ];
 
     public function submit(): void
@@ -106,6 +110,7 @@ class ContactForm extends Component
             $minutes = (int) ceil(RateLimiter::availableIn($limiterKey) / 60);
 
             $this->addError('captcha', 'تعداد درخواست‌های ارسالی بیش از حد مجاز است؛ حدود '.fa_num(max(1, $minutes)).' دقیقهٔ دیگر دوباره تلاش کنید.');
+
             return;
         }
 
@@ -113,29 +118,31 @@ class ContactForm extends Component
 
         // ۲) هانی‌پات: فیلد مخفی پُر است = ربات → ذخیره نمی‌شود
         if (Features::honeypot() && trim($this->website) !== '') {
-            CaptchaService::fresh();
+            CaptchaService::fresh('contact');
             $this->reset('captcha');
             $this->addError('captcha', 'پاسخ سؤال امنیتی نادرست است؛ سؤال جدید آماده شد.');
+
             return;
         }
 
         // ۳) کپچای خودمیزبان (پاسخ مصرف و سؤال تازه می‌شود)
-        if (Features::captcha('contact') && ! CaptchaService::verify($this->captcha)) {
+        if (Features::captcha('contact') && ! CaptchaService::verify($this->captcha, 'contact')) {
             $this->reset('captcha');
             $this->addError('captcha', 'پاسخ سؤال امنیتی نادرست است؛ سؤال جدید آماده شد.');
+
             return;
         }
 
         RateLimiter::hit($limiterKey, $decayMinutes * 60);
 
         ContactMessage::create([
-            'name'         => trim($data['name']),
-            'phone'        => normalize_mobile($data['phone']),
-            'email'        => $data['email'] ?: null,
+            'name' => trim($data['name']),
+            'phone' => normalize_mobile($data['phone']),
+            'email' => $data['email'] ?: null,
             'request_type' => $data['requestType'],
-            'message'      => trim($data['message']),
-            'status'       => ContactMessage::STATUS_NEW,
-            'ip'           => request()->ip(),
+            'message' => trim($data['message']),
+            'status' => ContactMessage::STATUS_NEW,
+            'ip' => request()->ip(),
         ]);
 
         $this->reset('message', 'captcha');

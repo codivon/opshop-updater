@@ -38,7 +38,7 @@
         </x-field>
 
         @if(\App\Support\Features::captcha('contact'))
-            <x-captcha wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+            <x-captcha spot="contact" wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
         @endif
 
         {{-- هانی‌پات ضدربات — برای انسان نامرئی است --}}

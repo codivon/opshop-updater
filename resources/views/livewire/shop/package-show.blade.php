@@ -347,6 +347,11 @@
                     </x-field>
                 @endif
 
+                {{-- کپچای فرم پرداخت (ضدربات — فقط برای خریدِ واقعی، نه دریافت رایگان/اشتراک) --}}
+                @if(!$effectiveFree && !$this->isCoveredBySubscription && \App\Support\Features::captcha('checkout'))
+                    <x-captcha spot="checkout" wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+                @endif
+
                 {{-- buy button --}}
                 @php($buyDisabled = !$effectiveFree && !$this->isCoveredBySubscription && $this->gateways->isEmpty())
                 @php($covered = $this->isCoveredBySubscription)
@@ -413,4 +418,7 @@
             </div>
         </div>
     </section>
+
+    {{-- مودال هشدار فیلترشکن/VPN — گارد IP پرداخت --}}
+    <x-vpn-guard-modal wireModel="showVpnModal" retryMethod="buy" />
 </div>

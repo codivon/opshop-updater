@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Shop;
 
+use App\Livewire\Concerns\WithPaymentGuard;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\DiscountCode;
 use App\Models\Gateway;
@@ -18,6 +19,7 @@ use Livewire\Component;
 #[Title('جزئیات پروژه')]
 class ProductShow extends Component
 {
+    use WithPaymentGuard;
     use WithToasts;
 
     public Product $product;
@@ -39,12 +41,15 @@ class ProductShow extends Component
             ->where('status', Product::STATUS_ACTIVE)
             ->first();
 
-        if (!$product) {
+        if (! $product) {
             abort(404);
         }
 
         $this->product = $product;
         $this->gatewayKey = (string) (Gateway::query()->active()->orderBy('ordering')->first()?->key ?? '');
+
+        // کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات)
+        $this->initPaymentCaptcha();
 
         // شمارش بازدید (هر بازدید کامل صفحه)
         $product->incrementViews();
@@ -83,15 +88,17 @@ class ProductShow extends Component
             (int) $this->product->final_price
         );
 
-        if (!$result['ok']) {
+        if (! $result['ok']) {
             $this->appliedCode = '';
             $this->toast($result['message'], 'error');
+
             return;
         }
 
         if ($result['code'] === null) {
             $this->appliedCode = '';
             $this->toast('ابتدا یک کد تخفیف وارد کنید.', 'warning');
+
             return;
         }
 
@@ -134,8 +141,9 @@ class ProductShow extends Component
         // ---- نسخه ----
         $latestVersion = $this->product->latestVersion()->first();
 
-        if (!$latestVersion || !$latestVersion->hasFile()) {
+        if (! $latestVersion || ! $latestVersion->hasFile()) {
             $this->toast('فایل قابل دانلود برای این پروژه هنوز آماده نیست. لطفاً بعداً تلاش کنید.', 'error');
+
             return;
         }
 
@@ -148,33 +156,34 @@ class ProductShow extends Component
                 (int) $this->product->final_price
             );
 
-            if (!$couponResult['ok']) {
+            if (! $couponResult['ok']) {
                 $this->appliedCode = '';
                 $this->toast($couponResult['message'], 'error');
+
                 return;
             }
 
-            /** @var \App\Models\DiscountCode|null $coupon */
-            $coupon          = $couponResult['code'];
-            $couponDiscount  = $couponResult['discount'];
-            $finalPrice      = $couponResult['final'];
+            /** @var DiscountCode|null $coupon */
+            $coupon = $couponResult['code'];
+            $couponDiscount = $couponResult['discount'];
+            $finalPrice = $couponResult['final'];
         } else {
-            $coupon         = null;
+            $coupon = null;
             $couponDiscount = 0;
-            $finalPrice     = 0;
+            $finalPrice = 0;
         }
 
         // ---- مسیر رایگان (پروژه رایگان یا کد تخفیفِ پوشش‌دهنده‌ی کامل مبلغ) ----
         if ($this->product->is_effectively_free || $finalPrice <= 0) {
             $purchase = ProductPurchase::create([
-                'product_id'       => $this->product->id,
-                'version_id'       => $latestVersion->id,
+                'product_id' => $this->product->id,
+                'version_id' => $latestVersion->id,
                 'discount_code_id' => $coupon?->id,
-                'original_amount'  => $this->product->final_price,
-                'amount'           => 0,
-                'discount_amount'  => $couponDiscount,
-                'status'           => ProductPurchase::STATUS_PAID,
-                'paid_at'          => now(),
+                'original_amount' => $this->product->final_price,
+                'amount' => 0,
+                'discount_amount' => $couponDiscount,
+                'status' => ProductPurchase::STATUS_PAID,
+                'paid_at' => now(),
             ]);
 
             // مسیر رایگان از markAsPaid عبور نمی‌کند → شمارنده‌ها اینجا دستی:
@@ -190,22 +199,33 @@ class ProductShow extends Component
             return;
         }
 
+        // ---- کپچای فرم پرداخت (ضدربات) — فقط مسیر پرداختِ واقعی ----
+        if (! $this->verifyPaymentCaptcha()) {
+            return;
+        }
+
+        // ---- گارد IP ایران: پرداخت فقط از IP ایران (ضد فیلترشکن/VPN) ----
+        if (! $this->ensurePaymentIpAllowed()) {
+            return;
+        }
+
         // ---- مسیر پرداخت ----
-        if ($this->gatewayKey === '' || !$this->gateways->firstWhere('key', $this->gatewayKey)) {
+        if ($this->gatewayKey === '' || ! $this->gateways->firstWhere('key', $this->gatewayKey)) {
             $this->toast('درگاه پرداخت فعالی تنظیم نشده است. لطفاً با پشتیبانی تماس بگیرید.', 'error');
+
             return;
         }
 
         $purchase = ProductPurchase::create([
-            'product_id'       => $this->product->id,
-            'version_id'       => $latestVersion->id,
+            'product_id' => $this->product->id,
+            'version_id' => $latestVersion->id,
             'discount_code_id' => $coupon?->id,
-            'callback_url'     => route('payment.callback'),
-            'original_amount'  => $this->product->final_price,
-            'amount'           => $finalPrice,
-            'discount_amount'  => $couponDiscount,
-            'gateway'          => $this->gatewayKey,
-            'status'           => ProductPurchase::STATUS_PENDING,
+            'callback_url' => route('payment.callback'),
+            'original_amount' => $this->product->final_price,
+            'amount' => $finalPrice,
+            'discount_amount' => $couponDiscount,
+            'gateway' => $this->gatewayKey,
+            'status' => ProductPurchase::STATUS_PENDING,
         ]);
 
         try {
@@ -214,6 +234,7 @@ class ProductShow extends Component
             // رکورد pending یتیم را پاک کن (الگوی گاتچای پروژه)
             optional($purchase)->delete();
             $this->toast($e->getMessage(), 'error');
+
             return;
         }
 

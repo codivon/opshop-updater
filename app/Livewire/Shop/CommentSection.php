@@ -23,7 +23,7 @@ use Livewire\WithPagination;
  */
 class CommentSection extends Component
 {
-    use WithToasts, WithPagination;
+    use WithPagination, WithToasts;
 
     /** مدل هدف — Product یا Package (morph map: product | package) */
     public Model $model;
@@ -33,8 +33,11 @@ class CommentSection extends Component
 
     /* ---- form ---- */
     public string $name = '';
+
     public string $email = '';
+
     public int $rating = 0;
+
     public string $body = '';
 
     /** پاسخ سؤال امنیتی (کپچای خودمیزبان) */
@@ -46,46 +49,46 @@ class CommentSection extends Component
     /** پیش‌پر کردن نام/ایمیل مشتری واردشده */
     public function mount(Model $model, string $label = 'محصول'): void
     {
-        $this->model  = $model;
-        $this->label  = $label;
+        $this->model = $model;
+        $this->label = $label;
 
         $customer = auth('customer')->user();
 
         if ($customer) {
-            $this->name  = (string) ($customer->name ?: '');
+            $this->name = (string) ($customer->name ?: '');
             $this->email = (string) ($customer->email ?: '');
         }
 
         if (Features::captcha('comments')) {
-            CaptchaService::fresh();
+            CaptchaService::fresh('comments');
         }
     }
 
     /** سؤال امنیتی جدید (دکمهٔ «سؤال دیگر» — بدون رفرش صفحه) */
     public function refreshCaptcha(): void
     {
-        CaptchaService::fresh();
+        CaptchaService::fresh('comments');
         $this->reset('captcha');
     }
 
     protected function rules(): array
     {
         return [
-            'name'   => ['required', 'string', 'max:120'],
-            'email'  => ['nullable', 'email', 'max:190'],
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['nullable', 'email', 'max:190'],
             // نکته: rating پیش‌فرض 0 است (بدون امتیاز) → min:0 و در submit صفر به null تبدیل می‌شود
             'rating' => ['nullable', 'integer', 'min:0', 'max:5'],
-            'body'   => ['required', 'string', 'min:3', 'max:5000'],
+            'body' => ['required', 'string', 'min:3', 'max:5000'],
         ];
     }
 
     protected $messages = [
         'name.required' => 'نام شما الزامی است.',
-        'name.max'      => 'نام حداکثر ۱۲۰ کاراکتر است.',
-        'email.email'   => 'ایمیل معتبر نیست.',
+        'name.max' => 'نام حداکثر ۱۲۰ کاراکتر است.',
+        'email.email' => 'ایمیل معتبر نیست.',
         'body.required' => 'متن دیدگاه الزامی است.',
-        'body.min'      => 'متن دیدگاه خیلی کوتاه است.',
-        'body.max'      => 'متن دیدگاه حداکثر ۵٬۰۰۰ کاراکتر است.',
+        'body.min' => 'متن دیدگاه خیلی کوتاه است.',
+        'body.max' => 'متن دیدگاه حداکثر ۵٬۰۰۰ کاراکتر است.',
     ];
 
     public function setRating(int $stars): void
@@ -103,6 +106,7 @@ class CommentSection extends Component
             $minutes = (int) ceil(RateLimiter::availableIn($limiterKey) / 60);
 
             $this->addError('captcha', 'تعداد دیدگاه‌های ارسالی بیش از حد مجاز است؛ حدود '.fa_num(max(1, $minutes)).' دقیقهٔ دیگر دوباره تلاش کنید.');
+
             return;
         }
 
@@ -110,16 +114,18 @@ class CommentSection extends Component
 
         // ۲) هانی‌پات: فیلد مخفی پُر است = ربات → ذخیره نمی‌شود
         if (Features::honeypot() && trim($this->website) !== '') {
-            CaptchaService::fresh();
+            CaptchaService::fresh('comments');
             $this->reset('captcha');
             $this->addError('captcha', 'پاسخ سؤال امنیتی نادرست است؛ سؤال جدید آماده شد.');
+
             return;
         }
 
         // ۳) کپچای خودمیزبان (پاسخ مصرف و سؤال تازه می‌شود)
-        if (Features::captcha('comments') && ! CaptchaService::verify($this->captcha)) {
+        if (Features::captcha('comments') && ! CaptchaService::verify($this->captcha, 'comments')) {
             $this->reset('captcha');
             $this->addError('captcha', 'پاسخ سؤال امنیتی نادرست است؛ سؤال جدید آماده شد.');
+
             return;
         }
 
@@ -127,13 +133,13 @@ class CommentSection extends Component
 
         Comment::create([
             'commentable_type' => $this->model->getMorphClass(),
-            'commentable_id'   => $this->model->getKey(),
-            'name'             => trim($data['name']),
-            'email'            => $data['email'] ?: null,
-            'rating'           => $data['rating'] ?: null,
-            'body'             => trim($data['body']),
-            'status'           => Comment::STATUS_PENDING,
-            'ip'               => request()->ip(),
+            'commentable_id' => $this->model->getKey(),
+            'name' => trim($data['name']),
+            'email' => $data['email'] ?: null,
+            'rating' => $data['rating'] ?: null,
+            'body' => trim($data['body']),
+            'status' => Comment::STATUS_PENDING,
+            'ip' => request()->ip(),
         ]);
 
         $this->reset('body', 'rating', 'captcha');

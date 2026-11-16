@@ -46,14 +46,14 @@ class CustomerLogin extends Component
         $this->redirect = (string) request()->query('redirect', '');
 
         if (Features::captcha('customer_login')) {
-            CaptchaService::fresh();
+            CaptchaService::fresh('customer_login');
         }
     }
 
     /** سؤال امنیتی جدید (دکمهٔ «سؤال دیگر» — بدون رفرش صفحه) */
     public function refreshCaptcha(): void
     {
-        CaptchaService::fresh();
+        CaptchaService::fresh('customer_login');
         $this->reset('captcha');
     }
 
@@ -78,6 +78,7 @@ class CustomerLogin extends Component
             $minutes = (int) ceil(RateLimiter::availableIn($limiterKey) / 60);
 
             $this->addError('updateCode', 'تلاش‌های ناموفق بیش از حد مجاز است؛ حدود '.fa_num(max(1, $minutes)).' دقیقهٔ دیگر دوباره تلاش کنید.');
+
             return;
         }
 
@@ -85,16 +86,18 @@ class CustomerLogin extends Component
 
         // ۲) هانی‌پات: فیلد مخفی پُر است = ربات → پیام عمومی و خروج
         if (Features::honeypot() && trim($this->website) !== '') {
-            CaptchaService::fresh();
+            CaptchaService::fresh('customer_login');
             $this->reset('captcha');
             $this->addError('updateCode', 'کد آپدیت نامعتبر است.');
+
             return;
         }
 
         // ۳) کپچای خودمیزبان (پاسخ مصرف و سؤال تازه می‌شود)
-        if (Features::captcha('customer_login') && ! CaptchaService::verify($this->captcha)) {
+        if (Features::captcha('customer_login') && ! CaptchaService::verify($this->captcha, 'customer_login')) {
             $this->reset('captcha');
             $this->addError('captcha', 'پاسخ سؤال امنیتی نادرست است؛ سؤال جدید آماده شد.');
+
             return;
         }
 
@@ -102,14 +105,16 @@ class CustomerLogin extends Component
             ->where('update_code', strtoupper(trim($data['updateCode'])))
             ->first();
 
-        if (!$customer) {
+        if (! $customer) {
             RateLimiter::hit($limiterKey, $decayMinutes * 60);
             $this->addError('updateCode', 'کد آپدیت نامعتبر است.');
+
             return;
         }
 
         if ($customer->status !== Customer::STATUS_ACTIVE) {
             $this->addError('updateCode', 'حساب این مشتری غیرفعال است. با پشتیبانی تماس بگیرید.');
+
             return;
         }
 
@@ -120,7 +125,7 @@ class CustomerLogin extends Component
         // هم‌گام با مکانیزم قدیمی (کد در session برای نشان اشتراک)
         session()->put('shop_update_code', $customer->update_code);
 
-        $this->toast('خوش آمدید، ' . $customer->name . '!');
+        $this->toast('خوش آمدید، '.$customer->name.'!');
 
         $target = ($this->redirect !== '' && str_starts_with($this->redirect, '/'))
             ? $this->redirect

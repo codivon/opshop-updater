@@ -2,22 +2,32 @@
 
 namespace App\Services;
 
+use App\Support\Features;
+use Illuminate\Support\Facades\Http;
+
 /**
- * کپچای خودمیزبان — بدون سرویس خارجی (گوگل/hCaptcha روی اینترنت ایران ناپایدارند):
+ * سرویس کپچا با «درایور» — چهار نوع:
  *
- *   ۱) سؤال ریاضی ساده با ارقام فارسی (مثل «۴ + ۳») — پاسخ فقط در سشن سرور
- *   ۲) نمایش به‌صورت «تصویر PNG» (CaptchaImageRenderer) نه متن HTML —
- *      استخراج سؤال با اسکریپت دیگر یک regex ساده نیست و نیاز به OCR دارد
- *   ۳) مصرف یک‌بارمصرف: هر بار verify سؤال تازه ساخته می‌شود (حتی اگر پاسخ درست باشد)
- *   ۴) تلهٔ زمان: پاسخ‌دادن زیر ۲ ثانیه = ربات (انسان باید سؤال را بخواند و تایپ کند)
- *   ۵) انقضا: سؤال بیش از ۳۰ دقیقه اعتبار ندارد (سشن بازِ رهاشده)
+ *   ۱) math        — ریاضی پیشرفتهٔ خودمیزبان (تعداد عملوند و عملیات مجاز از پنل؛
+ *                    مثل «۴ + ۷ × ۲») — پیش‌فرض و سازگار با اینترنت ایران
+ *   ۲) image       — تصویری حرف‌عددی خودمیزبان (۵ نویسهٔ بی‌ابهام مثل «K7M2R»)
+ *   ۳) hcaptcha    — ویجت ابری hCaptcha (کلیدها از پنل)
+ *   ۴) turnstile   — ویجت ابری Cloudflare Turnstile (کلیدها از پنل)
  *
- * در فرم‌های عمومی جفت هانی‌پات (فیلد مخفی website) هم هست: ربات‌های ساده
- * همهٔ inputها را پر می‌کنند و قبل از رسیدن به کپچا رد می‌شوند.
+ * هر «نقطه» (spot) درایور خودش را از پنل دارد:
+ *   admin_login | admin_register | customer_login | comments | contact | checkout
+ * درایور ابری بدون کلید → فال‌بک امن به math (هیچ فرمی از کار نمی‌افتد).
+ *
+ * خودمیزبان‌ها:
+ *   - نمایش به‌صورت «تصویر PNG» (CaptchaImageRenderer) نه متن HTML — استخراج با OCR نه regex
+ *   - پاسخ فقط در سشن سرور؛ مصرف یک‌بارمصرف (هر verify سؤال تازه می‌سازد)
+ *   - تلهٔ زمان: پاسخ‌دادن زیر sec_captcha_min_seconds ثانیه = ربات
+ *   - انقضا: سؤال بیش از ۳۰ دقیقه اعتبار ندارد
+ *
+ * در فرم‌های عمومی جفت هانی‌پات (فیلد مخفی website) هم هست.
  *
  * شمارندهٔ «نسخه» در سشن با هر fresh() بالا می‌رود؛ img کپچا آن را به‌عنوان
- * پارامتر cache-busting در src دارد تا پس از تازه‌سازی، مرورگر تصویر نو بگیرد
- * (بدون رفرش صفحه — هم Livewire هم فرم کلاسیک).
+ * پارامتر cache-busting در src دارد تا پس از تازه‌سازی، مرورگر تصویر نو بگیرد.
  */
 class CaptchaService
 {
@@ -35,6 +45,18 @@ class CaptchaService
     /** حداکثر عمر سؤال (ثانیه) */
     public const MAX_AGE = 1800;
 
+    /** درایورهای پشتیبانی‌شده */
+    public const DRIVERS = ['image', 'math', 'hcaptcha', 'turnstile'];
+
+    /** الفبای تصویری حرف‌عددی — نویسه‌های بی‌ابهام (بدون I/1، O/0 و…) */
+    public const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+    /** طول پاسخ تصویری حرف‌عددی */
+    public const ALPHA_LENGTH = 5;
+
+    /** سقف مقدار جواب ریاضی (ورودی verify حداکثر ۴ رقم می‌پذیرد) */
+    protected const MATH_CEIL = 9999;
+
     /**
      * کمینهٔ ثانیهٔ تلهٔ زمان — از پنل «امنیت و امکانات» قابل تنظیم.
      */
@@ -44,18 +66,12 @@ class CaptchaService
     }
 
     /**
-     * متن سؤال فعلی برای نمایش (در صورت نبود یا منقضی‌بودن، سؤال تازه می‌سازد).
-     * نمایش مستقیم این متن در HTML ممنوع — فقط در تصویر استفاده می‌شود.
+     * درایور نقطهٔ داده‌شده — با فال‌بک امن خودمیزبان.
+     * $spot: admin_login | admin_register | customer_login | comments | contact | checkout
      */
-    public static function question(): string
+    public static function driver(string $spot = 'generic'): string
     {
-        $ts = (int) session(self::SESSION_TS, 0);
-
-        if (! is_numeric(session(self::SESSION_ANSWER)) || (time() - $ts) > self::MAX_AGE) {
-            static::fresh();
-        }
-
-        return (string) session(self::SESSION_QUESTION);
+        return Features::captchaDriver($spot);
     }
 
     /**
@@ -67,56 +83,202 @@ class CaptchaService
     }
 
     /**
-     * ساخت سؤال تازه — پاسخ قبلی باطل می‌شود.
+     * متن سؤال فعلی برای نمایش (در صورت نبود یا منقضی‌بودن، سؤال تازه می‌سازد).
+     * نمایش مستقیم این متن در HTML ممنوع — فقط در تصویر استفاده می‌شود.
      */
-    public static function fresh(): void
+    public static function question(): string
     {
-        $a = random_int(2, 9);
-        $b = random_int(2, 9);
+        $ts = (int) session(self::SESSION_TS, 0);
 
-        switch (random_int(1, 3)) {
-            case 1:
-                $text = fa_num($a).' + '.fa_num($b);
-                $answer = $a + $b;
-                break;
-
-            case 2:
-                $text = fa_num($a).' × '.fa_num($b);
-                $answer = $a * $b;
-                break;
-
-            default: // تفریق همیشه نامنفی (عدد بزرگ‌تر منهای کوچک‌تر)
-                $text = fa_num(max($a, $b)).' − '.fa_num(min($a, $b));
-                $answer = max($a, $b) - min($a, $b);
+        if (! is_numeric(session(self::SESSION_ANSWER)) && ! is_string(session(self::SESSION_ANSWER)) || (time() - $ts) > self::MAX_AGE) {
+            static::fresh();
         }
 
+        return (string) session(self::SESSION_QUESTION);
+    }
+
+    /**
+     * ساخت سؤال تازه بر اساس درایور نقطهٔ داده‌شده — پاسخ قبلی باطل می‌شود.
+     * سرویس‌های ابری سؤال سشن ندارند؛ فقط شمارندهٔ نسخه جلو می‌رود تا تصویرِ
+     * اگر درایور بعداً عوض شد cache-busting درست کار کند.
+     *
+     * بدون پارامتر (فراخوانی‌های قدیمی) = ریاضی خودمیزبان.
+     */
+    public static function fresh(?string $spot = null): void
+    {
+        $driver = $spot !== null ? static::driver($spot) : 'math';
+
+        if ($driver === 'image') {
+            // حرف‌عددی: پاسخ همان رشتهٔ سؤال است (باید یک رشته بسازیم نه دو!)
+            $code = static::randomAlpha();
+            static::store($code, $code);
+        } elseif ($driver === 'math') {
+            [$text, $answer] = static::mathExpression();
+            static::store($text, (string) $answer);
+        } else {
+            // hcaptcha / turnstile — سؤال سشن ندارد؛ فقط نسخه جلو می‌رود
+            session([self::SESSION_VERSION => static::version() + 1]);
+        }
+    }
+
+    /**
+     * بررسی پاسخ کاربر بر اساس درایور نقطه.
+     * خودمیزبان‌ها همیشه سؤال را مصرف و تازه می‌کنند (حتی اگر پاسخ درست باشد)
+     * تا یک پاسخ درست قابل استفادهٔ مجدد برای حمله نباشد.
+     */
+    public static function verify(mixed $input, string $spot = 'generic'): bool
+    {
+        $driver = static::driver($spot);
+
+        if ($driver === 'hcaptcha' || $driver === 'turnstile') {
+            return static::verifyCloud($input, $driver);
+        }
+
+        $expected = session(self::SESSION_ANSWER);
+        $raw = trim((string) en_num(trim((string) $input)));
+        $age = time() - (int) session(self::SESSION_TS, 0);
+        $timed = $age >= static::minSeconds() && $age <= self::MAX_AGE;
+
+        if ($driver === 'image') {
+            // حرف‌عددی: فقط نویسه‌های الفبایی‌عددی، بدون حساسیت به بزرگی/کوچکی
+            $given = strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', $raw));
+            $ok = is_string($expected)
+                && $given !== ''
+                && $given === strtoupper((string) $expected)
+                && $timed;
+        } else {
+            // ریاضی — ارقام فارسی/عربی هم پذیرفته می‌شود (en_num)
+            $given = $raw;
+            $ok = is_numeric($expected)
+                && preg_match('/^\d{1,4}$/', $given) === 1
+                && (int) $given === (int) $expected
+                && $timed;
+        }
+
+        static::fresh($spot);
+
+        return $ok;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  تولید سؤال */
+    /* ------------------------------------------------------------------ */
+
+    /** ذخیرهٔ سؤال/پاسخ تازه در سشن */
+    protected static function store(string $question, string $answer): void
+    {
         session([
-            self::SESSION_QUESTION => $text,
+            self::SESSION_QUESTION => $question,
             self::SESSION_ANSWER => $answer,
             self::SESSION_TS => time(),
             self::SESSION_VERSION => static::version() + 1,
         ]);
     }
 
-    /**
-     * بررسی پاسخ کاربر (ارقام فارسی/عربی هم پذیرفته می‌شود).
-     * همیشه سؤال را مصرف و تازه می‌کند — مستقل از درست‌بودن پاسخ —
-     * تا یک پاسخ درست قابل استفادهٔ مجدد برای حمله نباشد.
-     */
-    public static function verify(mixed $input): bool
+    /** رشتهٔ تصویری حرف‌عددی — نویسه‌های بی‌ابهام */
+    protected static function randomAlpha(): string
     {
-        $expected = session(self::SESSION_ANSWER);
-        $given = trim((string) en_num(trim((string) $input)));
-        $age = time() - (int) session(self::SESSION_TS, 0);
+        $chars = '';
+        $max = strlen(self::ALPHABET) - 1;
 
-        $ok = is_numeric($expected)
-            && preg_match('/^\d{1,4}$/', $given) === 1
-            && (int) $given === (int) $expected
-            && $age >= self::minSeconds()
-            && $age <= self::MAX_AGE;
+        for ($i = 0; $i < self::ALPHA_LENGTH; $i++) {
+            $chars .= self::ALPHABET[random_int(0, $max)];
+        }
 
-        static::fresh();
+        return $chars;
+    }
 
-        return $ok;
+    /**
+     * عبارت ریاضی پیشرفته — تعداد عملوند و عملیات مجاز از پنل.
+     * تفریق همیشه نتیجهٔ نامنفی؛ ضرب سقف ۹۹۹۹ را رعایت می‌کند
+     * (ورودی verify حداکثر ۴ رقم است).
+     *
+     * @return array{0: string, 1: int} [متن سؤال، جواب]
+     */
+    protected static function mathExpression(): array
+    {
+        [$operands, $ops] = Features::mathConfig();
+        $operands = max(2, min(5, $operands));
+
+        $acc = random_int(2, 9);
+        $numbers = [$acc];
+        $operators = [];
+
+        for ($i = 1; $i < $operands; $i++) {
+            $op = $ops[random_int(0, count($ops) - 1)];
+
+            if ($op === '×' && $acc * 9 > self::MATH_CEIL) {
+                $op = '+'; // سقف جواب
+            }
+
+            if ($op === '−' && $acc <= 2) {
+                $op = '+'; // تفریقِ نامنفی ممکن نیست
+            }
+
+            $n = match ($op) {
+                '+' => random_int(2, 9),
+                '×' => random_int(2, 9),
+                default => random_int(2, min(9, $acc - 1)),
+            };
+
+            $acc = match ($op) {
+                '+' => $acc + $n,
+                '×' => $acc * $n,
+                default => $acc - $n,
+            };
+
+            $numbers[] = $n;
+            $operators[] = $op;
+        }
+
+        $text = fa_num($numbers[0]);
+
+        foreach ($operators as $i => $op) {
+            $text .= ' '.$op.' '.fa_num($numbers[$i + 1]);
+        }
+
+        return [$text, $acc];
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  راستی‌آزمایی سرویس ابری */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * توکن ویجت ابری (hcaptcha/turnstile) را با API رسمی سایت‌وریفی چک می‌کند.
+     * خطای شبکه/سرویس = پاسخ نامعتبر (fail-closed — کپچا است، نه پرداخت).
+     */
+    protected static function verifyCloud(mixed $input, string $driver): bool
+    {
+        $token = trim((string) $input);
+
+        if ($token === '' || mb_strlen($token) > 8192) {
+            return false;
+        }
+
+        $secret = trim((string) setting($driver === 'hcaptcha' ? 'sec_captcha_hcaptcha_secret' : 'sec_captcha_turnstile_secret', ''));
+
+        if ($secret === '') {
+            return false;
+        }
+
+        $endpoint = $driver === 'hcaptcha'
+            ? 'https://api.hcaptcha.com/siteverify'
+            : 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+
+        try {
+            $response = Http::asForm()
+                ->connectTimeout(5)
+                ->timeout(10)
+                ->post($endpoint, [
+                    'secret' => $secret,
+                    'response' => $token,
+                    'remoteip' => (string) request()->ip(),
+                ]);
+
+            return (bool) ($response->json('success') ?? false);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

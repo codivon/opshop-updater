@@ -335,6 +335,11 @@
                     @endif
 
                     <div class="space-y-2.5 border-t border-zinc-200/80 px-5 py-4 dark:border-zinc-800">
+                        {{-- کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات) --}}
+                        @if(\App\Support\Features::captcha('checkout'))
+                            <x-captcha spot="checkout" wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+                        @endif
+
                         @if($this->paymentStarted)
                             {{-- تراکنش در جریان: ادامه پرداخت با همان لینک درگاه --}}
                             <div class="mb-3 flex items-start gap-2.5 rounded-xl bg-amber-50 p-3 ring-1 ring-amber-600/15 dark:bg-amber-500/10 dark:ring-amber-400/20">
@@ -391,4 +396,7 @@
             </aside>
         </div>
     @endif
+
+    {{-- مودال هشدار فیلترشکن/VPN — گارد IP پرداخت --}}
+    <x-vpn-guard-modal wireModel="showVpnModal" retryMethod="pay" />
 </div>

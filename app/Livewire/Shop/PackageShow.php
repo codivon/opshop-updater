@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Shop;
 
+use App\Livewire\Concerns\WithPaymentGuard;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Models\DiscountCode;
@@ -11,6 +12,7 @@ use App\Models\PackageLicense;
 use App\Models\PackagePricingPlan;
 use App\Models\PackagePurchase;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Services\DiscountService;
 use App\Services\LicenseService;
 use App\Services\PaymentService;
@@ -25,6 +27,7 @@ use Livewire\Component;
 #[Title('جزئیات پکیج')]
 class PackageShow extends Component
 {
+    use WithPaymentGuard;
     use WithToasts;
 
     public Package $package;
@@ -52,7 +55,7 @@ class PackageShow extends Component
             ->where('status', Package::STATUS_ACTIVE)
             ->first();
 
-        if (!$package) {
+        if (! $package) {
             abort(404);
         }
 
@@ -66,10 +69,13 @@ class PackageShow extends Component
         // در نبود لاگین، از کد معتبر ذخیره‌شده در session (مکانیزم قدیمی) استفاده می‌کنیم.
         $this->updateCode = auth('customer')->user()?->update_code
             ?? (string) session('shop_update_code', '');
+
+        // کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات)
+        $this->initPaymentCaptcha();
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Computed                                                         */
+    /*  Computed */
     /* ---------------------------------------------------------------- */
 
     #[Computed]
@@ -109,7 +115,7 @@ class PackageShow extends Component
             return collect();
         }
 
-        return \App\Models\SubscriptionPlan::query()
+        return SubscriptionPlan::query()
             ->active()
             ->whereHas('packages', fn ($q) => $q->where('packages.id', $this->package->id))
             ->with(['packages' => fn ($q) => $q->where('packages.id', $this->package->id)])
@@ -151,7 +157,7 @@ class PackageShow extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  کد تخفیف                                                          */
+    /*  کد تخفیف */
     /* ---------------------------------------------------------------- */
 
     /** مبلغ مبنا برای کد تخفیف: final_price طرح انتخاب‌شده (۰ اگر طرحی انتخاب نشده) */
@@ -174,23 +180,26 @@ class PackageShow extends Component
         $base = $this->discountBaseAmount();
 
         if ($base <= 0) {
-            $this->toast(!$this->package->is_free && $this->plans->isNotEmpty()
+            $this->toast(! $this->package->is_free && $this->plans->isNotEmpty()
                 ? 'ابتدا طرح قیمت‌گذاری را انتخاب کنید.'
                 : 'برای این پکیج امکان استفاده از کد تخفیف وجود ندارد.', 'warning');
+
             return;
         }
 
         $result = $discountService->resolve($this->discountCode, DiscountCode::CONTEXT_PACKAGE, $base);
 
-        if (!$result['ok']) {
+        if (! $result['ok']) {
             $this->appliedCode = '';
             $this->toast($result['message'], 'error');
+
             return;
         }
 
         if ($result['code'] === null) {
             $this->appliedCode = '';
             $this->toast('ابتدا یک کد تخفیف وارد کنید.', 'warning');
+
             return;
         }
 
@@ -249,7 +258,7 @@ class PackageShow extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Buy                                                              */
+    /*  Buy */
     /* ---------------------------------------------------------------- */
 
     public function buy(PaymentService $paymentService, LicenseService $licenseService, DiscountService $discountService): void
@@ -258,7 +267,7 @@ class PackageShow extends Component
         // مشتری واردشده نیازی به تایپ کد ندارد؛ در غیر این صورت کد اجباری است.
         $customer = auth('customer')->user();
 
-        if (!$customer) {
+        if (! $customer) {
             $this->validate([
                 'updateCode' => ['required', 'string', 'max:64'],
             ], [
@@ -269,13 +278,15 @@ class PackageShow extends Component
                 ->where('update_code', strtoupper(trim($this->updateCode)))
                 ->first();
 
-            if (!$customer) {
+            if (! $customer) {
                 $this->toast('کد آپدیت نامعتبر است.', 'error');
+
                 return;
             }
 
             if ($customer->status !== 'active') {
                 $this->toast('حساب این مشتری غیرفعال است.', 'error');
+
                 return;
             }
         } else {
@@ -288,47 +299,52 @@ class PackageShow extends Component
         $subscription = $this->findCoveringSubscription($customer);
         if (
             $subscription
-            && !$this->package->is_free
+            && ! $this->package->is_free
         ) {
             $this->fulfillWithSubscription($customer, $subscription);
+
             return;
         }
 
         // ---- طرح ----
         // (validate با آرایهٔ خالی در Livewire 3 به دنبال rules() می‌گردد → فقط وقتی قاعده داریم صدا می‌زنیم)
-        if (!$this->package->is_free && $this->plans->isNotEmpty()) {
+        if (! $this->package->is_free && $this->plans->isNotEmpty()) {
             $this->validate(['planId' => ['required']], [
                 'planId.required' => 'لطفاً طرح قیمت‌گذاری را انتخاب کنید.',
             ]);
         }
 
-        /** @var \App\Models\PackagePricingPlan|null $plan */
+        /** @var PackagePricingPlan|null $plan */
         $plan = null;
         if ($this->planId !== '') {
             $plan = $this->package->activePricingPlans()->where('id', (int) $this->planId)->first();
 
-            if (!$plan) {
+            if (! $plan) {
                 $this->toast('طرح قیمت‌گذاری انتخاب‌شده معتبر نیست.', 'error');
+
                 return;
             }
         }
 
-        if (!$this->package->is_free && $this->plans->isNotEmpty() && !$plan) {
+        if (! $this->package->is_free && $this->plans->isNotEmpty() && ! $plan) {
             $this->toast('لطفاً طرح قیمت‌گذاری را انتخاب کنید.', 'error');
+
             return;
         }
 
         // جلوگیری از خرید مجدد طرح یک‌بار مصرف (مثل جریان API)
         if ($plan && $plan->is_one_time && $plan->hasCustomerUsed($customer->id)) {
             $this->toast('شما قبلاً از این طرح استفاده کرده‌اید. این طرح فقط یک‌بار قابل خریداری است. لطفاً طرح دیگری انتخاب کنید.', 'error');
+
             return;
         }
 
         // ---- نسخه ----
         $latestVersion = $this->package->latestVersion()->first();
 
-        if (!$latestVersion) {
+        if (! $latestVersion) {
             $this->toast('نسخه فعالی برای این پکیج وجود ندارد.', 'error');
+
             return;
         }
 
@@ -344,44 +360,45 @@ class PackageShow extends Component
                 $couponBase
             );
 
-            if (!$couponResult['ok']) {
+            if (! $couponResult['ok']) {
                 $this->appliedCode = '';
                 $this->toast($couponResult['message'], 'error');
+
                 return;
             }
 
-            /** @var \App\Models\DiscountCode|null $coupon */
-            $coupon         = $couponResult['code'];
+            /** @var DiscountCode|null $coupon */
+            $coupon = $couponResult['code'];
             $couponDiscount = $couponResult['discount'];
-            $finalPrice     = $couponResult['final'];
+            $finalPrice = $couponResult['final'];
         } else {
-            $coupon         = null;
+            $coupon = null;
             $couponDiscount = 0;
-            $finalPrice     = 0;
+            $finalPrice = 0;
         }
 
         // ---- مسیر رایگان ----
         // (پکیج رایگان، طرح صفر تومانی، یا کد تخفیفِ پوشش‌دهنده‌ی کامل مبلغ)
         if ($this->package->is_free || ($plan && $plan->final_price <= 0) || $finalPrice <= 0) {
             // پکیج رایگان بدون طرح → لایسنس نامحدود
-            if (!$plan) {
+            if (! $plan) {
                 $plan = new PackagePricingPlan([
                     'duration_months' => 0,
-                    'is_one_time'     => false,
+                    'is_one_time' => false,
                 ]);
             }
 
             $purchase = PackagePurchase::create([
-                'package_id'       => $this->package->id,
-                'version_id'       => $latestVersion->id,
-                'pricing_plan_id'  => $plan->exists ? $plan->id : null,
-                'customer_id'      => $customer->id,
+                'package_id' => $this->package->id,
+                'version_id' => $latestVersion->id,
+                'pricing_plan_id' => $plan->exists ? $plan->id : null,
+                'customer_id' => $customer->id,
                 'discount_code_id' => $coupon?->id,
-                'original_amount'  => $couponBase,
-                'amount'           => 0,
-                'discount_amount'  => $couponDiscount,
-                'status'           => PackagePurchase::STATUS_PAID,
-                'paid_at'          => now(),
+                'original_amount' => $couponBase,
+                'amount' => 0,
+                'discount_amount' => $couponDiscount,
+                'status' => PackagePurchase::STATUS_PAID,
+                'paid_at' => now(),
             ]);
 
             $licenseService->issueOrRenew($purchase, $plan);
@@ -399,24 +416,35 @@ class PackageShow extends Component
             return;
         }
 
+        // ---- کپچای فرم پرداخت (ضدربات) — فقط مسیر پرداختِ واقعی ----
+        if (! $this->verifyPaymentCaptcha()) {
+            return;
+        }
+
+        // ---- گارد IP ایران: پرداخت فقط از IP ایران (ضد فیلترشکن/VPN) ----
+        if (! $this->ensurePaymentIpAllowed()) {
+            return;
+        }
+
         // ---- مسیر پرداخت ----
-        if ($this->gatewayKey === '' || !$this->gateways->firstWhere('key', $this->gatewayKey)) {
+        if ($this->gatewayKey === '' || ! $this->gateways->firstWhere('key', $this->gatewayKey)) {
             $this->toast('درگاه پرداخت فعالی تنظیم نشده است.', 'error');
+
             return;
         }
 
         $purchase = PackagePurchase::create([
-            'package_id'       => $this->package->id,
-            'version_id'       => $latestVersion->id,
-            'pricing_plan_id'  => $plan->id,
-            'customer_id'      => $customer->id,
+            'package_id' => $this->package->id,
+            'version_id' => $latestVersion->id,
+            'pricing_plan_id' => $plan->id,
+            'customer_id' => $customer->id,
             'discount_code_id' => $coupon?->id,
-            'callback_url'     => route('payment.callback'),
-            'original_amount'  => (int) $plan->final_price,
-            'amount'           => $finalPrice,
-            'discount_amount'  => $couponDiscount,
-            'gateway'          => $this->gatewayKey,
-            'status'           => PackagePurchase::STATUS_PENDING,
+            'callback_url' => route('payment.callback'),
+            'original_amount' => (int) $plan->final_price,
+            'amount' => $finalPrice,
+            'discount_amount' => $couponDiscount,
+            'gateway' => $this->gatewayKey,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         session()->put('shop_update_code', trim($this->updateCode));
@@ -425,6 +453,7 @@ class PackageShow extends Component
             $payment = $paymentService->createPayment($purchase, $this->gatewayKey);
         } catch (\Throwable $e) {
             $this->toast($e->getMessage(), 'error');
+
             return;
         }
 
@@ -432,7 +461,7 @@ class PackageShow extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  دریافت رایگان با اشتراک فعال (بدون درگاه)                        */
+    /*  دریافت رایگان با اشتراک فعال (بدون درگاه) */
     /* ---------------------------------------------------------------- */
 
     /**
@@ -456,31 +485,33 @@ class PackageShow extends Component
 
         if ($activeLicense) {
             $this->toast('این پکیج از قبل با اشتراک شما فعال است.');
+
             return;
         }
 
         // ---- نسخه ----
         $latestVersion = $this->package->latestVersion()->first();
 
-        if (!$latestVersion) {
+        if (! $latestVersion) {
             $this->toast('نسخه فعالی برای این پکیج وجود ندارد.', 'error');
+
             return;
         }
 
         $plan = $subscription->plan;
         // مدت رایگان از «پیکربندی مؤثرِ مدتِ خریداری‌شده» — نه صرفاً پکیج‌های سطح طرح (Task 66)
-        $covered    = $subscription->effectivePackages()->firstWhere('id', $this->package->id);
+        $covered = $subscription->effectivePackages()->firstWhere('id', $this->package->id);
         $freeMonths = (int) ($covered?->pivot->free_months ?? 1);
 
         // ---- خرید رایگان (بدون درگاه) ----
         $purchase = PackagePurchase::create([
-            'package_id'      => $this->package->id,
-            'version_id'      => $latestVersion->id,
+            'package_id' => $this->package->id,
+            'version_id' => $latestVersion->id,
             'pricing_plan_id' => null,
-            'customer_id'     => $customer->id,
-            'amount'          => 0,
-            'status'          => PackagePurchase::STATUS_PAID,
-            'paid_at'         => now(),
+            'customer_id' => $customer->id,
+            'amount' => 0,
+            'status' => PackagePurchase::STATUS_PAID,
+            'paid_at' => now(),
         ]);
 
         // ---- صدور/تمدید لایسنس رایگان با مدتِ طرح (pivot free_months) ----
@@ -499,15 +530,15 @@ class PackageShow extends Component
             $expiresAt = $freeMonths > 0 ? (clone $baseDate)->addMonths($freeMonths) : null;
 
             $license = PackageLicense::create([
-                'license_key'     => PackageLicense::generateKey(),
-                'package_id'      => $this->package->id,
-                'customer_id'     => $customer->id,
-                'renewed_from'    => $existing?->id,
-                'status'          => PackageLicense::STATUS_ACTIVE,
-                'starts_at'       => $startsAt,
-                'expires_at'      => $expiresAt,
+                'license_key' => PackageLicense::generateKey(),
+                'package_id' => $this->package->id,
+                'customer_id' => $customer->id,
+                'renewed_from' => $existing?->id,
+                'status' => PackageLicense::STATUS_ACTIVE,
+                'starts_at' => $startsAt,
+                'expires_at' => $expiresAt,
                 'duration_months' => $freeMonths,
-                'notes'           => 'دسترسی رایگان از طریق اشتراک «' . ($plan?->name ?? 'طرح اشتراک') . '».',
+                'notes' => 'دسترسی رایگان از طریق اشتراک «'.($plan?->name ?? 'طرح اشتراک').'».',
             ]);
 
             if ($existing) {
@@ -545,7 +576,7 @@ class PackageShow extends Component
     {
         $customer ??= $this->currentCustomer();
 
-        if (!$customer) {
+        if (! $customer) {
             return null;
         }
 

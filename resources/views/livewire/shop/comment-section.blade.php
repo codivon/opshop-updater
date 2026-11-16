@@ -112,7 +112,7 @@
             </x-field>
 
             @if(\App\Support\Features::captcha('comments'))
-                <x-captcha wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+                <x-captcha spot="comments" wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
             @endif
 
             {{-- هانی‌پات ضدربات — برای انسان نامرئی است --}}

@@ -17,6 +17,7 @@ use App\Livewire\Messages\Index;
 use App\Livewire\Packages\Show;
 use App\Livewire\Settings\Developer;
 use App\Livewire\Settings\HomePage;
+use App\Livewire\Settings\LicenseKey;
 use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\Security;
 use App\Livewire\Shop\Changelog;
@@ -167,7 +168,10 @@ Route::get('captcha/image', [CaptchaImageController::class, 'show'])
     ->middleware('throttle:120,1');
 
 Route::get('captcha/refresh', function () {
-    CaptchaService::fresh();
+    // نقطهٔ درخواست‌کننده (اگر پاس شد) — درایور همان نقطه از پنل خوانده می‌شود
+    $spot = (string) request()->query('spot', '');
+
+    CaptchaService::fresh(in_array($spot, ['admin_login', 'admin_register', 'customer_login', 'comments', 'contact', 'checkout'], true) ? $spot : null);
 
     return back();
 })->name('captcha.refresh');
@@ -250,7 +254,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', EnsureAdminRole::cla
     Route::get('settings/security', Security::class)->name('settings.security');
 
     // کلید امضای لایسنس: ساخت/تعویض EC P-256 از پنل — بدون نیاز به شِل (هاست اشتراکی)
-    Route::get('settings/license-key', App\Livewire\Settings\LicenseKey::class)->name('settings.license-key');
+    Route::get('settings/license-key', LicenseKey::class)->name('settings.license-key');
 
     // تنظیمات برنامه‌نویس: محیط/دیباگ (.env)، کش‌ها، بهینه‌سازی و مایگریشن‌های در انتظار
     Route::get('settings/developer', Developer::class)->name('settings.developer');

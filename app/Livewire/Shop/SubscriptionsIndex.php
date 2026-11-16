@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Shop;
 
+use App\Livewire\Concerns\WithPaymentGuard;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Models\DiscountCode;
@@ -21,6 +22,7 @@ use Livewire\Component;
 #[Title('طرح‌های اشتراک')]
 class SubscriptionsIndex extends Component
 {
+    use WithPaymentGuard;
     use WithToasts;
 
     /** کد آپدیت مشتری */
@@ -45,6 +47,9 @@ class SubscriptionsIndex extends Component
     {
         $this->updateCode = (string) session('shop_update_code', '');
         $this->gatewayKey = (string) $this->gateways->first()?->key ?? '';
+
+        // کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات)
+        $this->initPaymentCaptcha();
     }
 
     #[Computed]
@@ -64,7 +69,7 @@ class SubscriptionsIndex extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  مدت اعتبار (چندگزینه‌ای)                                          */
+    /*  مدت اعتبار (چندگزینه‌ای) */
     /* ---------------------------------------------------------------- */
 
     /** مدت انتخاب‌شدهٔ یک طرح — یا null (فال‌بک به تک‌مدت پیش‌فرض طرح) */
@@ -81,7 +86,7 @@ class SubscriptionsIndex extends Component
      */
     public function displayDurationFor(SubscriptionPlan $plan): ?SubscriptionPlanDuration
     {
-        if (!$plan->hasDurations()) {
+        if (! $plan->hasDurations()) {
             return null;
         }
 
@@ -102,7 +107,7 @@ class SubscriptionsIndex extends Component
         /** @var SubscriptionPlan|null $plan */
         $plan = $this->plans->firstWhere('id', $planId);
 
-        if (!$plan || !$plan->durationOption($months)) {
+        if (! $plan || ! $plan->durationOption($months)) {
             return; // مدت نامعتبر نادیده گرفته می‌شود
         }
 
@@ -111,7 +116,7 @@ class SubscriptionsIndex extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  جزئیات هر مدت (مودال نمایشی کارت — Task 64)                       */
+    /*  جزئیات هر مدت (مودال نمایشی کارت — Task 64) */
     /* ---------------------------------------------------------------- */
 
     /**
@@ -126,24 +131,24 @@ class SubscriptionsIndex extends Component
      */
     public function durationDetailsFor(SubscriptionPlan $plan): array
     {
-        if (!$plan->hasDurations()) {
+        if (! $plan->hasDurations()) {
             return [];
         }
 
         return $plan->durationOptions()
             ->map(fn (SubscriptionPlanDuration $d) => [
-                'label'    => $d->duration_label,
-                'price'    => $d->final_price <= 0 ? 'رایگان' : money($d->final_price, false) . ' تومان',
-                'original' => ($d->has_discount && $d->final_price > 0) ? money($d->price, false) . ' تومان' : '',
-                'percent'  => (int) $d->discount_percent,
-                'custom'   => $d->hasOwnFeatures() || $d->hasOwnPackages(),
+                'label' => $d->duration_label,
+                'price' => $d->final_price <= 0 ? 'رایگان' : money($d->final_price, false).' تومان',
+                'original' => ($d->has_discount && $d->final_price > 0) ? money($d->price, false).' تومان' : '',
+                'percent' => (int) $d->discount_percent,
+                'custom' => $d->hasOwnFeatures() || $d->hasOwnPackages(),
                 // قابلیت‌های مؤثر (اختصاصی مدت یا ارث‌بری از طرح)
                 'features' => array_values($d->resolvedFeatures($plan->features ?? [])),
                 // پکیج‌های همراه مؤثر (اختصاصی مدت یا ارث‌بری از طرح) با برچسب ماه رایگان
                 'packages' => $d->resolvedPackages($plan->packages)
                     ->map(fn ($p) => [
                         'name' => $p->name,
-                        'free' => \App\Models\SubscriptionPlan::freeMonthsLabel((int) $p->pivot->free_months),
+                        'free' => SubscriptionPlan::freeMonthsLabel((int) $p->pivot->free_months),
                     ])
                     ->values()
                     ->all(),
@@ -167,18 +172,18 @@ class SubscriptionsIndex extends Component
         }
 
         return [[
-            'label'    => $plan->duration_label,
-            'price'    => $plan->final_price <= 0 ? 'رایگان' : money($plan->final_price, false) . ' تومان',
+            'label' => $plan->duration_label,
+            'price' => $plan->final_price <= 0 ? 'رایگان' : money($plan->final_price, false).' تومان',
             'original' => ($plan->discount_price > 0 && $plan->price > $plan->final_price)
-                ? money($plan->price, false) . ' تومان' : '',
-            'percent'  => ($plan->discount_price > 0 && $plan->price > 0)
+                ? money($plan->price, false).' تومان' : '',
+            'percent' => ($plan->discount_price > 0 && $plan->price > 0)
                 ? (int) round(($plan->discount_price / max(1, $plan->price)) * 100) : 0,
-            'custom'   => false,
+            'custom' => false,
             'features' => array_values($plan->features ?? []),
             'packages' => $plan->packages
                 ->map(fn ($p) => [
                     'name' => $p->name,
-                    'free' => \App\Models\SubscriptionPlan::freeMonthsLabel((int) $p->pivot->free_months),
+                    'free' => SubscriptionPlan::freeMonthsLabel((int) $p->pivot->free_months),
                 ])
                 ->values()
                 ->all(),
@@ -207,7 +212,7 @@ class SubscriptionsIndex extends Component
 
         $customer = Customer::where('update_code', $code)->first();
 
-        if (!$customer) {
+        if (! $customer) {
             return collect();
         }
 
@@ -234,7 +239,7 @@ class SubscriptionsIndex extends Component
                 ? $plan->durationOption((int) $this->selectedDurations[$plan->id])
                 : null;
 
-            if (!$current) {
+            if (! $current) {
                 $first = $plan->durationOptions()->first();
 
                 if ($first) {
@@ -249,7 +254,7 @@ class SubscriptionsIndex extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  کد تخفیف                                                          */
+    /*  کد تخفیف */
     /* ---------------------------------------------------------------- */
 
     /** طرحِ در حال خرید (یا null) */
@@ -268,20 +273,23 @@ class SubscriptionsIndex extends Component
 
         if ($base <= 0) {
             $this->toast('ابتدا طرح موردنظر را برای خرید انتخاب کنید.', 'warning');
+
             return;
         }
 
         $result = $discountService->resolve($this->discountCode, DiscountCode::CONTEXT_SUBSCRIPTION, $base);
 
-        if (!$result['ok']) {
+        if (! $result['ok']) {
             $this->appliedCode = '';
             $this->toast($result['message'], 'error');
+
             return;
         }
 
         if ($result['code'] === null) {
             $this->appliedCode = '';
             $this->toast('ابتدا یک کد تخفیف وارد کنید.', 'warning');
+
             return;
         }
 
@@ -311,7 +319,7 @@ class SubscriptionsIndex extends Component
 
         $result = app(DiscountService::class)->resolve($this->appliedCode, DiscountCode::CONTEXT_SUBSCRIPTION, $base);
 
-        if (!$result['ok']) {
+        if (! $result['ok']) {
             return ['base' => $base, 'discount' => 0, 'final' => $base];
         }
 
@@ -349,9 +357,14 @@ class SubscriptionsIndex extends Component
             'updateCode.required' => 'کد آپدیت الزامی است.',
         ]);
 
+        // ---- کپچای فرم پرداخت (ضدربات) ----
+        if (! $this->verifyPaymentCaptcha()) {
+            return;
+        }
+
         $plan = SubscriptionPlan::active()->where('slug', trim($this->buyingSlug))->first();
 
-        if (!$plan) {
+        if (! $plan) {
             $this->toast('طرح انتخاب‌شده معتبر نیست.', 'error');
 
             return;
@@ -361,7 +374,7 @@ class SubscriptionsIndex extends Component
             ->where('update_code', trim($this->updateCode))
             ->first();
 
-        if (!$customer) {
+        if (! $customer) {
             $this->toast('کد آپدیت نامعتبر است.', 'error');
 
             return;
@@ -377,7 +390,7 @@ class SubscriptionsIndex extends Component
         /** @var SubscriptionPlanDuration|null $durationOption */
         $durationOption = $this->selectedDurationFor($plan);
 
-        if ($plan->hasDurations() && !$durationOption) {
+        if ($plan->hasDurations() && ! $durationOption) {
             $this->toast('یک مدت اعتبار برای این طرح انتخاب کنید.', 'error');
 
             return;
@@ -390,7 +403,7 @@ class SubscriptionsIndex extends Component
 
         // ---- کد تخفیف (راستی‌آزمایی مجدد سمت سرور) ----
         $coupon = null;
-        $base   = $effectiveFinal;
+        $base = $effectiveFinal;
 
         if ($base > 0) {
             $couponResult = $discountService->resolve(
@@ -399,7 +412,7 @@ class SubscriptionsIndex extends Component
                 $base
             );
 
-            if (!$couponResult['ok']) {
+            if (! $couponResult['ok']) {
                 $this->appliedCode = '';
                 $this->toast($couponResult['message'], 'error');
 
@@ -407,6 +420,12 @@ class SubscriptionsIndex extends Component
             }
 
             $coupon = $couponResult['code'];
+        }
+
+        // ---- گارد IP ایران: پرداخت فقط از IP ایران (ضد فیلترشکن/VPN) ----
+        // فقط مسیر انتقال به درگاه؛ درخواست رایگانِ در انتظار تأیید مدیر باز می‌ماند
+        if ($effectiveFinal > 0 && ! $this->ensurePaymentIpAllowed()) {
+            return;
         }
 
         try {

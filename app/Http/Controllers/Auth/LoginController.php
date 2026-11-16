@@ -40,6 +40,7 @@ class LoginController extends Controller
      * خاموش‌کردن در پنل → سقف عملاً نامحدود.
      */
     protected $maxAttempts = 5;
+
     protected $decayMinutes = 15;
 
     /**
@@ -65,7 +66,7 @@ class LoginController extends Controller
         // هانی‌پات: فیلد مخفی website که انسان پر نمی‌کند؛ اگر پُر بود = ربات
         // → پاسخ مثل «گذرواژهٔ اشتباه» است تا ربات متوجه تله نشود.
         if (Features::honeypot() && trim((string) $request->input('website')) !== '') {
-            CaptchaService::fresh();
+            CaptchaService::fresh('admin_login');
 
             throw ValidationException::withMessages([
                 $this->username() => __('auth.failed'),
@@ -76,11 +77,11 @@ class LoginController extends Controller
         // (حتی ورود موفق) سؤال بعدی متفاوت است.
         $rules = [
             $this->username() => ['required', 'string'],
-            'password'        => ['required', 'string'],
+            'password' => ['required', 'string'],
         ];
 
         if (Features::captcha('admin_login')) {
-            $rules['captcha'] = ['required', 'string', new CaptchaRule];
+            $rules['captcha'] = ['required', 'string', new CaptchaRule('admin_login')];
         }
 
         $request->validate($rules);
@@ -102,9 +103,9 @@ class LoginController extends Controller
         Auth::guard('web')->logout();
 
         $request->session()->put([
-            '2fa:id'       => $user->id,
+            '2fa:id' => $user->id,
             '2fa:remember' => $request->boolean('remember'),
-            '2fa:sent'     => $sent,
+            '2fa:sent' => $sent,
         ]);
 
         return redirect()->route('admin.2fa.challenge');

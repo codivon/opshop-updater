@@ -7,7 +7,9 @@ use App\Models\DiscountCode;
 use App\Models\Gateway;
 use App\Models\PackageLicense;
 use App\Models\PackagePurchase;
+use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\URL;
 use Livewire\Livewire;
 use Tests\Concerns\MakesShopData;
@@ -23,31 +25,44 @@ use Tests\TestCase;
  */
 class PackageCheckoutTest extends TestCase
 {
-    use RefreshDatabase, MakesShopData;
+    use MakesShopData, RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // این فایل جریان پرداخت را می‌آزماید نه کپچا/گارد IP — هر دو خاموش
+        // (رفتار کپچا/گارد در CaptchaDriversAndIpGuardTest پوشش داده می‌شود)
+        Setting::set('sec_captcha_checkout', '0', 'string', 'security');
+        Cache::forget('setting:sec_captcha_checkout');
+
+        Setting::set('sec_payment_ip_guard', '0', 'string', 'security');
+        Cache::forget('setting:sec_payment_ip_guard');
+    }
 
     /** هدرهای احراز API برای مشتری داده‌شده */
     private function apiHeaders(string $updateCode, string $websiteUrl): array
     {
         return [
-            'Authorization' => 'Bearer ' . $updateCode,
+            'Authorization' => 'Bearer '.$updateCode,
             'X-Project-Url' => $websiteUrl,
-            'Accept'        => 'application/json',
+            'Accept' => 'application/json',
         ];
     }
 
     public function test_api_paid_purchase_returns_checkout_url_without_gateway_transaction(): void
     {
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package, ['price' => 350000]);
+        $plan = $this->makePlan($package, ['price' => 350000]);
         $customer = $this->makeCustomer();
 
         $response = $this->postJson(
-            '/api/v1/packages/' . $package->slug . '/purchase',
+            '/api/v1/packages/'.$package->slug.'/purchase',
             [
                 'pricing_plan_id' => $plan->id,
-                'callback_url'    => 'https://example.com/pay/callback',
-                'gateway'         => 'local',
+                'callback_url' => 'https://example.com/pay/callback',
+                'gateway' => 'local',
             ],
             $this->apiHeaders($customer->update_code, $customer->website_url)
         );
@@ -75,21 +90,21 @@ class PackageCheckoutTest extends TestCase
 
     public function test_checkout_page_displays_package_plan_and_discount_field(): void
     {
-        $package  = $this->makePackage(['name' => 'پکیج فروشگاهی خاص']);
+        $package = $this->makePackage(['name' => 'پکیج فروشگاهی خاص']);
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package, ['price' => 350000, 'name' => 'طرح ویژه', 'duration_months' => 6]);
+        $plan = $this->makePlan($package, ['price' => 350000, 'name' => 'طرح ویژه', 'duration_months' => 6]);
         $customer = $this->makeCustomer();
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'callback_url'    => 'https://example.com/pay/callback',
-            'gateway'         => 'local',
+            'customer_id' => $customer->id,
+            'callback_url' => 'https://example.com/pay/callback',
+            'gateway' => 'local',
             'original_amount' => 350000,
-            'amount'          => 350000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'amount' => 350000,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         $url = URL::temporarySignedRoute('shop.checkout', now()->addHour(), ['purchase' => $purchase->id]);
@@ -107,43 +122,43 @@ class PackageCheckoutTest extends TestCase
 
     public function test_invalid_signed_link_is_rejected(): void
     {
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package);
+        $plan = $this->makePlan($package);
         $customer = $this->makeCustomer();
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'amount'          => 100000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'customer_id' => $customer->id,
+            'amount' => 100000,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         // بدون امضا / با امضای دستکاری‌شده → 403
-        $this->get('/checkout/package/' . $purchase->id)->assertStatus(403);
+        $this->get('/checkout/package/'.$purchase->id)->assertStatus(403);
 
         $url = URL::temporarySignedRoute('shop.checkout', now()->addHour(), ['purchase' => $purchase->id]);
-        $this->get($url . 'x')->assertStatus(403);
+        $this->get($url.'x')->assertStatus(403);
     }
 
     public function test_apply_discount_updates_preview_and_payable_amount(): void
     {
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package, ['price' => 100000]);
+        $plan = $this->makePlan($package, ['price' => 100000]);
         $customer = $this->makeCustomer();
-        $coupon   = $this->makeCoupon(['code' => 'CHK30', 'value' => 30, 'applies_products' => false]);
+        $coupon = $this->makeCoupon(['code' => 'CHK30', 'value' => 30, 'applies_products' => false]);
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'amount'          => 100000,
+            'customer_id' => $customer->id,
+            'amount' => 100000,
             'original_amount' => 100000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         Livewire::test(PackageCheckout::class, ['purchase' => $purchase])
@@ -163,18 +178,18 @@ class PackageCheckoutTest extends TestCase
 
     public function test_invalid_discount_code_is_rejected(): void
     {
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package);
+        $plan = $this->makePlan($package);
         $customer = $this->makeCustomer();
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'amount'          => 100000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'customer_id' => $customer->id,
+            'amount' => 100000,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         Livewire::test(PackageCheckout::class, ['purchase' => $purchase])
@@ -187,22 +202,22 @@ class PackageCheckoutTest extends TestCase
 
     public function test_pay_creates_gateway_transaction_and_redirects(): void
     {
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package, ['price' => 100000]);
+        $plan = $this->makePlan($package, ['price' => 100000]);
         $customer = $this->makeCustomer();
-        $coupon   = $this->makeCoupon(['code' => 'CHKPAY', 'value' => 10, 'applies_products' => false]);
+        $coupon = $this->makeCoupon(['code' => 'CHKPAY', 'value' => 10, 'applies_products' => false]);
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'callback_url'    => 'https://example.com/pay/callback',
-            'gateway'         => 'local',
-            'amount'          => 100000,
+            'customer_id' => $customer->id,
+            'callback_url' => 'https://example.com/pay/callback',
+            'gateway' => 'local',
+            'amount' => 100000,
             'original_amount' => 100000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         Livewire::test(PackageCheckout::class, ['purchase' => $purchase])
@@ -229,26 +244,26 @@ class PackageCheckoutTest extends TestCase
 
     public function test_full_discount_issues_license_without_gateway(): void
     {
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package, ['price' => 100000]);
+        $plan = $this->makePlan($package, ['price' => 100000]);
         $customer = $this->makeCustomer();
-        $coupon   = $this->makeCoupon([
-            'code'             => 'CHKFULL',
-            'type'             => DiscountCode::TYPE_PERCENT,
-            'value'            => 100,
+        $coupon = $this->makeCoupon([
+            'code' => 'CHKFULL',
+            'type' => DiscountCode::TYPE_PERCENT,
+            'value' => 100,
             'applies_products' => false,
         ]);
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'gateway'         => 'local',
-            'amount'          => 100000,
+            'customer_id' => $customer->id,
+            'gateway' => 'local',
+            'amount' => 100000,
             'original_amount' => 100000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         Livewire::test(PackageCheckout::class, ['purchase' => $purchase])
@@ -273,20 +288,20 @@ class PackageCheckoutTest extends TestCase
 
     public function test_cancel_marks_purchase_failed_and_returns_to_store(): void
     {
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package);
+        $plan = $this->makePlan($package);
         $customer = $this->makeCustomer();
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'callback_url'    => 'https://example.com/pay/callback?order=12',
-            'gateway'         => 'local',
-            'amount'          => 100000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'customer_id' => $customer->id,
+            'callback_url' => 'https://example.com/pay/callback?order=12',
+            'gateway' => 'local',
+            'amount' => 100000,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         Livewire::test(PackageCheckout::class, ['purchase' => $purchase])
@@ -302,19 +317,19 @@ class PackageCheckoutTest extends TestCase
 
     public function test_paid_purchase_shows_paid_state(): void
     {
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package);
+        $plan = $this->makePlan($package);
         $customer = $this->makeCustomer();
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'amount'          => 0,
-            'status'          => PackagePurchase::STATUS_PAID,
-            'paid_at'         => now(),
+            'customer_id' => $customer->id,
+            'amount' => 0,
+            'status' => PackagePurchase::STATUS_PAID,
+            'paid_at' => now(),
         ]);
 
         $url = URL::temporarySignedRoute('shop.checkout', now()->addHour(), ['purchase' => $purchase->id]);
@@ -330,21 +345,21 @@ class PackageCheckoutTest extends TestCase
         Gateway::create(['name' => 'زیبال', 'key' => 'zibal', 'is_active' => true, 'ordering' => 10]);
         Gateway::create(['name' => 'غیرفعال', 'key' => 'off', 'is_active' => false, 'ordering' => 1]);
 
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package, ['price' => 100000]);
+        $plan = $this->makePlan($package, ['price' => 100000]);
         $customer = $this->makeCustomer();
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'callback_url'    => 'https://example.com/pay/callback',
-            'gateway'         => 'local',
-            'amount'          => 100000,
+            'customer_id' => $customer->id,
+            'callback_url' => 'https://example.com/pay/callback',
+            'gateway' => 'local',
+            'amount' => 100000,
             'original_amount' => 100000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         $url = URL::temporarySignedRoute('shop.checkout', now()->addHour(), ['purchase' => $purchase->id]);
@@ -368,20 +383,20 @@ class PackageCheckoutTest extends TestCase
 
     public function test_pay_rejects_invalid_gateway_selection(): void
     {
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package, ['price' => 100000]);
+        $plan = $this->makePlan($package, ['price' => 100000]);
         $customer = $this->makeCustomer();
 
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'gateway'         => 'local',
-            'amount'          => 100000,
+            'customer_id' => $customer->id,
+            'gateway' => 'local',
+            'amount' => 100000,
             'original_amount' => 100000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         Livewire::test(PackageCheckout::class, ['purchase' => $purchase])
@@ -402,21 +417,21 @@ class PackageCheckoutTest extends TestCase
     {
         Gateway::create(['name' => 'زیبال', 'key' => 'zibal', 'is_active' => true, 'ordering' => 10]);
 
-        $package  = $this->makePackage();
+        $package = $this->makePackage();
         $this->makePackageVersion($package);
-        $plan     = $this->makePlan($package, ['price' => 100000]);
+        $plan = $this->makePlan($package, ['price' => 100000]);
         $customer = $this->makeCustomer();
 
         // خرید بدون درگاهِ ثبت‌شده (رکوردهای قدیمی) → پیش‌فرض اولین درگاه فعال
         $purchase = PackagePurchase::create([
-            'package_id'      => $package->id,
-            'version_id'      => $package->latestVersion()->first()->id,
+            'package_id' => $package->id,
+            'version_id' => $package->latestVersion()->first()->id,
             'pricing_plan_id' => $plan->id,
-            'customer_id'     => $customer->id,
-            'callback_url'    => 'https://example.com/pay/callback',
-            'amount'          => 100000,
+            'customer_id' => $customer->id,
+            'callback_url' => 'https://example.com/pay/callback',
+            'amount' => 100000,
             'original_amount' => 100000,
-            'status'          => PackagePurchase::STATUS_PENDING,
+            'status' => PackagePurchase::STATUS_PENDING,
         ]);
 
         // بدون انتخاب کاربر → اولین درگاه فعال (زیبال با ordering=10 جلوتر از local=99)

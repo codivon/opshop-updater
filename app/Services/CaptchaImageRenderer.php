@@ -28,6 +28,21 @@ class CaptchaImageRenderer
         return resource_path('fonts/Vazirmatn-Bold.ttf');
     }
 
+    /**
+     * عرض بوم بر اساس طول سؤال — عبارت ریاضی چندعملوندی (تا ۵ عملوند) و
+     * پاسخ حرف‌عددی ۵ نویسه‌ای بدون بریدگی جا می‌شوند.
+     */
+    public static function widthFor(string $question): int
+    {
+        $glyphs = preg_replace('/\s+/u', '', $question) ?? '';
+        $spaces = max(0, mb_strlen($question) - mb_strlen($glyphs));
+
+        // ~۱۸px برای هر نویسهٔ رسم‌شده + ~۷px برای فاصله + حاشیهٔ دو طرف
+        $width = 30 + (mb_strlen($glyphs) * 19) + ($spaces * 7);
+
+        return (int) max(static::WIDTH, min(360, $width));
+    }
+
     public static function supported(): bool
     {
         return function_exists('imagettftext')
@@ -44,8 +59,10 @@ class CaptchaImageRenderer
             return static::renderFallback($question);
         }
 
-        $width = static::WIDTH;
         $height = static::HEIGHT;
+
+        // عرض دینامیک: عبارت‌های بلند (ریاضی چندعملوندی) و پاسخ حرف‌عددی جا داشته باشند
+        $width = static::widthFor($question);
 
         $img = imagecreatetruecolor($width, $height);
 
@@ -111,9 +128,10 @@ class CaptchaImageRenderer
             return base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mPcv5+hHgAGgwJ/lK3Q6wAAAABJRU5ErkJggg==');
         }
 
-        $img = imagecreatetruecolor(static::WIDTH, static::HEIGHT);
+        $width = static::widthFor($question);
+        $img = imagecreatetruecolor($width, static::HEIGHT);
         $bg = imagecolorallocate($img, 244, 245, 247);
-        imagefilledrectangle($img, 0, 0, static::WIDTH, static::HEIGHT, $bg);
+        imagefilledrectangle($img, 0, 0, $width, static::HEIGHT, $bg);
         $color = imagecolorallocate($img, 60, 65, 75);
 
         imagestring($img, 5, 30, 15, en_num($question), $color);

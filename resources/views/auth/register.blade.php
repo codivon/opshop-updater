@@ -23,7 +23,7 @@
             </x-field>
 
             @if(\App\Support\Features::captcha('admin_register'))
-                <x-captcha name="captcha" />
+                <x-captcha spot="admin_register" name="captcha" />
             @endif
 
             {{-- هانی‌پات ضدربات — برای انسان نامرئی است --}}

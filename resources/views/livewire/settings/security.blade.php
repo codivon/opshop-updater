@@ -1,4 +1,3 @@
-@php($errBag = $errors ?? new \Illuminate\Support\ViewErrorBag)
 <div class="space-y-6">
     {{-- header --}}
     <div class="flex flex-wrap items-center justify-between gap-4">
@@ -24,30 +23,137 @@
             <x-slot:security>
                 <div class="space-y-6">
                     {{-- ربات‌گیر (کپچا) --}}
-                    <x-card title="ربات‌گیر (کپچای خودمیزبان)" subtitle="سؤال امنیتی ریاضی بدون سرویس خارجی — سازگار با اینترنت ایران.">
+                    <x-card title="ربات‌گیر (کپچا)" subtitle="ضدربات هر فرم — برای هر نقطه، فعال‌سازی و نوع کپچا جداگانه.">
                         <div class="space-y-5">
                             <div class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
-                                <x-toggle wire:model="form.sec_captcha_enabled" label="فعال‌سازی ربات‌گیر (کلید اصلی)" id="sec_captcha_enabled" />
+                                <x-toggle wire:model="form.sec_captcha_enabled" label="فعال‌سازی کپچا (کلید اصلی)" id="sec_captcha_enabled" />
                             </div>
+
+                            @php
+                                $captchaDriverOptions = [
+                                    'image'     => 'تصویری حرف‌عددی',
+                                    'math'      => 'ریاضی پیشرفته',
+                                    'hcaptcha'  => 'hCaptcha',
+                                    'turnstile' => 'Cloudflare Turnstile',
+                                ];
+                                $captchaSpots = [
+                                    'admin_login'    => 'ورود مدیر',
+                                    'admin_register' => 'ثبت‌نام مدیر',
+                                    'customer_login' => 'ورود مشتری (کد آپدیت)',
+                                    'comments'       => 'دیدگاه‌های فروشگاه',
+                                    'contact'        => 'فرم تماس',
+                                    'checkout'       => 'فرم‌های پرداخت فروشگاه',
+                                ];
+                            @endphp
 
                             <div class="grid gap-3 sm:grid-cols-2">
-                                <div class="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
-                                    <x-toggle wire:model="form.sec_captcha_admin_login" label="فرم ورود مدیر" id="sec_captcha_admin_login" />
-                                </div>
-                                <div class="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
-                                    <x-toggle wire:model="form.sec_captcha_admin_register" label="فرم ثبت‌نام مدیر" id="sec_captcha_admin_register" />
-                                </div>
-                                <div class="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
-                                    <x-toggle wire:model="form.sec_captcha_customer_login" label="ورود مشتریان (کد آپدیت)" id="sec_captcha_customer_login" />
-                                </div>
-                                <div class="rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
-                                    <x-toggle wire:model="form.sec_captcha_comments" label="فرم دیدگاه‌های فروشگاه" id="sec_captcha_comments" />
-                                </div>
+                                @foreach($captchaSpots as $spot => $spotLabel)
+                                    <div class="space-y-2.5 rounded-xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                        <x-toggle wire:model="form.sec_captcha_{{ $spot }}" label="{{ $spotLabel }}" id="sec_captcha_{{ $spot }}" />
+                                        <div>
+                                            <label for="sec_captcha_driver_{{ $spot }}" class="mb-1 block text-[11px] font-bold text-zinc-500 dark:text-zinc-400">نوع کپچا</label>
+                                            <select id="sec_captcha_driver_{{ $spot }}"
+                                                    wire:model="form.sec_captcha_driver_{{ $spot }}"
+                                                    aria-label="نوع کپچای {{ $spotLabel }}"
+                                                    class="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-xs font-bold text-zinc-700 outline-none transition-colors focus:border-brand-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">
+                                                @foreach($captchaDriverOptions as $value => $optionLabel)
+                                                    <option value="{{ $value }}" @selected(($form['sec_captcha_driver_'.$spot] ?? 'math') === $value)>{{ $optionLabel }}</option>
+                                                @endforeach
+                                            </select>
+                                            @error('form.sec_captcha_driver_'.$spot)
+                                                <p class="mt-1 text-xs font-bold text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                                            @enderror
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </x-card>
+
+                    {{-- کپچاهای ابری + پیکربندی ریاضی --}}
+                    <x-card title="کپچاهای ابری و پیکربندی کپچای ریاضی" subtitle="کلیدهای hCaptcha - Cloudflare Turnstile — تعداد عملوند و عملیات ریاضی.">
+                        <div class="space-y-5">
+                            <div class="rounded-xl bg-amber-50 p-3.5 text-xs leading-6 text-amber-800 ring-1 ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20">
+                                برای نقاطی که نوع کپچای آن‌ها «hCaptcha» یا «Cloudflare Turnstile» است، کلیدهای زیر الزامی است؛ در نبود کلیدها، آن نقطه به‌صورت امن به «ریاضی پیشرفتهٔ خودمیزبان» برمی‌گردد (فرم هرگز بدون کپچا نمی‌ماند). درایورهای خودمیزبان (تصویری حرف‌عددی و ریاضی) بدون سرویس خارجی روی هر هاستی — حتی با اینترنت ایران — کار می‌کنند.
                             </div>
 
-                            <x-field label="تلهٔ زمان (حداقل ثانیهٔ پاسخ‌دادن)" for="sec_captcha_min_seconds" hint="پاسخ سریع‌تر از این حد = ربات. صفر یعنی خاموش.">
+                            <div class="grid gap-5 sm:grid-cols-2">
+                                <x-field label="Site Key — hCaptcha" for="sec_captcha_hcaptcha_site">
+                                    <x-input id="sec_captcha_hcaptcha_site" wire:model="form.sec_captcha_hcaptcha_site" dir="ltr" placeholder="10000000-ffff-ffff-ffff-000000000001" class="font-mono text-xs" />
+                                </x-field>
+                                <x-field label="Secret Key — hCaptcha" for="sec_captcha_hcaptcha_secret">
+                                    <x-input id="sec_captcha_hcaptcha_secret" wire:model="form.sec_captcha_hcaptcha_secret" dir="ltr" placeholder="0x0000000000000000000000000000000000000000" class="font-mono text-xs" />
+                                </x-field>
+                                <x-field label="Site Key — Cloudflare Turnstile" for="sec_captcha_turnstile_site">
+                                    <x-input id="sec_captcha_turnstile_site" wire:model="form.sec_captcha_turnstile_site" dir="ltr" placeholder="0x4AAAAAAA…" class="font-mono text-xs" />
+                                </x-field>
+                                <x-field label="Secret Key — Cloudflare Turnstile" for="sec_captcha_turnstile_secret">
+                                    <x-input id="sec_captcha_turnstile_secret" wire:model="form.sec_captcha_turnstile_secret" dir="ltr" placeholder="0x4AAAAAAA…" class="font-mono text-xs" />
+                                </x-field>
+                            </div>
+
+                            {{-- پیکربندی کپچای ریاضی --}}
+                            <div class="space-y-4 rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                <p class="text-xs font-black text-zinc-700 dark:text-zinc-200">پیچ‌آگیل کپچای ریاضی پیشرفته — تعداد عملوند و عملیات مجاز</p>
+
+                                <x-field label="تعداد عملوند" for="sec_captcha_math_operands" hint="مثلاً ۳ عملوند: «۴ + ۷ × ۲»">
+                                    <select id="sec_captcha_math_operands"
+                                            wire:model="form.sec_captcha_math_operands"
+                                            aria-label="تعداد عملوند کپچای ریاضی"
+                                            class="w-full max-w-40 rounded-lg border border-zinc-300 bg-white px-2.5 py-2 text-xs font-bold text-zinc-700 outline-none transition-colors focus:border-brand-400 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200">
+                                        @for($i = 2; $i <= 5; $i++)
+                                            <option value="{{ $i }}">{{ fa_num($i) }} عملوند</option>
+                                        @endfor
+                                    </select>
+                                </x-field>
+
+                                <div class="grid gap-3 sm:grid-cols-3">
+                                    <div class="rounded-lg bg-white p-3 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/60">
+                                        <x-toggle wire:model="form.sec_captcha_math_add" label="جمع (+)" id="sec_captcha_math_add" />
+                                    </div>
+                                    <div class="rounded-lg bg-white p-3 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/60">
+                                        <x-toggle wire:model="form.sec_captcha_math_mul" label="ضرب (×)" id="sec_captcha_math_mul" />
+                                    </div>
+                                    <div class="rounded-lg bg-white p-3 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/60">
+                                        <x-toggle wire:model="form.sec_captcha_math_sub" label="تفریق (−)" id="sec_captcha_math_sub" />
+                                    </div>
+                                </div>
+                                @error('form.sec_captcha_math_add')
+                                    <p class="text-xs font-bold text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                                @enderror
+
+                                <p class="text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                                    سؤال در تصویر PNG با نویز/چرخش/خط مزاحم رندر می‌شود (استخراج با OCR نه regex)؛ پاسخ فقط در سشن سرور است، مصرف یک‌بارمصرف دارد و تلهٔ زمان روی آن فعال است.
+                                </p>
+                            </div>
+
+                            <x-field label="تلهٔ زمان (حداقل ثانیهٔ پاسخ‌دادن)" for="sec_captcha_min_seconds" hint="پاسخ سریع‌تر از این حد = ربات. صفر یعنی خاموش. فقط روی کپچای خودمیزبان اثر دارد.">
                                 <x-input id="sec_captcha_min_seconds" wire:model="form.sec_captcha_min_seconds" type="number" min="0" max="60" dir="ltr" class="w-28" />
                             </x-field>
+                        </div>
+                    </x-card>
+
+                    {{-- گارد IP پرداخت --}}
+                    <x-card title="گارد IP پرداخت (ضد فیلترشکن/VPN)" subtitle="پرداخت‌ها فقط از IP ایران پذیرفته می‌شود؛ انتقال به درگاه با فیلترشکن انجام نمی‌شود.">
+                        <div class="space-y-5">
+                            <div class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                <x-toggle wire:model="form.sec_payment_ip_guard" label="فعال‌سازی گارد IP پرداخت (کلید اصلی)" id="sec_payment_ip_guard" />
+                            </div>
+
+                            <div class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                <x-toggle wire:model="form.sec_payment_ip_guard_strict" label="حالت سخت‌گیرانه — وقتی سرویس تشخیص IP در دسترس نیست، پرداخت بسته شود" id="sec_payment_ip_guard_strict" />
+                            </div>
+
+                            <div class="rounded-xl bg-zinc-100/70 p-4 text-xs leading-6 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300">
+                                <p class="font-black">چطور کار می‌کند؟</p>
+                                <p class="mt-1.5">در همهٔ صفحه‌های دارای دکمهٔ پرداخت (تسویه پکیج، پروژه، قالب و اشتراک)، پیش از انتقال به درگاه، IP کاربر با سرویس‌های تشخیص (ip-api.com و فال‌بک ipwho.is) بررسی می‌شود:</p>
+                                <ul class="mt-2 space-y-1.5">
+                                    <li class="flex items-start gap-2"><span class="mt-1.5 size-1.5 shrink-0 rounded-full bg-zinc-400"></span> IP خارج از ایران → مودال هشدار «فیلترشکن (VPN) شناسایی شد» و عدم انتقال به درگاه.</li>
+                                    <li class="flex items-start gap-2"><span class="mt-1.5 size-1.5 shrink-0 rounded-full bg-zinc-400"></span> پرچم proxy/hosting (فیلترشکن یا سرور) → همان مودال هشدار، حتی با IP ایران.</li>
+                                    <li class="flex items-start gap-2"><span class="mt-1.5 size-1.5 shrink-0 rounded-full bg-zinc-400"></span> نتیجهٔ هر IP ۱۰ دقیقه کش می‌شود؛ مسیرهای رایگان (بدون درگاه) از گارد مستثنی‌اند.</li>
+                                    <li class="flex items-start gap-2"><span class="mt-1.5 size-1.5 shrink-0 rounded-full bg-zinc-400"></span> قطعی سرویس‌های تشخیص → حالت عادی: اجازهٔ پرداخت (fail-open)؛ حالت سخت‌گیرانه: بستن پرداخت.</li>
+                                </ul>
+                            </div>
                         </div>
                     </x-card>
 

@@ -59,7 +59,7 @@ class RegisterController extends Controller
 
         // ضدربات: کپچای خودمیزبان (سؤال ریاضی سشن) — از پنل امنیت و امکانات
         if (Features::captcha('admin_register')) {
-            $rules['captcha'] = ['required', 'string', new CaptchaRule];
+            $rules['captcha'] = ['required', 'string', new CaptchaRule('admin_register')];
         }
 
         return Validator::make($data, $rules, [

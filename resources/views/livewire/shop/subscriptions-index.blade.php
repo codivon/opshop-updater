@@ -325,6 +325,11 @@
                                     <div>
                                         @include('livewire.shop.partials.gateway-picker', ['gateways' => $this->gateways])
                                     </div>
+
+                                    {{-- کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات) --}}
+                                    @if(\App\Support\Features::captcha('checkout'))
+                                        <x-captcha spot="checkout" wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+                                    @endif
                                 @endif
 
                                 {{-- کد تخفیف (پایه: مدت انتخابی) --}}
@@ -523,4 +528,7 @@
             </div>
         @endif
     </section>
+
+    {{-- مودال هشدار فیلترشکن/VPN — گارد IP پرداخت --}}
+    <x-vpn-guard-modal wireModel="showVpnModal" retryMethod="buy" />
 </div>
