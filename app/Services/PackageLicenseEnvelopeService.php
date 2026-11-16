@@ -280,16 +280,37 @@ class PackageLicenseEnvelopeService
      * =================================================================== */
 
     /**
+     * شناسهٔ پایدار کلید امضای فعلی (۱۲ رقم اول SHA-1 کلید خصوصی).
+     *
+     * چرا لازم است؟ محتوای مانیفست برای هر نسخه ثابت است، ولی «امضا» به کلید
+     * خصوصیِ لحظهٔ امضا وابسته است. اگر کلید کش فقط slug+version باشد، بعد از
+     * چرخش کلید (تغویض از پنل) تا ۳۰ روز امضای کهنهٔ کش‌شده سرو می‌شود و
+     * فروشگاهِ با کلید عمومی جدید آن را رد می‌کند (خطای «امضای مانیفست
+     * یکپارچگی معتبر نیست» در نصب پکیج‌ها).
+     *
+     * با گنجاندن شناسهٔ کلید در کلیدِ کش، تعویض کلید = کلید کش جدید = امضای
+     * تازه با کلید فعلی؛ مدخل‌های کهنه دیگر هرگز خوانده نمی‌شوند.
+     */
+    public function signingKeyId(): string
+    {
+        $pem = $this->resolvePrivateKeyPem();
+
+        return $pem === '' ? 'no-key' : substr(sha1($pem), 0, 12);
+    }
+
+    /**
      * ساخت مانیفست امضاشده از ZIP نسخهٔ پکیج — SHA-256 همهٔ فایل‌ها.
      *
      * نکته: پوشهٔ .git داخل ZIP اگر وجود داشته باشد (نباید وجود داشته باشد)
-     * نادیده گرفته می‌شود. نتیجه per-version کش می‌شود تا هر verify ZIP باز نشود.
+     * نادیده گرفته می‌شود. نتیجه per-version کش می‌شود تا هر verify ZIP باز نشود؛
+     * کلیدِ کش شامل شناسهٔ کلید امضاست (signingKeyId) تا بعد از چرخش کلید،
+     * امضای کهنه هرگز دوباره سرو نشود.
      *
      * @return array{manifest: array<string,mixed>, signature: string}
      */
     public function manifestForVersion(Package $package, PackageVersion $version): array
     {
-        $cacheKey = 'license_envelope.manifest.'.$package->slug.'.'.$version->version;
+        $cacheKey = 'license_envelope.manifest.'.$package->slug.'.'.$version->version.'.'.$this->signingKeyId();
 
         $cached = Cache::get($cacheKey);
 
@@ -313,7 +334,8 @@ class PackageLicenseEnvelopeService
             'signature' => $this->sign($manifest),
         ];
 
-        // مانیفست ثابت نسخه است — کش طولانی بی‌خطر است
+        // محتوای مانیفست ثابتِ نسخه است؛ کلیدِ کش به کلید امضا گره خورده،
+        // پس کش طولانی بی‌خطر است (تعویض کلید ⇒ کلیدِ کش جدید ⇒ امضای تازه)
         Cache::put($cacheKey, $result, now()->addDays(30));
 
         return $result;

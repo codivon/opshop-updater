@@ -599,12 +599,44 @@ class ApiPackageController extends Controller
                 return response()->json(['error' => 'لایسنس یا اشتراک فعالی برای این پکیج ندارید.'], 403);
             }
 
-            $version = $request->filled('version')
-                ? $package->versions()->where('version', $request->version)->first()
+            // تطبیق نسخه: دقیق ← نرم (فاصله/پیشوند v/بزرگی‌حرف) ← خطای گویا با
+            // فهرست نسخه‌های موجود، تا عدم‌تطابق نسخهٔ فروشگاه و بازار فوراً
+            // از متن خطا یا لاگ قابل‌تشخیص باشد (قبلاً فقط «یافت نشد» برمی‌گشت).
+            $requestedVersion = $request->filled('version') ? (string) $request->version : null;
+
+            $version = $requestedVersion !== null
+                ? $package->versions()->where('version', $requestedVersion)->first()
                 : $package->latestVersion()->first();
 
+            if (! $version instanceof PackageVersion && $requestedVersion !== null) {
+                $needle = $this->normalizeVersion($requestedVersion);
+
+                foreach ($package->versions()->orderByDesc('id')->get() as $candidate) {
+                    if ($this->normalizeVersion((string) $candidate->version) === $needle) {
+                        $version = $candidate;
+
+                        break;
+                    }
+                }
+            }
+
             if (!$version instanceof PackageVersion) {
-                return response()->json(['error' => 'نسخهٔ درخواستی یافت نشد.'], 404);
+                $available = $package->versions()->orderByDesc('id')->limit(10)->pluck('version')->all();
+
+                Log::warning('Packages API: manifest version not found', [
+                    'slug'               => $slug,
+                    'requested_version'  => $requestedVersion,
+                    'available_versions' => $available,
+                    'customer_id'        => $customer->id,
+                ]);
+
+                return response()->json([
+                    'error' => 'نسخهٔ درخواستی یافت نشد.'
+                        . ($requestedVersion !== null && $requestedVersion !== '' ? ' (نسخهٔ درخواستی فروشگاه: '.$requestedVersion.')' : '')
+                        . ($available !== []
+                            ? ' — نسخه‌های موجود روی بازار: '.implode(' ، ', $available).' (برای رفع: پکیج را در فروشگاه به یکی از این نسخه‌ها آپدیت کنید.)'
+                            : ' — هیچ نسخه‌ای برای این پکیج روی بازار ثبت نشده است.'),
+                ], 404);
             }
 
             $envelopeService = app(PackageLicenseEnvelopeService::class);
@@ -924,5 +956,16 @@ class ApiPackageController extends Controller
         ]);
 
         return $token->token;
+    }
+
+    /* ===================================================================
+     *  Helper — نرمال‌سازی نسخه برای تطبیق نرم
+     *  ('v1.2.1' / '1.2.1 ' / 'V1.2.1' همه = '1.2.1')
+     * =================================================================== */
+    private function normalizeVersion(string $version): string
+    {
+        $version = strtolower(trim($version));
+
+        return (string) preg_replace('/^v\s*/', '', $version);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -137,9 +138,14 @@ class LicenseSigningKeyService
         // معادل artisan config:clear — بدون شِل
         $cacheCleared = $this->clearConfigCache();
 
+        // پاک‌سازی امضاهای مانیفستِ کش‌شده با کلید قدیمی — فروشگاه‌ها باید
+        // امضای تازه با کلید جدید بگیرند نه امضای کهنهٔ کش (driver دیتابیس)
+        $manifestCacheFlushed = $this->flushManifestSignatureCache();
+
         Log::warning('License signing key '.($force ? 'ROTATED' : 'generated').' from admin panel', [
-            'fingerprint'         => $this->fingerprint($publicPem),
-            'config_cache_cleared' => $cacheCleared,
+            'fingerprint'              => $this->fingerprint($publicPem),
+            'config_cache_cleared'     => $cacheCleared,
+            'manifest_cache_flushed'   => $manifestCacheFlushed,
         ]);
 
         return [
@@ -166,6 +172,36 @@ class LicenseSigningKeyService
             return true;
         } catch (\Throwable $e) {
             Log::warning('License signing key: config:clear failed from panel', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * بهترین‌تلاش برای حذف مانیفست‌های امضاشدهٔ کش‌شده با کلید قبلی.
+     *
+     * درایور پیش‌فرض کش دیتابیس است (پشتیبانی از tags ندارد) — مستقیم جدول
+     * cache خالی می‌شود. برای درایورهای دیگر، هرگز نباید چرخش کلید را بشکند؛
+     * فقط لاگ می‌شود (کلیدِ کشِ مانیفست شامل شناسهٔ کلید امضاست —
+     * PackageLicenseEnvelopeService::signingKeyId — پس مدخل‌های کهنه به‌هرحال
+     * دیگر سرو نمی‌شوند؛ این پاک‌سازی صرفاً بهداشتی است).
+     */
+    private function flushManifestSignatureCache(): bool
+    {
+        try {
+            if ((string) config('cache.default') === 'database') {
+                DB::table((string) config('cache.database.table', 'cache'))
+                    ->where('key', 'like', 'license_envelope.manifest.%')
+                    ->delete();
+
+                return true;
+            }
+
+            return false;
+        } catch (\Throwable $e) {
+            Log::warning('License signing key: manifest signature cache flush failed', [
                 'error' => $e->getMessage(),
             ]);
 
