@@ -27,6 +27,11 @@ class Novinopay extends Driver
     protected string|null $paymentUrl = null;
 
     /**
+     * HTTP status code of the last gateway response (for precise error messages).
+     */
+    protected int|null $lastHttpStatus = null;
+
+    /**
      * Novinopay constructor.
      * Construct the class with the relevant settings.
      */
@@ -137,20 +142,41 @@ class Novinopay extends Driver
 
     /**
      * Send a request to the gateway and hand back its decoded answer.
+     *
+     * فیکس Task 86: خطاهای شبکه و پاسخ‌های غیر JSON (مثل صفحهٔ 404 HTML) قبلاً
+     * به «خطای ناشناخته‌ای رخ داده است.» تبدیل می‌شدند؛ حالا پیام دقیق برمی‌گردد.
      */
     protected function send(string $url, array $data): array
     {
-        $response = $this->client->request('POST', $url, [
-            RequestOptions::JSON => $data,
-            RequestOptions::HEADERS => [
-                'Accept' => 'application/json',
-            ],
-            RequestOptions::HTTP_ERRORS => false,
-        ]);
+        try {
+            $response = $this->client->request('POST', $url, [
+                RequestOptions::JSON => $data,
+                RequestOptions::HEADERS => [
+                    'Accept' => 'application/json',
+                ],
+                RequestOptions::HTTP_ERRORS => false,
+                RequestOptions::TIMEOUT => 30,
+            ]);
+        } catch (\Throwable $e) {
+            // خطای شبکه (قطع اتصال، DNS، تایم‌اوت...) — پیام واضح به‌جای استثنای خام Guzzle
+            throw new PurchaseFailedException(
+                'ارتباط با درگاه نوین‌پی برقرار نشد ('.$e->getMessage().') — اتصال سرور به novinopay.com را بررسی کنید.',
+                0
+            );
+        }
 
-        $body = json_decode((string) $response->getBody(), true);
+        $this->lastHttpStatus = $response->getStatusCode();
+        $raw = (string) $response->getBody();
+        $body = json_decode($raw, true);
 
-        return is_array($body) ? $body : [];
+        if (is_array($body)) {
+            return $body;
+        }
+
+        // پاسخ غیر JSON (HTML 404/500 و غیره) — پیام دقیق با کد HTTP تا علت گم نشود
+        return [
+            'message' => "پاسخ درگاه نوین‌پی معتبر نبود (HTTP {$this->lastHttpStatus} بدون JSON) — آدرس API یا دسترسی سرور را بررسی کنید.",
+        ];
     }
 
     /**

@@ -101,11 +101,13 @@ return [
             'description' => 'payment using asanpardakht',
         ],
         'novinopay' => [
-            // درایور رسمی نوین‌پی (پورت از shetabit/multipay v3.6.0 در packages/shetabit)
-            // درگاه آدرس صفحهٔ پرداخت (payment_url) را در پاسخ purchase برمی‌گرداند؛ URL اضافه لازم نیست
-            'apiPurchaseUrl' => 'https://novinopay.com/merchant/invoices/add',
-            'apiVerificationUrl' => 'https://novinopay.com/merchant/invoices/verify',
-            'merchantId' => '',
+            // درایور رسمی نوین‌پی — مستندات: https://novinopay.com/docs
+            // 🔧 فیکس Task 86: URLهای قبلی (novinopay.com/merchant/invoices/add) الگوی Sepordeh
+            // بودند و 404 HTML برمی‌گرداندند → «خطای ناشناخته‌ای رخ داده است».
+            // endpointهای واقعی IPG v2 روی subدامنهٔ api هستند؛ درگاه payment_url را در پاسخ purchase برمی‌گرداند.
+            'apiPurchaseUrl' => 'https://api.novinopay.com/payment/ipg/v2/request',
+            'apiVerificationUrl' => 'https://api.novinopay.com/payment/ipg/v2/verification',
+            'merchantId' => '', // مرچنت از پنل ← درگاه‌ها ← «درگاه نوین پی» خوانده می‌شود
             'callbackUrl' => 'http://yoursite.com/path/to',
             'description' => 'payment using novinopay',
             'currency' => 'T', // واحد مبلغ Invoice: R, T (Rial, Toman) — همیشه ریال به درگاه ارسال می‌شود

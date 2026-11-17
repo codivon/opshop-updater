@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\EnvEditor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -324,6 +325,112 @@ class DeveloperSettingsTest extends TestCase
         Livewire::test(Developer::class)
             ->call('optimize')
             ->assertDispatched('toast');
+    }
+
+    /* -------------------------------------------------------------- */
+    /*  تب «لاگ‌های سیستم» — نمایشگر لاگ + کپی کامل رکورد (Task 86) */
+    /* -------------------------------------------------------------- */
+
+    public function test_logs_tab_renders_entries_from_laravel_log(): void
+    {
+        // فایل لاگ آزمون با دو رکورد شناخته‌شده
+        $testLog = storage_path('logs/laravel.log');
+        File::ensureDirectoryExists(dirname($testLog));
+        File::put($testLog,
+            "[2026-11-17 10:00:00] production.ERROR: خطای آزمونی خرید\r".
+            '{"purchase_id":999,"error":"قابل تست"} '.
+            "\n#0 /path/one.php(11): App\\Services\\PaymentService->createPayment()\n".
+            "#1 /path/two.php(22): Shetabit\\Multipay\\Payment->purchase()\n\n".
+            "[2026-11-17 10:05:00] production.INFO: پیام اطلاعاتی آزمونی\n\n"
+        );
+
+        try {
+            $this->actingAs($this->admin)
+                ->get(route('admin.settings.developer'))
+                ->assertOk()
+                ->assertSee('لاگ‌های سیستم')
+                ->assertSee('laravel.log')
+                ->assertSee('خطای آزمونی خرید')
+                ->assertSee('پیام اطلاعاتی آزمونی')
+                // کلید کپی کامل رکورد
+                ->assertSee('کپی کامل رکورد')
+                // استک‌تریس کامل در رکورد بازشو برای کپی
+                ->assertSee('#0 /path/one.php(11)');
+        } finally {
+            File::delete($testLog);
+        }
+    }
+
+    public function test_logs_tab_search_filters_entries(): void
+    {
+        $testLog = storage_path('logs/laravel.log');
+        File::ensureDirectoryExists(dirname($testLog));
+        File::put($testLog,
+            "[2026-11-17 10:00:00] production.ERROR: خطای درگاه نوین‌پی\n\n".
+            "[2026-11-17 10:05:00] production.ERROR: خطای کش پیکربندی\n\n"
+        );
+
+        try {
+            $this->actingAs($this->admin);
+
+            Livewire::withQueryParams([])
+                ->test(Developer::class)
+                ->set('logSearch', 'نوین‌پی')
+                ->assertSee('خطای درگاه نوین‌پی')
+                ->assertDontSee('خطای کش پیکربندی');
+
+            // فیلتر سطح
+            Livewire::test(Developer::class)
+                ->set('logLevel', 'error')
+                ->assertSee('خطای درگاه نوین‌پی')
+                // «همه سطوح» در حالت سطح خالی — با فیلتر error فقط دو رکورد error هستند
+                ->assertDontSee('پیام اطلاعاتی');
+        } finally {
+            File::delete($testLog);
+        }
+    }
+
+    public function test_clear_log_action_empties_log_file(): void
+    {
+        $testLog = storage_path('logs/laravel.log');
+        File::ensureDirectoryExists(dirname($testLog));
+        File::put($testLog, "[2026-11-17 10:00:00] production.ERROR: رکورد برای پاک‌سازی\n\n");
+
+        try {
+            $this->actingAs($this->admin);
+
+            Livewire::test(Developer::class)
+                ->set('confirmClearLog', true)
+                ->call('clearLog')
+                ->assertDispatched('toast')
+                ->assertSet('confirmClearLog', false);
+
+            $this->assertSame('', File::get($testLog));
+        } finally {
+            File::delete($testLog);
+        }
+    }
+
+    public function test_guest_cannot_clear_log(): void
+    {
+        $testLog = storage_path('logs/laravel.log');
+        File::ensureDirectoryExists(dirname($testLog));
+        File::put($testLog, "[2026-11-17 10:00:00] production.ERROR: رکورد محافظت‌شده\n\n");
+
+        try {
+            // الگوی «تب باز + سشن مرده»: بوت با ادمین، خروج، سپس اکشن — باید redirect بگیرد نه پاک‌سازی
+            $this->actingAs($this->admin);
+
+            $component = Livewire::test(Developer::class);
+            auth()->logout();
+
+            $component->call('clearLog')
+                ->assertRedirect(route('login'));
+
+            $this->assertStringContainsString('رکورد محافظت‌شده', File::get($testLog));
+        } finally {
+            File::delete($testLog);
+        }
     }
 
     /* -------------------------------------------------------------- */

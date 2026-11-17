@@ -48,6 +48,9 @@
         [
             'label' => 'سیستم',
             'items' => [
+                // درآمد (Task 86): منو در سایدبار واقعی ادمین اضافه شد — قبلاً فقط
+                // به سایدبار قدیمی Blade (back/partials) اضافه شده بود و کاربر آن را نمی‌دید
+                ['route' => 'admin.revenue.index', 'title' => 'درآمد', 'icon' => 'banknote', 'match' => ['admin.revenue*']],
                 ['route' => 'admin.reports.index', 'title' => 'گزارش‌ها', 'icon' => 'bar-chart', 'match' => ['admin.reports*']],
                 ['route' => 'admin.logs.index', 'title' => 'لاگ‌ها', 'icon' => 'terminal', 'match' => ['admin.logs*']],
                 ['route' => 'admin.tools.backup', 'title' => 'پشتیبان‌گیری', 'icon' => 'archive', 'match' => ['admin.tools*']],

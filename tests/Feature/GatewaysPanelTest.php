@@ -211,8 +211,12 @@ class GatewaysPanelTest extends TestCase
     {
         $driver = config('payment.drivers.novinopay');
 
-        $this->assertSame('https://novinopay.com/merchant/invoices/add', $driver['apiPurchaseUrl']);
-        $this->assertSame('https://novinopay.com/merchant/invoices/verify', $driver['apiVerificationUrl']);
+        // 🔧 فیکس Task 86 — مستندات رسمی https://novinopay.com/docs:
+        // endpointهای واقعی IPG v2 روی subدامنهٔ api هستند؛ URLهای قبلی
+        // (novinopay.com/merchant/invoices/add) الگوی اشتباه Sepordeه بودند و
+        // 404 HTML برمی‌گرداندند → «خطای ناشناخته‌ای رخ داده است» در خرید واقعی.
+        $this->assertSame('https://api.novinopay.com/payment/ipg/v2/request', $driver['apiPurchaseUrl']);
+        $this->assertSame('https://api.novinopay.com/payment/ipg/v2/verification', $driver['apiVerificationUrl']);
         // v3.6.0: currency در زمان اجرا به enum IranCurrency تبدیل می‌شود (Toman → ضریب ۱۰)
         $this->assertInstanceOf(IranCurrency::class, $driver['currency']);
         $this->assertSame(10, $driver['currency']->ratio());
