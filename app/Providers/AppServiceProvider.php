@@ -8,8 +8,10 @@ use App\Models\Product;
 use App\Models\Template;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Illuminate\Support\ViewErrorBag;
 use Shetabit\Multipay\Constants\IranCurrency;
 
@@ -20,6 +22,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // نام‌های مستعار کمکی — تا Str:: و Arr:: در Blade بدون namespace کامل کار کنند
+        // (رفع خطای «Class "Str" not found» در ویوها)
+        if (! class_exists('Str')) {
+            class_alias(Str::class, 'Str');
+        }
+        if (! class_exists('Arr')) {
+            class_alias(Arr::class, 'Arr');
+        }
+
         // RateLimiter (throttle مسیرها + تلاش‌های ورود + سقف کامنت) روی استور «file»
         // — مستقل از جدول cache دیتابیس؛ روی هاست اشتراکی همیشه در دسترس است.
         $this->app->singleton(RateLimiter::class, function ($app) {

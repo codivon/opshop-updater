@@ -601,7 +601,9 @@ class Seo
             'Disallow: /captcha',
             'Disallow: /templates/download',
             'Disallow: /products/download',
-            'Disallow: /uploads/',
+            // تصاویر محصول (تامبنیل/گالری) برای «جستجوی تصویر» گوگل و رنک تصاویر باید خزنده بمانند —
+            // فقط لوگوی درگاه‌های پرداخت از ایندکس خارج می‌شود
+            'Disallow: /uploads/gateways/',
             'Disallow: /login',
             'Disallow: /register',
             'Disallow: /password/*',

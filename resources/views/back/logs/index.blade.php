@@ -68,7 +68,7 @@
                                 @endphp
                                 <span class="badge {{ $badgeClass }}">{{ $log['level'] }}</span>
                             </td>
-                            <td class="font-monospace small text-break">{{ Str::limit($log['message'], 150) }}</td>
+                            <td class="font-monospace small text-break">{{ \Illuminate\Support\Str::limit($log['message'], 150) }}</td>
                         </tr>
                     @empty
                         <tr>

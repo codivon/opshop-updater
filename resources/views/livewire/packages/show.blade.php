@@ -754,7 +754,7 @@
                         <x-input id="form_meta_title" wire:model="form.meta_title" dir="ltr" placeholder="{{ $package->name }}" />
                     </x-field>
                     <x-field label="توضیح متا (Description)" for="form_meta_description" hint="۱۵۰ تا ۱۶۰ کاراکتر گویا با کلمات کلیدی هدف.">
-                        <x-textarea id="form_meta_description" wire:model="form.meta_description" rows="3" placeholder="{{ Str::limit($package->short_description ?: '', 155) }}" />
+                        <x-textarea id="form_meta_description" wire:model="form.meta_description" rows="3" placeholder="{{ \Illuminate\Support\Str::limit($package->short_description ?: '', 155) }}" />
                     </x-field>
                 </div>
             </div>
