@@ -14,17 +14,17 @@ class SmsTemplate extends Model
     ];
 
     protected $casts = [
-        'variables'     => 'array',
+        'variables' => 'array',
         'pattern_codes' => 'array',
-        'is_active'     => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     /** نام درایورهای پشتیبانی‌شده (برای UI و ارسال) */
     public const DRIVERS = [
-        'kavenegar'    => 'کاوه‌نگار',
-        'melipayamak'  => 'ملی‌پیامک',
-        'ippanel'      => 'آی‌پی‌پنل',
-        'farazsms'     => 'فراز اس‌ام‌اس',
+        'kavenegar' => 'کاوه‌نگار',
+        'melipayamak' => 'ملی‌پیامک',
+        'ippanel' => 'آی‌پی‌پنل',
+        'farazsms' => 'فراز اس‌ام‌اس',
         'idehpardazan' => 'ایده پردازان',
     ];
 
@@ -32,6 +32,7 @@ class SmsTemplate extends Model
     public const SYSTEM_KEYS = [
         'purchase_paid', 'subscription_paid', 'subscription_activated',
         'subscription_renewed', 'subscription_expiring', 'subscription_expired',
+        'package_reserved', 'package_renewal_activated', 'subscription_reserved',
     ];
 
     /** کد پترن برای یک درایور مشخص */
@@ -45,11 +46,11 @@ class SmsTemplate extends Model
     /** رندر متن با مقادیر متغیرها */
     public function render(array $vars = []): string
     {
-        $text  = (string) $this->body;
+        $text = (string) $this->body;
         $names = is_array($this->variables) ? $this->variables : [];
 
         foreach ($names as $name) {
-            $text = str_replace('{' . $name . '}', (string) ($vars[$name] ?? ''), $text);
+            $text = str_replace('{'.$name.'}', (string) ($vars[$name] ?? ''), $text);
         }
 
         return $text;

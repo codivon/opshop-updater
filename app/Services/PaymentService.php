@@ -730,6 +730,27 @@ class PaymentService
                 'gateway' => $gateway,
             ]);
 
+            // 6️⃣ Task 87 — خرید رزروشده: پول پرداخت شده اما صدور لایسنس به پایان
+            // دورهٔ فعلی مشتری موکول می‌شود (کالکسیون renewals:activate فعال می‌کند)
+            if ($purchase->isReserved()) {
+                $activateAt = $purchase->reserved_activate_at;
+
+                Log::info('Reserved purchase paid — license issuance deferred', [
+                    'purchase_id' => $purchase->id,
+                    'activate_at' => $activateAt?->toDateTimeString(),
+                ]);
+
+                return [
+                    'paid' => true,
+                    'reserved' => true,
+                    'activation_at' => $activateAt?->toDateTimeString(),
+                    'message' => 'پرداخت با موفقیت تأیید شد؛ این خرید پس از پایان دورهٔ فعلی شما ('
+                        .($activateAt ? (verta_date($activateAt, 'Y/m/d') ?? $activateAt->format('Y/m/d')) : '—')
+                        .') به‌صورت خودکار فعال می‌شود.',
+                    'purchase_id' => $purchase->id,
+                ];
+            }
+
             // 6️⃣ صدور لایسنس
             try {
                 $license = $renew

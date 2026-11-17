@@ -18,12 +18,15 @@ class PackagePurchase extends Model
         'original_amount', 'amount', 'discount_amount',
         'callback_url', 'gateway', 'payment_url', 'status', 'paid_at', 'meta',
         'access_token',
+        'reserved_activate_at', 'reserved_source_license_id', 'reserved_activated_at',
     ];
 
     protected $casts = [
         'amount' => 'integer',
         'paid_at' => 'datetime',
         'meta' => 'array',
+        'reserved_activate_at' => 'datetime',
+        'reserved_activated_at' => 'datetime',
     ];
 
     public const STATUS_PENDING = 'pending';
@@ -101,5 +104,19 @@ class PackagePurchase extends Model
             'status' => self::STATUS_FAILED,
             'meta' => array_merge($this->meta ?? [], ['fail_reason' => $reason]),
         ]);
+    }
+
+    /* ---------------- Task 87 — رزرو تمدید ---------------- */
+
+    /** آیا این خرید «رزروشده» است؟ (پرداخت شده اما لایسنسش پس از پایان دورهٔ فعلی صادر می‌شود) */
+    public function isReserved(): bool
+    {
+        return $this->reserved_activate_at !== null;
+    }
+
+    /** آیا رزرو هنوز فعال نشده؟ */
+    public function isReservedPending(): bool
+    {
+        return $this->isReserved() && $this->reserved_activated_at === null;
     }
 }

@@ -60,7 +60,17 @@ class ApiPaymentCallbackController extends Controller
                 'license_key' => (string) ($result['license_key'] ?? $purchase->license?->license_key ?? ''),
             ];
 
-            $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
+            // Task 87 — خرید رزروشده → پیامک «رزرو شد» به‌جای پیامک لایسنس
+            if ($purchase->isReserved()) {
+                $this->smsManager->send('package_reserved', $purchase->customer?->phone, array_merge($vars, [
+                    'end_date' => $purchase->reserved_activate_at
+                        ? (verta_date($purchase->reserved_activate_at, 'Y/m/d') ?? $purchase->reserved_activate_at->format('Y/m/d'))
+                        : '',
+                ]), $purchase, once: true);
+            } else {
+                $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
+            }
+
             $this->smsManager->notifyAdminSale('package', 'admin_purchase_paid', $vars, $purchase);
         }
 

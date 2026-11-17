@@ -164,8 +164,35 @@
                 </div>
             </x-card>
 
-            {{-- license card --}}
-            @if($purchase->license)
+            {{-- Task 87 — کارت خرید رزروشده: لایسنس پس از پایان دورهٔ فعلی صادر می‌شود --}}
+            @if(!$purchase->license && $purchase->isReserved())
+                <x-card title="خرید رزروشده" subtitle="فعال‌سازی خودکار پس از پایان دورهٔ فعلی">
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-3 rounded-2xl bg-violet-50 p-4 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/25">
+                            <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400">
+                                <x-icon name="clock" class="size-5" />
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-sm font-black text-violet-800 dark:text-violet-300">پرداخت شما با موفقیت انجام شد؛ خرید رزرو شد</p>
+                                <p class="mt-1 text-xs leading-6 text-violet-700/90 dark:text-violet-300/80">
+                                    اعتبار فعلی شما برای پکیج «{{ $purchase->package?->name }}» هنوز ادامه دارد. خرید جدید شما به‌صورت رزرو ذخیره شده و
+                                    پس از پایان دورهٔ فعلی ({{ $purchase->reserved_activate_at ? verta_date($purchase->reserved_activate_at, 'Y/m/d') : '—' }})
+                                    به‌طور خودکار فعال می‌شود؛ لایسنس و پیامک فعال‌سازی در همان لحظه ارسال می‌شود.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between rounded-xl bg-zinc-50 px-4 py-3 ring-1 ring-zinc-200/80 dark:bg-zinc-800/60 dark:ring-zinc-700">
+                            <span class="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                <x-icon name="calendar-clock" class="size-4" />
+                                زمان فعال‌سازی خودکار
+                            </span>
+                            <span class="text-sm font-black tabular-nums text-zinc-900 dark:text-zinc-50">
+                                {{ $purchase->reserved_activate_at ? verta_date($purchase->reserved_activate_at, 'Y/m/d — H:i') : '—' }}
+                            </span>
+                        </div>
+                    </div>
+                </x-card>
+            @elseif($purchase->license)
                 @php($license = $purchase->license)
                 <x-card title="لایسنس شما" subtitle="این کلید را برای فعال‌سازی/به‌روزرسانی پکیج استفاده کنید">
                     <div class="space-y-4">

@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection;
-use Carbon\Carbon;
 
 class Subscription extends Model
 {
@@ -26,6 +26,7 @@ class Subscription extends Model
         'final_amount',
         'payment_status',
         'description',
+        'reserved_activate_at',
     ];
 
     protected $casts = [
@@ -35,6 +36,7 @@ class Subscription extends Model
         'price' => 'decimal:2',
         'discount' => 'decimal:2',
         'final_amount' => 'decimal:2',
+        'reserved_activate_at' => 'datetime',
     ];
 
     // روابط
@@ -128,8 +130,21 @@ class Subscription extends Model
     // متد کمکی برای بررسی انقضا
     public function isExpired(): bool
     {
-        if (!$this->expires_at) return false;
+        if (! $this->expires_at) {
+            return false;
+        }
+
         return Carbon::now()->greaterThan($this->expires_at);
+    }
+
+    /* ---------- Task 87 — رزرو تمدید ---------- */
+
+    /** وضعیت رزروشده: پرداخت/تأیید شده اما فعال‌سازی به پایان اشتراک فعلی موکول شده */
+    public const STATUS_RESERVED = 'reserved';
+
+    public function isReserved(): bool
+    {
+        return $this->status === self::STATUS_RESERVED || $this->reserved_activate_at !== null;
     }
 
     /** تاریخ انقضای مؤثر — expires_at یا در نبودش end_date (هم‌سو با صفحهٔ اشتراک‌ها) */
@@ -141,11 +156,11 @@ class Subscription extends Model
     // فرمت کردن قیمت به تومان
     public function getFormattedPriceAttribute(): string
     {
-        return number_format($this->price) . ' تومان';
+        return number_format($this->price).' تومان';
     }
 
     public function getFormattedFinalAmountAttribute(): string
     {
-        return number_format($this->final_amount) . ' تومان';
+        return number_format($this->final_amount).' تومان';
     }
 }

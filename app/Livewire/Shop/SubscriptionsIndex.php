@@ -12,6 +12,7 @@ use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanDuration;
 use App\Services\DiscountService;
+use App\Services\RenewalService;
 use App\Services\SubscriptionService;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -221,6 +222,32 @@ class SubscriptionsIndex extends Component
             ->whereIn('admin_status', [SubscriptionOrder::ADMIN_STATUS_PENDING, SubscriptionOrder::ADMIN_STATUS_APPROVED, SubscriptionOrder::ADMIN_STATUS_REJECTED])
             ->get()
             ->keyBy('subscription_plan_id');
+    }
+
+    /**
+     * Task 87 — وضعیت خرید مجدد هر طرح برای مشتری جاری (بنر + قفل دکمه):
+     * [plan_id => ['state' => blocked|window|reserved, 'days', 'message', ...]]
+     */
+    #[Computed]
+    public function renewalNotices()
+    {
+        $code = trim($this->updateCode);
+
+        if ($code === '') {
+            return collect();
+        }
+
+        $customer = Customer::where('update_code', $code)->first();
+
+        if (! $customer) {
+            return collect();
+        }
+
+        $service = app(RenewalService::class);
+
+        return $this->plans
+            ->mapWithKeys(fn ($plan) => [$plan->id => $service->pageNoticeForPlan($customer->id, $plan->id)])
+            ->filter();
     }
 
     public function setBuying(string $slug): void

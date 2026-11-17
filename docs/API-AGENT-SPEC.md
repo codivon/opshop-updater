@@ -209,12 +209,23 @@ Validation errors: 422 `{"error": "انتخاب طرح قیمت‌گذاری ا�
 `{"error": "آدرس بازگشت (callback_url) برای پرداخت الزامی است."}` (missing callback),
 invalid gateway → 422, one-time plan already used → 422.
 
+**Duplicate-purchase guard (renewal reservation — Task 87):** if the customer already has an
+**active license for the same package**:
+
+- More than **5 days remaining** → `422 {"error": "شما این پکیج را با طرح «...» خریداری کرده‌اید و اعتبار آن تا N روز دیگر به پایان می‌رسد. از ۵ روز مانده به پایان اعتبار می‌توانید طرح بعدی را خریداری کنید؛ …"}`.
+- Within the **5-day window** → allowed, but the purchase is **reserved**: the paid outcome
+  additionally includes `"reserved": true`, `"activation_at": "YYYY-MM-DD HH:MM:SS"`
+  (the end of the customer's current period) and a `message`. The license is issued
+  automatically at `activation_at` (the panel scheduler activates it and sends an SMS).
+- A **reserved purchase already pending payment** → 422 with a hint to complete it first.
+
 #### `POST /payments/{transactionId}/verify` — verify payment
 
 Call after the user returns from the gateway. If the purchase is still `pending`, the panel
 attempts gateway verification itself.
 
 - Success → `{"paid": true, "license_key": "...", "expires_at": "...", "days_remaining": 365, "download_token": "dl_...", "signature": "<sha256>", "version": "2.1.0"}`
+- **Reserved success** (bought inside the 5-day window) → `{"paid": true, "license_key": null, "reserved": true, "activation_at": "...", "message": "…پس از پایان دورهٔ فعلی به‌صورت خودکار فعال می‌شود."}` — keep polling this endpoint after `activation_at` to receive the license when it is auto-issued.
 - Not verified yet → 400 `{"paid": false, "error": "پرداخت هنوز تأیید نشده است."}` — poll with backoff.
 - Unknown transaction → 404.
 

@@ -9,7 +9,6 @@ use App\Livewire\Shop\SubscriptionsIndex;
 use App\Models\Customer;
 use App\Models\PackageLicense;
 use App\Models\SubscriptionPlan;
-use App\Models\SubscriptionPlanDuration;
 use App\Services\SubscriptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -30,7 +29,7 @@ use Tests\TestCase;
  */
 class PlanDurationConfigTest extends TestCase
 {
-    use RefreshDatabase, MakesShopData;
+    use MakesShopData, RefreshDatabase;
 
     private SubscriptionService $service;
 
@@ -45,13 +44,13 @@ class PlanDurationConfigTest extends TestCase
     private function makeMultiDurationPlan(): SubscriptionPlan
     {
         $plan = SubscriptionPlan::create([
-            'name'            => 'طرح چندمدتی',
-            'slug'            => 'multi-dur-' . uniqid(),
+            'name' => 'طرح چندمدتی',
+            'slug' => 'multi-dur-'.uniqid(),
             'duration_months' => 1,
-            'price'           => 0,
-            'is_active'       => true,
-            'sort_order'      => 0,
-            'features'        => ['پشتیبانی پایه'],
+            'price' => 0,
+            'is_active' => true,
+            'sort_order' => 0,
+            'features' => ['پشتیبانی پایه'],
         ]);
 
         $plan->durations()->create(['duration_months' => 1, 'price' => 0, 'is_active' => true, 'sort_order' => 1]);
@@ -69,14 +68,14 @@ class PlanDurationConfigTest extends TestCase
         $plan->packages()->attach($planPackage->id, ['free_months' => 1]);
 
         $vipPackage = $this->makePackage(['name' => 'پکیج ویژه ۳ ماهه']);
-        $duration3  = $plan->durations()->where('duration_months', 3)->first();
+        $duration3 = $plan->durations()->where('duration_months', 3)->first();
         $duration3->packages()->attach($vipPackage->id, ['free_months' => 3]);
 
         $customer = $this->makeCustomer();
 
         // خرید با مدت ۳ ماهه → snapshot از پیکربندی همان مدت
         $result = $this->service->purchase($customer, $plan, null, null, null, 3);
-        $order  = $result['order'];
+        $order = $result['order'];
 
         $this->assertTrue($result['is_free']);
         $this->assertSame(
@@ -108,7 +107,7 @@ class PlanDurationConfigTest extends TestCase
 
         // مدت ۱ ماهه پیکربندی اختصاصی ندارد → پکیج‌های طرح با همان مدت‌هایشان
         $result = $this->service->purchase($customer, $plan, null, null, null, 1);
-        $order  = $result['order'];
+        $order = $result['order'];
 
         $this->assertSame(
             [$planPackage->id],
@@ -130,23 +129,26 @@ class PlanDurationConfigTest extends TestCase
         $duration3 = $plan->durations()->where('duration_months', 3)->first();
         $duration3->update(['features' => ['پشتیبانی VIP سه‌ماهه', 'آپدیت رایگان']]);
 
-        $customer = $this->makeCustomer();
+        // Task 87 — هر مشتری فقط یک سفارشِ در جریان برای هر طرح دارد؛
+        // دو مدت متفاوت با دو مشتری بررسی می‌شود
+        $customer3 = $this->makeCustomer();
+        $customer1 = $this->makeCustomer();
 
         // مدت ۳ ماهه → قابلیت‌های اختصاصی همان مدت
-        $order3 = $this->service->purchase($customer, $plan, null, null, null, 3)['order'];
+        $order3 = $this->service->purchase($customer3, $plan, null, null, null, 3)['order'];
         $this->assertSame(['پشتیبانی VIP سه‌ماهه', 'آپدیت رایگان'], $order3->meta['plan']['features']);
         $this->assertSame(['پشتیبانی VIP سه‌ماهه', 'آپدیت رایگان'], $order3->meta['chosen_duration']['features']);
 
         // مدت ۱ ماهه (بدون پیکربندی) → قابلیت‌های خود طرح
-        $order1 = $this->service->purchase($customer, $plan, null, null, null, 1)['order'];
+        $order1 = $this->service->purchase($customer1, $plan, null, null, null, 1)['order'];
         $this->assertSame(['پشتیبانی پایه'], $order1->meta['plan']['features']);
     }
 
     public function test_admin_panel_saves_and_reloads_per_duration_config(): void
     {
-        $plan   = $this->makeMultiDurationPlan();
-        $pkgA   = $this->makePackage(['name' => 'پکیج الف']);
-        $pkgB   = $this->makePackage(['name' => 'پکیج ب']);
+        $plan = $this->makeMultiDurationPlan();
+        $pkgA = $this->makePackage(['name' => 'پکیج الف']);
+        $pkgB = $this->makePackage(['name' => 'پکیج ب']);
         $plan->packages()->attach($pkgA->id, ['free_months' => 1]);
 
         $duration1 = $plan->durations()->where('duration_months', 1)->first();
@@ -173,8 +175,8 @@ class PlanDurationConfigTest extends TestCase
         // pivot پکیج‌های مدت ۳ ماهه
         $this->assertDatabaseHas('subscription_plan_duration_package', [
             'subscription_plan_duration_id' => $duration3After->id,
-            'package_id'                    => $pkgB->id,
-            'free_months'                   => 3,
+            'package_id' => $pkgB->id,
+            'free_months' => 3,
         ]);
         $this->assertDatabaseMissing('subscription_plan_duration_package', [
             'subscription_plan_duration_id' => $duration1After->id,
@@ -248,7 +250,7 @@ class PlanDurationConfigTest extends TestCase
         $plan->packages()->attach($planPackage->id, ['free_months' => 1]);
 
         $vipPackage = $this->makePackage(['name' => 'پکیج ویژه مودال']);
-        $duration3  = $plan->durations()->where('duration_months', 3)->first();
+        $duration3 = $plan->durations()->where('duration_months', 3)->first();
         $duration3->update(['features' => ['قابلیت ویژه مودال']]);
         $duration3->packages()->attach($vipPackage->id, ['free_months' => 3]);
 
@@ -272,7 +274,7 @@ class PlanDurationConfigTest extends TestCase
 
         // طرح تک‌مدتی (بدون ردیف مدت) → جزئیاتی ندارد (مودال نمایش داده نمی‌شود)
         $single = SubscriptionPlan::create([
-            'name' => 'تک‌مدتی', 'slug' => 'single-' . uniqid(),
+            'name' => 'تک‌مدتی', 'slug' => 'single-'.uniqid(),
             'duration_months' => 2, 'price' => 10000, 'is_active' => true,
         ]);
         $this->assertSame([], Livewire::test(SubscriptionsIndex::class)->instance()->durationDetailsFor($single));
@@ -299,7 +301,7 @@ class PlanDurationConfigTest extends TestCase
         $plan->packages()->attach($planPackage->id, ['free_months' => 1]);
 
         $vipPackage = $this->makePackage(['name' => 'پکیج ویژه فروشگاه']);
-        $duration3  = $plan->durations()->where('duration_months', 3)->first();
+        $duration3 = $plan->durations()->where('duration_months', 3)->first();
         $duration3->update(['features' => ['قابلیت ویژه سه‌ماهه']]);
         $duration3->packages()->attach($vipPackage->id, ['free_months' => 3]);
 
@@ -328,7 +330,7 @@ class PlanDurationConfigTest extends TestCase
         $plan->packages()->attach($planPackage->id, ['free_months' => 1]);
 
         $vipPackage = $this->makePackage(['name' => 'پکیج ویژه سه‌ماهه']);
-        $duration3  = $plan->durations()->where('duration_months', 3)->first();
+        $duration3 = $plan->durations()->where('duration_months', 3)->first();
         $duration3->update(['features' => ['قابلیت اختصاصی سه‌ماهه']]);
         $duration3->packages()->attach($vipPackage->id, ['free_months' => 3]);
 
@@ -349,7 +351,7 @@ class PlanDurationConfigTest extends TestCase
     public function test_shop_single_duration_plan_gets_details_entry(): void
     {
         $plan = SubscriptionPlan::create([
-            'name' => 'تک‌مدتی ویژه', 'slug' => 'single-' . uniqid(),
+            'name' => 'تک‌مدتی ویژه', 'slug' => 'single-'.uniqid(),
             'duration_months' => 2, 'price' => 100000, 'discount_price' => 20000,
             'is_active' => true, 'features' => ['پشتیبانی دوماهه'],
         ]);
@@ -379,7 +381,7 @@ class PlanDurationConfigTest extends TestCase
     {
         // چندمدتیِ کاملاً خالی — بدون قابلیت سطح طرح و بدون پکیج (ارث‌بری هم چیزی ندارد)
         $emptyPlan = SubscriptionPlan::create([
-            'name' => 'چندمدتی خالی', 'slug' => 'multi-empty-' . uniqid(),
+            'name' => 'چندمدتی خالی', 'slug' => 'multi-empty-'.uniqid(),
             'duration_months' => 1, 'price' => 0,
             'is_active' => true, 'features' => [],
         ]);
@@ -388,7 +390,7 @@ class PlanDurationConfigTest extends TestCase
 
         // تک‌مدتیِ خالی
         SubscriptionPlan::create([
-            'name' => 'تک‌مدتی خالی', 'slug' => 'single-empty-' . uniqid(),
+            'name' => 'تک‌مدتی خالی', 'slug' => 'single-empty-'.uniqid(),
             'duration_months' => 1, 'price' => 50000,
             'is_active' => true, 'features' => [],
         ]);
@@ -409,7 +411,7 @@ class PlanDurationConfigTest extends TestCase
         $plan->packages()->attach($planPackage->id, ['free_months' => 1]);
 
         $vipPackage = $this->makePackage(['name' => 'پکیج ویژه']);
-        $duration3  = $plan->durations()->where('duration_months', 3)->first();
+        $duration3 = $plan->durations()->where('duration_months', 3)->first();
         $duration3->update(['features' => ['قابلیت ویژه سه‌ماهه'], 'price' => 1200000]);
         $duration3->packages()->attach($vipPackage->id, ['free_months' => 3]);
 
@@ -421,7 +423,7 @@ class PlanDurationConfigTest extends TestCase
         $copy = SubscriptionPlan::query()->whereKeyNot($plan->id)->sole();
 
         // نام/شناسه/وضعیت — کپی غیرفعال ساخته می‌شود تا بی‌اجازه منتشر نشود
-        $this->assertSame($plan->name . ' (کپی)', $copy->name);
+        $this->assertSame($plan->name.' (کپی)', $copy->name);
         $this->assertNotSame($plan->slug, $copy->slug);
         $this->assertFalse($copy->is_active);
         $this->assertSame('توضیحات طرح اصلی', $copy->description);
@@ -432,8 +434,8 @@ class PlanDurationConfigTest extends TestCase
         // پکیج سطح طرح با همان مدت رایگان
         $this->assertDatabaseHas('subscription_plan_package', [
             'subscription_plan_id' => $copy->id,
-            'package_id'           => $planPackage->id,
-            'free_months'          => 1,
+            'package_id' => $planPackage->id,
+            'free_months' => 1,
         ]);
 
         // مدت‌ها با قیمت/قابلیت‌هایشان
@@ -445,8 +447,8 @@ class PlanDurationConfigTest extends TestCase
         // پکیج اختصاصی مدت ۳ ماهه کپی‌شده
         $this->assertDatabaseHas('subscription_plan_duration_package', [
             'subscription_plan_duration_id' => $copyDuration3->id,
-            'package_id'                    => $vipPackage->id,
-            'free_months'                   => 3,
+            'package_id' => $vipPackage->id,
+            'free_months' => 3,
         ]);
 
         // مدت ۱ ماهه بدون پیکربندی اختصاصی
@@ -460,7 +462,7 @@ class PlanDurationConfigTest extends TestCase
         Livewire::test(PlansIndex::class)->call('copy', $plan->id);
         $this->assertSame(3, SubscriptionPlan::count());
         // هر دو کپی با شناسه‌های متمایز (سوییچ تصادفی خودکار در تداخل)
-        $this->assertSame(2, SubscriptionPlan::where('slug', 'like', $plan->slug . '-copy%')->count());
+        $this->assertSame(2, SubscriptionPlan::where('slug', 'like', $plan->slug.'-copy%')->count());
         $this->assertSame(3, SubscriptionPlan::query()->distinct('slug')->count('slug'));
     }
 
@@ -484,7 +486,7 @@ class PlanDurationConfigTest extends TestCase
         $plan->packages()->attach($planPackage->id, ['free_months' => 1]);
 
         $vipPackage = $this->makePackage(['name' => 'پکیج ویژه ۳ ماهه']);
-        $duration3  = $plan->durations()->where('duration_months', 3)->first();
+        $duration3 = $plan->durations()->where('duration_months', 3)->first();
         $duration3->packages()->attach($vipPackage->id, ['free_months' => 2]);
 
         $customer = $this->makeCustomer();
@@ -498,9 +500,9 @@ class PlanDurationConfigTest extends TestCase
     private function apiHeaders(Customer $customer): array
     {
         return [
-            'Authorization' => 'Bearer ' . $customer->update_code,
+            'Authorization' => 'Bearer '.$customer->update_code,
             'X-Project-Url' => $customer->website_url,
-            'Accept'        => 'application/json',
+            'Accept' => 'application/json',
         ];
     }
 
@@ -532,7 +534,7 @@ class PlanDurationConfigTest extends TestCase
         $this->makePackageVersion($vipPackage);
 
         // پکیجِ اختصاصی مدت ۳ ماهه → رایگان با اشتراک فعال (لایسنس همان ۲ ماهِ همان مدت)
-        $this->postJson('/api/v1/packages/' . $vipPackage->slug . '/purchase', [
+        $this->postJson('/api/v1/packages/'.$vipPackage->slug.'/purchase', [
             'callback_url' => 'https://example.com/callback',
         ], $this->apiHeaders($customer))
             ->assertOk()
@@ -547,7 +549,7 @@ class PlanDurationConfigTest extends TestCase
         $this->assertTrue($license->expires_at->gt(now()->addMonths(1)));
 
         // پکیجِ سطح طرح در مدتِ دارای پیکربندی اختصاصی پوشش داده نمی‌شود → مسیر خرید عادی
-        $this->postJson('/api/v1/packages/' . $planPackage->slug . '/purchase', [
+        $this->postJson('/api/v1/packages/'.$planPackage->slug.'/purchase', [
             'callback_url' => 'https://example.com/callback',
         ], $this->apiHeaders($customer))
             ->assertStatus(422)
@@ -558,7 +560,7 @@ class PlanDurationConfigTest extends TestCase
     {
         [$customer,,, $vipPackage] = $this->makePurchasedDurationScenario();
 
-        $this->getJson('/api/v1/packages/' . $vipPackage->slug, $this->apiHeaders($customer))
+        $this->getJson('/api/v1/packages/'.$vipPackage->slug, $this->apiHeaders($customer))
             ->assertOk()
             ->assertJsonPath('data.subscription.is_free_with_subscription', true)
             ->assertJsonPath('data.subscription.free_months', 2)
@@ -576,7 +578,7 @@ class PlanDurationConfigTest extends TestCase
         Storage::fake('local');
         Storage::disk('local')->put($version->file_path, 'FAKE-ZIP-CONTENT');
 
-        $this->get('/api/v1/packages/' . $vipPackage->slug . '/download', $this->apiHeaders($customer))
+        $this->get('/api/v1/packages/'.$vipPackage->slug.'/download', $this->apiHeaders($customer))
             ->assertOk()
             ->assertHeader('X-Package-Version', '1.0.0');
     }

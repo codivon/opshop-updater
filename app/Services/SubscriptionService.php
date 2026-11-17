@@ -12,6 +12,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanDuration;
 use App\Services\Sms\SmsManager;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -41,9 +42,9 @@ class SubscriptionService
     /**
      * ثبت سفارش اشتراک.
      *
-     * @param  string|null $callbackUrl آدرس بازگشت فروشگاه مشتری (API) — در مسیر وب خالی است.
-     * @param  DiscountCode|null $coupon کد تخفیف اعمال‌شده (از قبل اعتبارسنجی‌شده توسط DiscountService)
-     * @param  int|null $durationMonths مدت اعتبار انتخابی مشتری (از طرح‌هایی که چند مدت دارند) —
+     * @param  string|null  $callbackUrl  آدرس بازگشت فروشگاه مشتری (API) — در مسیر وب خالی است.
+     * @param  DiscountCode|null  $coupon  کد تخفیف اعمال‌شده (از قبل اعتبارسنجی‌شده توسط DiscountService)
+     * @param  int|null  $durationMonths  مدت اعتبار انتخابی مشتری (از طرح‌هایی که چند مدت دارند) —
      *                                    null = فال‌بک به تک‌مدت پیش‌فرض طرح (سازگاری با داده‌های قدیمی)
      * @return array{order: SubscriptionOrder, payment_url?: string, transaction_id?: string, is_free?: bool, message?: string}
      *
@@ -51,7 +52,7 @@ class SubscriptionService
      */
     public function purchase(Customer $customer, SubscriptionPlan $plan, ?string $gatewayKey = null, ?string $callbackUrl = null, ?DiscountCode $coupon = null, ?int $durationMonths = null): array
     {
-        if (!$plan->is_active) {
+        if (! $plan->is_active) {
             throw new RuntimeException('این طرح اشتراک فعال نیست.');
         }
 
@@ -64,20 +65,29 @@ class SubscriptionService
             throw new RuntimeException('شما قبلاً از این طرح استفاده کرده‌اید؛ این طرح فقط یک‌بار قابل خریداری است.');
         }
 
+        // Task 87 — گارد خرید مجدد طرحِ در حالِ اعتبار:
+        // اعتبار فعال برای همین طرح → تا ۵ روزِ پایانی مسدود؛ در پنجرهٔ ۵ روزه → رزرو
+        $renewalService = app(RenewalService::class);
+        $renewal = $renewalService->evaluateSubscriptionRenewal($customer->id, $plan->id);
+
+        if (! $renewal['allowed']) {
+            throw new RuntimeException($renewal['message']);
+        }
+
         // ---- مدت اعتبار انتخابی (طرح‌های چندمدتی) ----
         /** @var SubscriptionPlanDuration|null $durationOption */
         $durationOption = null;
         if ($durationMonths !== null) {
             $durationOption = $plan->durationOption($durationMonths);
 
-            if (!$durationOption) {
+            if (! $durationOption) {
                 throw new RuntimeException('مدت اعتبار انتخاب‌شده برای این طرح معتبر نیست.');
             }
         }
 
         // مبلغ: گزینهٔ مدت انتخابی (اگر هست) وگرنه تک‌مدت پیش‌فرض طرح
-        $amount    = $durationOption ? (int) $durationOption->price : (int) $plan->price;
-        $discount  = $durationOption ? (int) ($durationOption->discount_price ?? 0) : (int) ($plan->discount_price ?? 0); // تخفیف مبلغی
+        $amount = $durationOption ? (int) $durationOption->price : (int) $plan->price;
+        $discount = $durationOption ? (int) ($durationOption->discount_price ?? 0) : (int) ($plan->discount_price ?? 0); // تخفیف مبلغی
         $chosenMonths = $durationOption ? (int) $durationOption->duration_months : (int) $plan->duration_months;
         $baseFinal = max(0, $amount - $discount);
 
@@ -105,14 +115,14 @@ class SubscriptionService
 
         $snapshot = [
             'plan' => [
-                'name'            => $plan->name,
-                'slug'            => $plan->slug,
+                'name' => $plan->name,
+                'slug' => $plan->slug,
                 'duration_months' => $chosenMonths,
-                'features'        => $snapshotFeatures,
-                'price'           => $amount,
-                'final_price'     => $final,
-                'is_one_time'     => (bool) $plan->is_one_time,
-                'packages'        => $snapshotPackages,
+                'features' => $snapshotFeatures,
+                'price' => $amount,
+                'final_price' => $final,
+                'is_one_time' => (bool) $plan->is_one_time,
+                'packages' => $snapshotPackages,
             ],
         ];
 
@@ -120,50 +130,58 @@ class SubscriptionService
         if ($durationOption) {
             $snapshot['chosen_duration'] = [
                 'duration_months' => $chosenMonths,
-                'label'           => $durationOption->duration_label,
-                'price'           => $amount,
-                'discount_price'  => $discount,
-                'final_price'     => $baseFinal,
+                'label' => $durationOption->duration_label,
+                'price' => $amount,
+                'discount_price' => $discount,
+                'final_price' => $baseFinal,
                 // پیکربندی مؤثر همین مدت در لحظهٔ خرید — منبع صدور لایسنس‌ها (Task 63)
-                'features'        => $snapshotFeatures,
-                'packages'        => $snapshotPackages,
+                'features' => $snapshotFeatures,
+                'packages' => $snapshotPackages,
             ];
         }
 
         // snapshot کد تخفیف (برای گزارش بعدی حتی پس از حذف کد)
         if ($coupon && $couponDiscount > 0) {
             $snapshot['coupon'] = [
-                'code'     => $coupon->code,
-                'type'     => $coupon->type,
-                'value'    => (int) $coupon->value,
+                'code' => $coupon->code,
+                'type' => $coupon->type,
+                'value' => (int) $coupon->value,
                 'discount' => $couponDiscount,
             ];
         }
 
+        // Task 87 — برچسب رزرو: پس از تأیید، اشتراک به‌صورت «reserved» ذخیره می‌شود تا
+        // بعد از پایان اشتراک فعلی مشتری به‌طور خودکار فعال شود
+        $isReservedOrder = (bool) ($renewal['reserved'] ?? false);
+
+        if ($isReservedOrder && $renewal['active_subscription']) {
+            $snapshot['renewal'] = $renewalService->subscriptionReservationPayload($renewal['active_subscription']);
+        }
+
         $order = SubscriptionOrder::create([
             'subscription_plan_id' => $plan->id,
-            'customer_id'          => $customer->id,
-            'discount_code_id'     => ($coupon && $couponDiscount > 0) ? $coupon->id : null,
-            'amount'               => $amount,
-            'discount'             => $totalDiscount,
-            'final_amount'         => $final,
-            'callback_url'         => $callbackUrl,
-            'status'               => SubscriptionOrder::STATUS_PENDING,
-            'admin_status'         => SubscriptionOrder::ADMIN_STATUS_PENDING,
-            'meta'                 => $snapshot,
+            'customer_id' => $customer->id,
+            'discount_code_id' => ($coupon && $couponDiscount > 0) ? $coupon->id : null,
+            'amount' => $amount,
+            'discount' => $totalDiscount,
+            'final_amount' => $final,
+            'callback_url' => $callbackUrl,
+            'status' => SubscriptionOrder::STATUS_PENDING,
+            'admin_status' => SubscriptionOrder::ADMIN_STATUS_PENDING,
+            'meta' => $snapshot,
         ]);
 
         // ---------- مسیر رایگان: بدون درگاه، مستقیم در انتظار تأیید مدیر ----------
         // (طرح رایگان یا کد تخفیفِ ۱۰۰٪)
         if ($final <= 0) {
             $order->update([
-                'amount'       => 0,
+                'amount' => 0,
                 // اگر کوپن پوشش کامل داده، تخفیفِ ثبت‌شده باید حفظ شود (برای گزارش/نمایش)
-                'discount'     => ($coupon && $couponDiscount > 0) ? $totalDiscount : 0,
+                'discount' => ($coupon && $couponDiscount > 0) ? $totalDiscount : 0,
                 'final_amount' => 0,
-                'status'       => SubscriptionOrder::STATUS_PAID,
-                'paid_at'      => now(),
-                'gateway'      => null,
+                'status' => SubscriptionOrder::STATUS_PAID,
+                'paid_at' => now(),
+                'gateway' => null,
             ]);
 
             // مصرف شمارنده کد تخفیف (مسیر رایگان از markAsPaid عبور نمی‌کند)
@@ -176,16 +194,19 @@ class SubscriptionService
                     $this->approve($order->refresh());
 
                     return [
-                        'order'          => $order,
-                        'is_free'        => true,
-                        'auto_approved'  => true,
-                        'message'        => 'اشتراک رایگان شما فعال شد.',
+                        'order' => $order,
+                        'is_free' => true,
+                        'auto_approved' => true,
+                        'reserved' => $isReservedOrder,
+                        'message' => $isReservedOrder
+                            ? 'خرید شما رزرو شد؛ پس از پایان اشتراک فعلی به‌صورت خودکار فعال می‌شود.'
+                            : 'اشتراک رایگان شما فعال شد.',
                     ];
                 } catch (\Throwable $e) {
                     // خطای تأیید خودکار نباید خرید را بشکند → مسیر عادی (انتظار تأیید مدیر)
                     Log::warning('Subscription auto-approve failed (free path)', [
                         'order_id' => $order->id,
-                        'error'    => $e->getMessage(),
+                        'error' => $e->getMessage(),
                     ]);
                 }
             }
@@ -194,8 +215,8 @@ class SubscriptionService
             try {
                 $vars = [
                     'customer_name' => $customer->name,
-                    'plan_name'     => $plan->name,
-                    'amount'        => 'رایگان',
+                    'plan_name' => $plan->name,
+                    'amount' => 'رایگان',
                 ];
 
                 $this->sms()->send('subscription_request_ack', $customer->phone, $vars, $order, once: true);
@@ -205,9 +226,12 @@ class SubscriptionService
             }
 
             return [
-                'order'    => $order,
-                'is_free'  => true,
-                'message'  => 'درخواست اشتراک رایگان ثبت شد و در انتظار تأیید مدیر است.',
+                'order' => $order,
+                'is_free' => true,
+                'reserved' => $isReservedOrder,
+                'message' => $isReservedOrder
+                    ? 'درخواست شما ثبت و رزرو شد؛ پس از تأیید مدیر و پایان اشتراک فعلی، به‌صورت خودکار فعال می‌شود.'
+                    : 'درخواست اشتراک رایگان ثبت شد و در انتظار تأیید مدیر است.',
             ];
         }
 
@@ -222,11 +246,11 @@ class SubscriptionService
         }
 
         return [
-            'order'          => $order,
-            'payment_url'    => $payment['payment_url'],
+            'order' => $order,
+            'payment_url' => $payment['payment_url'],
             'transaction_id' => $payment['transaction_id'],
-            'amount'         => $final,
-            'gateway'        => $payment['gateway'],
+            'amount' => $final,
+            'gateway' => $payment['gateway'],
         ];
     }
 
@@ -241,7 +265,7 @@ class SubscriptionService
     {
         $order = SubscriptionOrder::where('transaction_id', $transactionId)->first();
 
-        if (!$order) {
+        if (! $order) {
             return ['paid' => false, 'message' => 'سفارش اشتراک یافت نشد.'];
         }
 
@@ -277,11 +301,11 @@ class SubscriptionService
      * پس از تأیید پرداخت: اگر تأیید خودکار فعال و سفارش هنوز منتظر مدیر باشد،
      * بلافاصله تأیید و فعال می‌شود؛ خطا جریان اصلی را نمی‌شکند (مسیر دستی مدیر باقی می‌ماند).
      *
-     * @param array{paid: bool, order?: SubscriptionOrder, message?: string} $result
+     * @param  array{paid: bool, order?: SubscriptionOrder, message?: string}  $result
      */
     private function autoApproveIfPending(SubscriptionOrder $order, array &$result): void
     {
-        if (!self::autoApproveEnabled()) {
+        if (! self::autoApproveEnabled()) {
             return;
         }
 
@@ -292,13 +316,13 @@ class SubscriptionService
         try {
             $this->approve($order->refresh());
 
-            $result['order']         = $order;
+            $result['order'] = $order;
             $result['auto_approved'] = true;
-            $result['message']       = 'پرداخت تأیید و اشتراک شما فعال شد.';
+            $result['message'] = 'پرداخت تأیید و اشتراک شما فعال شد.';
         } catch (\Throwable $e) {
             Log::warning('Subscription auto-approve failed (paid path)', [
                 'order_id' => $order->id,
-                'error'    => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -319,7 +343,7 @@ class SubscriptionService
             return $order->subscription; // idempotent
         }
 
-        if (!$order->isPaid()) {
+        if (! $order->isPaid()) {
             throw new RuntimeException('این سفارش هنوز پرداخت نشده است؛ ابتدا باید پرداخت تأیید شود.');
         }
 
@@ -327,112 +351,176 @@ class SubscriptionService
             throw new RuntimeException('این درخواست قبلاً رد شده است.');
         }
 
-        $plan     = $order->plan;
+        $plan = $order->plan;
         $customer = $order->customer;
 
-        return DB::transaction(function () use ($order, $plan, $customer) {
+        // Task 87 — خرید رزروشده: این سفارش پس از پایان اشتراک فعلی مشتری فعال می‌شود
+        $isReservedOrder = (bool) (is_array($order->meta) ? ($order->meta['renewal']['reserved'] ?? false) : false);
+        $reservedActivateAt = $isReservedOrder
+            ? (is_array($order->meta) ? ($order->meta['renewal']['activate_at'] ?? null) : null)
+            : null;
+
+        return DB::transaction(function () use ($order, $plan, $customer, $isReservedOrder, $reservedActivateAt) {
             // مدت اعتبار: اولویت با مدتِ انتخاب‌شدهٔ مشتری (meta)؛ سپس مدت فعلی طرح؛
             // اگر طرح حذف شده باشد از snapshot سفارش — نهایتاً ۱ ماه
-            $months    = (int) ($order->meta['chosen_duration']['duration_months']
+            $months = (int) ($order->meta['chosen_duration']['duration_months']
                 ?? $plan?->duration_months
                 ?? $order->meta['plan']['duration_months']
                 ?? 1);
-            $startsAt  = now();
-            $expiresAt = $months > 0 ? (clone $startsAt)->addMonths($months) : null;
 
-            // ۱) اشتراک فعال
-            $subscription = Subscription::create([
-                'customer_id'          => $customer->id,
-                'project_id'           => null, // اشتراکِ طرح‌محور، پروژه خاصی ندارد
-                'subscription_plan_id' => $plan?->id,
-                'subscription_order_id' => $order->id,
-                'start_date'           => $startsAt->toDateString(),
-                'end_date'             => $expiresAt?->toDateString(),
-                'expires_at'           => $expiresAt,
-                'status'               => 'active',
-                'price'                => $order->amount,
-                'discount'             => $order->discount,
-                'final_amount'         => $order->final_amount,
-                'payment_status'       => 'paid',
-                'description'          => 'اشتراک «' . $order->plan_name . '» — فعال‌شده پس از تأیید مدیر.',
-            ]);
+            if ($isReservedOrder && $reservedActivateAt) {
+                // رزروشده: بدون تاریخ شروع — کالکسیون renewals:activate بعد از پایان
+                // اشتراک فعلی، تاریخ‌ها را ست می‌کند، لایسنس‌های پکیج‌ها را می‌دهد و پیامک می‌فرستد
+                $subscription = Subscription::create([
+                    'customer_id' => $customer->id,
+                    'project_id' => null,
+                    'subscription_plan_id' => $plan?->id,
+                    'subscription_order_id' => $order->id,
+                    'start_date' => null,
+                    'end_date' => null,
+                    'expires_at' => null,
+                    'status' => Subscription::STATUS_RESERVED,
+                    'price' => $order->amount,
+                    'discount' => $order->discount,
+                    'final_amount' => $order->final_amount,
+                    'payment_status' => 'paid',
+                    'reserved_activate_at' => $reservedActivateAt ? Carbon::parse($reservedActivateAt) : null,
+                    'description' => 'اشتراک «'.$order->plan_name.'» — رزروشده؛ پس از پایان اشتراک فعلی به‌صورت خودکار فعال می‌شود.',
+                ]);
+            } else {
+                $startsAt = now();
+                $expiresAt = $months > 0 ? (clone $startsAt)->addMonths($months) : null;
 
-            // ۲) لایسنس رایگان پکیج‌های همراه طرح
-            // اولویت (Task 63): پیکربندی مؤثرِ مدتِ انتخابیِ مشتری در لحظهٔ خرید
-            // (meta.chosen_duration.packages) → پکیج‌های فعلی طرح → snapshot قدیمی طرح
-            $granted = [];
-            $packages = collect();
-            $durationSnap = $order->meta['chosen_duration']['packages'] ?? [];
+                // ۱) اشتراک فعال
+                $subscription = Subscription::create([
+                    'customer_id' => $customer->id,
+                    'project_id' => null, // اشتراکِ طرح‌محور، پروژه خاصی ندارد
+                    'subscription_plan_id' => $plan?->id,
+                    'subscription_order_id' => $order->id,
+                    'start_date' => $startsAt->toDateString(),
+                    'end_date' => $expiresAt?->toDateString(),
+                    'expires_at' => $expiresAt,
+                    'status' => 'active',
+                    'price' => $order->amount,
+                    'discount' => $order->discount,
+                    'final_amount' => $order->final_amount,
+                    'payment_status' => 'paid',
+                    'description' => 'اشتراک «'.$order->plan_name.'» — فعال‌شده پس از تأیید مدیر.',
+                ]);
 
-            if (!empty($durationSnap)) {
-                $packages = Package::whereIn('id', array_column($durationSnap, 'id'))
-                    ->get()
-                    ->map(function ($p) use ($durationSnap) {
-                        $snap = collect($durationSnap)->firstWhere('id', $p->id);
-                        $p->pivot = (object) ['free_months' => (int) ($snap['free_months'] ?? 1)];
+                // ۲) لایسنس رایگان پکیج‌های همراه طرح (فقط اشتراکِ فوری — رزروشده بعداً در فعال‌سازی)
+                $granted = [];
+                $packages = $this->resolveOrderPackages($subscription);
 
-                        return $p;
-                    });
-            } elseif ($plan) {
-                $packages = $plan->packages()->get(['packages.id', 'packages.name', 'packages.slug']);
-            }
+                foreach ($packages as $package) {
+                    $freeMonths = (int) ($package->pivot->free_months ?? 1);
+                    $license = $this->grantPackageAccess($customer, $package, $freeMonths, $order);
 
-            // اگر طرح حذف شده باشد، از snapshot سفارش استفاده می‌کنیم
-            if ($packages->isEmpty() && !empty($order->meta['plan']['packages'])) {
-                $packages = Package::whereIn('id', array_column($order->meta['plan']['packages'], 'id'))
-                    ->get()
-                    ->map(function ($p) use ($order) {
-                        $snap = collect($order->meta['plan']['packages'])->firstWhere('id', $p->id);
-                        $p->pivot = (object) ['free_months' => (int) ($snap['free_months'] ?? 1)];
-
-                        return $p;
-                    });
-            }
-
-            foreach ($packages as $package) {
-                $freeMonths = (int) ($package->pivot->free_months ?? 1);
-                $license    = $this->grantPackageAccess($customer, $package, $freeMonths, $order);
-
-                if ($license) {
-                    $granted[] = [
-                        'package' => $package->name,
-                        'months'  => $freeMonths,
-                        'license' => $license->license_key,
-                    ];
+                    if ($license) {
+                        $granted[] = [
+                            'package' => $package->name,
+                            'months' => $freeMonths,
+                            'license' => $license->license_key,
+                        ];
+                    }
                 }
             }
 
             // ۳) نهایی‌سازی سفارش
             $order->update([
-                'admin_status'    => SubscriptionOrder::ADMIN_STATUS_APPROVED,
-                'approved_at'     => now(),
+                'admin_status' => SubscriptionOrder::ADMIN_STATUS_APPROVED,
+                'approved_at' => now(),
                 'subscription_id' => $subscription->id,
-                'starts_at'       => $startsAt,
-                'expires_at'      => $expiresAt,
+                'starts_at' => $isReservedOrder ? null : $startsAt,
+                'expires_at' => $isReservedOrder ? null : $expiresAt,
             ]);
 
             Log::info('Subscription order approved', [
-                'order_id'       => $order->id,
-                'customer_id'    => $customer->id,
-                'subscription'   => $subscription->id,
-                'granted_packages' => count($granted),
+                'order_id' => $order->id,
+                'customer_id' => $customer->id,
+                'subscription' => $subscription->id,
+                'reserved' => $isReservedOrder,
+                'granted_packages' => $isReservedOrder ? 0 : count($granted),
             ]);
+
+            if ($isReservedOrder) {
+                // رزروشده: پیامک رزرو + فعال‌سازی/پیامکِ بعداً توسط کالکسیون renewals:activate
+                DB::afterCommit(function () use ($customer, $order, $subscription, $reservedActivateAt) {
+                    try {
+                        $this->sms()->send('subscription_reserved', $customer->phone, [
+                            'customer_name' => $customer->name ?? 'مشتری',
+                            'plan_name' => $order->plan_name,
+                            'end_date' => verta_date(Carbon::parse($reservedActivateAt), 'Y/m/d')
+                                ?? Carbon::parse($reservedActivateAt)->format('Y/m/d'),
+                        ], $subscription, once: true);
+                    } catch (\Throwable $e) {
+                        Log::warning('Reserved subscription SMS failed: '.$e->getMessage());
+                    }
+                });
+
+                return $subscription;
+            }
 
             // 📱 پیامک: اشتراک فعال شد (پس از commit دیتابیس)
             DB::afterCommit(function () use ($customer, $order, $subscription, $expiresAt) {
                 try {
                     $this->sms()->send('subscription_activated', $customer->phone, [
                         'customer_name' => $customer->name ?? 'مشتری',
-                        'plan_name'     => $order->plan_name,
-                        'end_date'      => verta_date($expiresAt, 'Y/m/d') ?? $expiresAt?->format('Y/m/d'),
+                        'plan_name' => $order->plan_name,
+                        'end_date' => verta_date($expiresAt, 'Y/m/d') ?? $expiresAt?->format('Y/m/d'),
                     ], $subscription, once: true);
                 } catch (\Throwable $e) {
-                    Log::warning('Activation SMS failed: ' . $e->getMessage());
+                    Log::warning('Activation SMS failed: '.$e->getMessage());
                 }
             });
 
             return $subscription;
         });
+    }
+
+    /**
+     * پکیج‌های همراهِ مؤثر یک اشتراک با pivot free_months — همان اولویتی که approve
+     * لایسنس‌ها را صادر می‌کند (Task 63/66):
+     *  ۱) پیکربندی مؤثرِ مدتِ انتخابی مشتری (meta.chosen_duration.packages)
+     *  ۲) پکیج‌های فعلی سطح طرح
+     *  ۳) snapshot طرح در سفارش (طرح حذف‌شده)
+     * (عمومی‌شده برای کالکسیون فعال‌سازی رزروها — Task 87)
+     */
+    public function resolveOrderPackages(Subscription $subscription): Collection
+    {
+        $order = $subscription->order;
+        $plan = $subscription->plan;
+        $meta = is_array($order?->meta) ? $order->meta : [];
+
+        $packages = collect();
+        $durationSnap = $meta['chosen_duration']['packages'] ?? [];
+
+        if (! empty($durationSnap)) {
+            $packages = Package::whereIn('id', array_column($durationSnap, 'id'))
+                ->get()
+                ->map(function ($p) use ($durationSnap) {
+                    $snap = collect($durationSnap)->firstWhere('id', $p->id);
+                    $p->pivot = (object) ['free_months' => (int) ($snap['free_months'] ?? 1)];
+
+                    return $p;
+                });
+        } elseif ($plan) {
+            $packages = $plan->packages()->get(['packages.id', 'packages.name', 'packages.slug']);
+        }
+
+        // اگر طرح حذف شده باشد، از snapshot سفارش استفاده می‌کنیم
+        if ($packages->isEmpty() && ! empty($meta['plan']['packages'])) {
+            $packages = Package::whereIn('id', array_column($meta['plan']['packages'], 'id'))
+                ->get()
+                ->map(function ($p) use ($meta) {
+                    $snap = collect($meta['plan']['packages'])->firstWhere('id', $p->id);
+                    $p->pivot = (object) ['free_months' => (int) ($snap['free_months'] ?? 1)];
+
+                    return $p;
+                });
+        }
+
+        return $packages;
     }
 
     /** رد درخواست اشتراک توسط مدیر */
@@ -445,8 +533,8 @@ class SubscriptionService
         $reason = $reason ?: 'درخواست شما توسط مدیر رد شد.';
 
         $order->update([
-            'admin_status'    => SubscriptionOrder::ADMIN_STATUS_REJECTED,
-            'rejected_at'     => now(),
+            'admin_status' => SubscriptionOrder::ADMIN_STATUS_REJECTED,
+            'rejected_at' => now(),
             'rejected_reason' => $reason,
         ]);
 
@@ -454,8 +542,8 @@ class SubscriptionService
         try {
             $this->sms()->send('subscription_rejected', $order->customer?->phone, [
                 'customer_name' => $order->customer?->name ?? 'مشتری',
-                'plan_name'     => $order->plan_name,
-                'reason'        => $reason,
+                'plan_name' => $order->plan_name,
+                'reason' => $reason,
             ], $order, once: true);
         } catch (\Throwable) {
             // پیامک هرگز نباید جریان اصلی را بشکند
@@ -499,7 +587,7 @@ class SubscriptionService
     /**
      * صدور یا تمدید لایسنس رایگان یک پکیج برای مشتری (با سفارش اشتراک).
      *
-     * @param  int $freeMonths مدت دسترسی رایگان (۰ = نامحدود)
+     * @param  int  $freeMonths  مدت دسترسی رایگان (۰ = نامحدود)
      */
     public function grantPackageAccess(Customer $customer, Package $package, int $freeMonths, SubscriptionOrder $order): PackageLicense
     {
@@ -507,7 +595,7 @@ class SubscriptionService
             $customer,
             $package,
             $freeMonths,
-            'دسترسی رایگان از طریق اشتراک «' . $order->plan_name . '».'
+            'دسترسی رایگان از طریق اشتراک «'.$order->plan_name.'».'
         );
     }
 
@@ -517,8 +605,8 @@ class SubscriptionService
      *  - اگر لایسنس فعال/منقضی (غیر باطل‌شده) دارد → تمدید: از انقضای فعلی + free_months
      *  - در غیر این صورت → لایسنس جدید از الان + free_months
      *
-     * @param  int         $freeMonths مدت دسترسی رایگان (۰ = نامحدود)
-     * @param  string|null $note       یادداشت لایسنس (منبع دسترسی رایگان)
+     * @param  int  $freeMonths  مدت دسترسی رایگان (۰ = نامحدود)
+     * @param  string|null  $note  یادداشت لایسنس (منبع دسترسی رایگان)
      */
     public function grantFreeAccess(Customer $customer, Package $package, int $freeMonths, ?string $note = null): PackageLicense
     {
@@ -537,15 +625,15 @@ class SubscriptionService
             $expiresAt = $freeMonths > 0 ? (clone $baseDate)->addMonths($freeMonths) : null;
 
             $license = PackageLicense::create([
-                'license_key'     => PackageLicense::generateKey(),
-                'package_id'      => $package->id,
-                'customer_id'     => $customer->id,
-                'renewed_from'    => $existing?->id,
-                'status'          => PackageLicense::STATUS_ACTIVE,
-                'starts_at'       => $startsAt,
-                'expires_at'      => $expiresAt,
+                'license_key' => PackageLicense::generateKey(),
+                'package_id' => $package->id,
+                'customer_id' => $customer->id,
+                'renewed_from' => $existing?->id,
+                'status' => PackageLicense::STATUS_ACTIVE,
+                'starts_at' => $startsAt,
+                'expires_at' => $expiresAt,
                 'duration_months' => $freeMonths,
-                'notes'           => $note ?: 'دسترسی رایگان از طریق اشتراک.',
+                'notes' => $note ?: 'دسترسی رایگان از طریق اشتراک.',
             ]);
 
             if ($existing) {
@@ -564,12 +652,12 @@ class SubscriptionService
 
                         $this->sms()->send('subscription_renewed', $customer->phone, [
                             'customer_name' => $customer->name ?? 'مشتری',
-                            'package_name'  => $package->name,
-                            'plan_name'     => $planName,
-                            'end_date'      => verta_date($expiresAt, 'Y/m/d') ?? $expiresAt?->format('Y/m/d'),
+                            'package_name' => $package->name,
+                            'plan_name' => $planName,
+                            'end_date' => verta_date($expiresAt, 'Y/m/d') ?? $expiresAt?->format('Y/m/d'),
                         ], $license);
                     } catch (\Throwable $e) {
-                        Log::warning('Renewal SMS failed: ' . $e->getMessage());
+                        Log::warning('Renewal SMS failed: '.$e->getMessage());
                     }
                 });
             }

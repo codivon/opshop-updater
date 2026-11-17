@@ -18,6 +18,7 @@ use App\Services\LicenseService;
 use App\Services\PackageApiAuthService;
 use App\Services\PackageLicenseEnvelopeService;
 use App\Services\PaymentService;
+use App\Services\RenewalService;
 use App\Services\Sms\SmsManager;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
@@ -281,6 +282,14 @@ class ApiPackageController extends Controller
                 ], 422);
             }
 
+            // Task 87 — گارد خرید مجدد این پکیج: اعتبار فعال → تا ۵ روزِ پایانی مسدود؛
+            // در پنجرهٔ ۵ روزه → خرید به‌صورت «رزرو» ثبت می‌شود (لایسنس پس از پایان دورهٔ فعلی)
+            $renewal = app(RenewalService::class)->evaluatePackageRenewal($customer->id, $package->id);
+
+            if (! $renewal['allowed']) {
+                return response()->json(['error' => $renewal['message']], 422);
+            }
+
             $latestVersion = $package->latestVersion()->first();
 
             if (! $latestVersion) {
@@ -331,6 +340,7 @@ class ApiPackageController extends Controller
                 'original_amount' => (int) $plan->final_price,
                 'amount' => (int) $plan->final_price,
                 'status' => PackagePurchase::STATUS_PENDING,
+                ...($renewal['reserved'] ? $renewal['meta'] : []), // Task 87 — رزرو تمدید
             ]);
 
             // صفحه تسویه: نام/تصویر پکیج + طرح + کد تخفیف + دکمه پرداخت/انصراف
@@ -348,6 +358,12 @@ class ApiPackageController extends Controller
                 'amount' => (int) $plan->final_price, // مبلغ پیش از کد تخفیف
                 'gateway' => $resolvedGateway,
                 'purchase_id' => $purchase->id,
+                // Task 87 — وضعیت رزرو: پس از پرداخت، لایسنس تا پایان دورهٔ فعلی صادر نمی‌شود
+                'reserved' => (bool) $renewal['reserved'],
+                'activation_at' => $renewal['reserved'] ? $renewal['meta']['reserved_activate_at'] : null,
+                'message' => $renewal['reserved']
+                    ? 'خرید شما پس از پرداخت به‌صورت رزرو ذخیره می‌شود و پس از پایان دورهٔ فعلی به‌طور خودکار فعال خواهد شد.'
+                    : null,
             ]);
         } catch (RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -393,6 +409,19 @@ class ApiPackageController extends Controller
                 ]);
             }
 
+            // Task 87 — خرید رزروشدهٔ پرداخت‌شده (لایسنس هنوز صادر نشده): پاسخ رزرو
+            if ($purchase->isPaid() && $purchase->isReserved()) {
+                return response()->json([
+                    'paid' => true,
+                    'license_key' => null,
+                    'expires_at' => null,
+                    'download_token' => null,
+                    'reserved' => true,
+                    'activation_at' => $purchase->reserved_activate_at?->toDateTimeString(),
+                    'message' => 'این خرید رزرو شده و پس از پایان دورهٔ فعلی شما به‌طور خودکار فعال می‌شود.',
+                ]);
+            }
+
             // اگر هنوز pending است، تلاش به تأیید درگاه
             if ($purchase->status === PackagePurchase::STATUS_PENDING) {
                 $result = $this->paymentService->verifyPayment($transactionId);
@@ -412,7 +441,17 @@ class ApiPackageController extends Controller
                             'license_key' => (string) ($result['license_key'] ?? $license?->license_key ?? ''),
                         ];
 
-                        $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
+                        // Task 87 — خرید رزروشده → پیامک «رزرو شد» به‌جای پیامک لایسنس
+                        if ($purchase->isReserved()) {
+                            $this->smsManager->send('package_reserved', $purchase->customer?->phone, array_merge($vars, [
+                                'end_date' => $purchase->reserved_activate_at
+                                    ? (verta_date($purchase->reserved_activate_at, 'Y/m/d') ?? $purchase->reserved_activate_at->format('Y/m/d'))
+                                    : '',
+                            ]), $purchase, once: true);
+                        } else {
+                            $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
+                        }
+
                         $this->smsManager->notifyAdminSale('package', 'admin_purchase_paid', $vars, $purchase);
                     } catch (\Throwable) {
                         // پیامک هرگز نباید جریان خرید را بشکند
@@ -428,6 +467,10 @@ class ApiPackageController extends Controller
                             : null,
                         'signature' => $latestVersion?->file_hash,
                         'version' => $latestVersion?->version,
+                        // Task 87 — خرید رزروشده: لایسنس پس از پایان دورهٔ فعلی صادر می‌شود
+                        'reserved' => (bool) $purchase->isReserved(),
+                        'activation_at' => $purchase->reserved_activate_at?->toDateTimeString(),
+                        'message' => $result['message'] ?? null,
                     ]);
                 }
 

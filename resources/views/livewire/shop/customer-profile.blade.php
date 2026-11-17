@@ -126,6 +126,9 @@
                                 </a>
                                 @if($license)
                                     <x-badge variant="success" icon="shield-check">لایسنس فعال</x-badge>
+                                @elseif($purchase->isReserved())
+                                    {{-- Task 87 — خرید رزروشده: فعال‌سازی خودکار پس از پایان دورهٔ فعلی --}}
+                                    <x-badge variant="violet" icon="clock">رزروشده — فعال‌سازی خودکار {{ $purchase->reserved_activate_at ? verta_date($purchase->reserved_activate_at, 'Y/m/d') : '' }}</x-badge>
                                 @else
                                     <x-badge variant="neutral" icon="receipt">خرید موفق</x-badge>
                                 @endif

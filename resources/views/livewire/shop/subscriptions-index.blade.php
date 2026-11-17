@@ -62,6 +62,7 @@
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                 @foreach($this->plans as $plan)
                     @php($myOrder = $this->myOrders->get($plan->id))
+                    @php($renewalNotice = $this->renewalNotices->get($plan->id))
                     @php($durOpt = $this->displayDurationFor($plan))
                     @php($durOpts = $plan->durationOptions())
                     @php($hasDurs = $durOpts->isNotEmpty())
@@ -131,6 +132,33 @@
 
                             @if($plan->description)
                                 <p class="text-sm leading-6 text-zinc-500 dark:text-zinc-400">{{ $plan->description }}</p>
+                            @endif
+
+                            {{-- Task 87 — وضعیت خرید مجدد این طرح (اعتبار فعال / پنجرهٔ ۵ روزه / رزروشده) --}}
+                            @if($renewalNotice)
+                                <div class="flex items-start gap-2.5 rounded-xl p-3 ring-1 {{
+                                    $renewalNotice['state'] === 'reserved'
+                                        ? 'bg-violet-50 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/25'
+                                        : ($renewalNotice['state'] === 'window'
+                                            ? 'bg-emerald-50 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/25'
+                                            : 'bg-amber-50 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/25')
+                                }}">
+                                    <x-icon name="{{ $renewalNotice['state'] === 'reserved' ? 'clock' : ($renewalNotice['state'] === 'window' ? 'calendar-clock' : 'lock') }}"
+                                            class="mt-0.5 size-4 shrink-0 {{
+                                        $renewalNotice['state'] === 'reserved'
+                                            ? 'text-violet-600 dark:text-violet-400'
+                                            : ($renewalNotice['state'] === 'window'
+                                                ? 'text-emerald-600 dark:text-emerald-400'
+                                                : 'text-amber-600 dark:text-amber-400')
+                                    }}" />
+                                    <p class="text-xs leading-5 {{
+                                        $renewalNotice['state'] === 'reserved'
+                                            ? 'text-violet-700/90 dark:text-violet-300/80'
+                                            : ($renewalNotice['state'] === 'window'
+                                                ? 'text-emerald-700/90 dark:text-emerald-300/80'
+                                                : 'text-amber-700/90 dark:text-amber-300/80')
+                                    }}">{{ $renewalNotice['message'] }}</p>
+                                </div>
                             @endif
 
                             {{-- قیمت — طرح‌های چندمدتی: تایل هر مدت با قیمت اصلی و تخفیف؛ تک‌مدتی: قیمت بزرگ --}}
@@ -254,6 +282,11 @@
                                 @if($myOrder && $myOrder->admin_status !== 'rejected')
                                     <x-btn variant="secondary" class="w-full" disabled>
                                         {{ $myOrder->admin_status === 'approved' ? 'فعال شده' : 'در انتظار تأیید مدیر' }}
+                                    </x-btn>
+                                @elseif($renewalNotice && in_array($renewalNotice['state'], ['blocked', 'reserved']))
+                                    {{-- Task 87 — خرید مجدد این طرح در بازهٔ فعلی مجاز نیست (بنر بالا توضیح می‌دهد) --}}
+                                    <x-btn variant="secondary" icon="lock" class="w-full" disabled>
+                                        خرید در بازهٔ فعلی امکان‌پذیر نیست
                                     </x-btn>
                                 @else
                                     <x-btn variant="primary" icon="shopping-cart" class="w-full" wire:click="setBuying('{{ $plan->slug }}')">

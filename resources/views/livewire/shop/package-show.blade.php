@@ -262,6 +262,48 @@
                         </p>
                     </div>
                 </div>
+            @elseif($renewalNotice = $this->renewalNotice)
+                {{-- Task 87 — وضعیت خرید مجدد: اعتبار فعال / پنجرهٔ ۵ روزه / رزروشده --}}
+                <div class="mb-4 flex items-start gap-3 rounded-2xl p-4 ring-1 {{
+                    $renewalNotice['state'] === 'reserved'
+                        ? 'bg-violet-50 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/25'
+                        : ($renewalNotice['state'] === 'window'
+                            ? 'bg-emerald-50 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/25'
+                            : 'bg-amber-50 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/25')
+                }}">
+                    <div class="flex size-10 shrink-0 items-center justify-center rounded-xl {{
+                        $renewalNotice['state'] === 'reserved'
+                            ? 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400'
+                            : ($renewalNotice['state'] === 'window'
+                                ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400'
+                                : 'bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400')
+                    }}">
+                        <x-icon name="{{ $renewalNotice['state'] === 'reserved' ? 'clock' : ($renewalNotice['state'] === 'window' ? 'calendar-clock' : 'lock') }}" class="size-5" />
+                    </div>
+                    <div class="min-w-0">
+                        <p class="flex flex-wrap items-center gap-2 text-sm font-black {{
+                            $renewalNotice['state'] === 'reserved'
+                                ? 'text-violet-800 dark:text-violet-300'
+                                : ($renewalNotice['state'] === 'window'
+                                    ? 'text-emerald-800 dark:text-emerald-300'
+                                    : 'text-amber-800 dark:text-amber-300')
+                        }}">
+                            {{ $renewalNotice['state'] === 'reserved' ? 'خرید رزروشده' : ($renewalNotice['state'] === 'window' ? 'زمان تمدید رسیده' : 'این پکیج را از قبل دارید') }}
+                            @if(($renewalNotice['days'] ?? null) !== null)
+                                <span class="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold tabular-nums ring-1 ring-inset ring-current/20 dark:bg-black/20">
+                                    {{ fa_num($renewalNotice['days']) }} روز مانده
+                                </span>
+                            @endif
+                        </p>
+                        <p class="mt-1 text-xs leading-6 {{
+                            $renewalNotice['state'] === 'reserved'
+                                ? 'text-violet-700/90 dark:text-violet-300/80'
+                                : ($renewalNotice['state'] === 'window'
+                                    ? 'text-emerald-700/90 dark:text-emerald-300/80'
+                                    : 'text-amber-700/90 dark:text-amber-300/80')
+                        }}">{{ $renewalNotice['message'] }}</p>
+                    </div>
+                </div>
             @endif
             <div class="card space-y-5 p-5 sm:p-6">
                 <div class="flex items-center justify-between gap-3">
@@ -354,9 +396,11 @@
 
                 {{-- buy button --}}
                 @php($buyDisabled = !$effectiveFree && !$this->isCoveredBySubscription && $this->gateways->isEmpty())
+                @php($renewalLocked = in_array($this->renewalNotice['state'] ?? '', ['blocked', 'reserved']))
+                @php($buyDisabled = $buyDisabled || $renewalLocked)
                 @php($covered = $this->isCoveredBySubscription)
-                <x-btn wire:click="buy" :loading="true" icon="{{ $covered ? 'crown' : ($effectiveFree ? 'download' : 'wallet') }}" class="w-full" :disabled="$buyDisabled">
-                    {{ $covered ? 'دریافت رایگان با اشتراک' : ($effectiveFree ? 'دریافت رایگان' : 'خرید و پرداخت') }}
+                <x-btn wire:click="buy" :loading="true" icon="{{ $covered ? 'crown' : ($effectiveFree ? 'download' : ($renewalLocked ? 'lock' : 'wallet')) }}" class="w-full" :disabled="$buyDisabled">
+                    {{ $covered ? 'دریافت رایگان با اشتراک' : ($effectiveFree ? 'دریافت رایگان' : ($renewalLocked ? 'خرید در بازهٔ فعلی امکان‌پذیر نیست' : 'خرید و پرداخت')) }}
                 </x-btn>
 
                 <p class="flex items-center justify-center gap-1.5 text-xs leading-4 text-zinc-400">

@@ -16,6 +16,7 @@ use App\Models\SubscriptionPlan;
 use App\Services\DiscountService;
 use App\Services\LicenseService;
 use App\Services\PaymentService;
+use App\Services\RenewalService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -257,6 +258,31 @@ class PackageShow extends Component
         return $this->findCoveringSubscription() !== null;
     }
 
+    /**
+     * Task 87 — وضعیت خرید مجدد این پکیج برای مشتری جاری (بنر + قفل دکمهٔ خرید):
+     * null = محدودیتی نیست؛ blocked = اعتبار فعال با بیش از ۵ روز مانده؛
+     * window = پنجرهٔ ۵ روزه (رزرو مجاز)؛ reserved = خرید رزروشدهٔ موجود
+     */
+    #[Computed]
+    public function renewalNotice(): ?array
+    {
+        $customer = $this->currentCustomer();
+
+        // مهمان با کد آپدیتِ تایپ‌شده هم وضعیت خرید مجدد خود را می‌بیند
+        if (! $customer && trim($this->updateCode) !== '') {
+            $customer = Customer::query()
+                ->where('update_code', trim($this->updateCode))
+                ->where('status', 'active')
+                ->first();
+        }
+
+        if (! $customer || $this->package->is_free || $this->isCoveredBySubscription) {
+            return null;
+        }
+
+        return app(RenewalService::class)->pageNoticeForPackage($customer->id, $this->package->id);
+    }
+
     /* ---------------------------------------------------------------- */
     /*  Buy */
     /* ---------------------------------------------------------------- */
@@ -377,6 +403,21 @@ class PackageShow extends Component
             $finalPrice = 0;
         }
 
+        // ---- Task 87 — گارد خرید مجدد این پکیج (فقط خریدِ پرداختی) ----
+        // اعتبار فعال همین پکیج → تا ۵ روزِ پایانی مسدود (با پیام دقیق)؛
+        // در پنجرهٔ ۵ روزه → خرید مجاز اما «رزرو»: لایسنس پس از پایان دورهٔ فعلی صادر می‌شود
+        $renewal = null;
+
+        if (! $this->package->is_free && $finalPrice > 0) {
+            $renewal = app(RenewalService::class)->evaluatePackageRenewal($customer->id, $this->package->id);
+
+            if (! $renewal['allowed']) {
+                $this->toast($renewal['message'], 'error');
+
+                return;
+            }
+        }
+
         // ---- مسیر رایگان ----
         // (پکیج رایگان، طرح صفر تومانی، یا کد تخفیفِ پوشش‌دهنده‌ی کامل مبلغ)
         if ($this->package->is_free || ($plan && $plan->final_price <= 0) || $finalPrice <= 0) {
@@ -445,6 +486,7 @@ class PackageShow extends Component
             'discount_amount' => $couponDiscount,
             'gateway' => $this->gatewayKey,
             'status' => PackagePurchase::STATUS_PENDING,
+            ...($renewal['reserved'] ?? false ? $renewal['meta'] : []), // Task 87 — رزرو تمدید
         ]);
 
         session()->put('shop_update_code', trim($this->updateCode));
