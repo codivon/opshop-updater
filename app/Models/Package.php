@@ -49,7 +49,9 @@ class Package extends Model
      */
     public function categoryModel(): BelongsTo
     {
-        return $this->belongsTo(Category::class);
+        // ⚠️ FK صریح ضروری است: پیش‌فرض لاراول از نام متد «category_model_id» را حدس می‌زد
+        // در حالی که ستون واقعی category_id است → رابطه همیشه null برمی‌گشت (گاتچای ۲۶)
+        return $this->belongsTo(Category::class, 'category_id');
     }
 
     public function versions(): HasMany

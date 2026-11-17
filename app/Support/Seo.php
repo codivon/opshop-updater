@@ -317,7 +317,9 @@ class Seo
                 'url' => '/packages/'.$package->slug,
                 'priceToman' => $price,
                 'currencyNote' => 'toman',
-                'category' => $package->category?->name,
+                // ⚠️ categoryModel نه category — ستون متنیِ قدیمی category آبجکت نیست
+                // و «?->name» روی رشته برای پکیج‌های قدیمی خطای ۵۰۰ می‌داد (گاتچای ۲۷)
+                'category' => $package->categoryModel?->name,
                 'rating' => $rating,
                 'version' => $package->latestVersion?->version,
                 'kind' => 'package',

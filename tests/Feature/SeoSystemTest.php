@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Settings\SeoSettings;
+use App\Models\Category;
 use App\Models\Setting;
 use App\Models\Template;
 use App\Models\User;
@@ -148,6 +149,35 @@ class SeoSystemTest extends TestCase
             ->assertOk()
             ->assertSee('<title>عنوان سفارشی سئو', false)
             ->assertSee('<meta name="description" content="توضیح سفارشی سئو برای پکیج"', false);
+    }
+
+    /** گاتچای ۲۶+۲۷: پکیج با دستهٔ متنیِ قدیمی — رابطه با FK درست + سئو بدون خطای «name on string» */
+    public function test_package_with_legacy_category_string_renders_and_uses_category_model(): void
+    {
+        $cat = Category::create([
+            'type' => 'package',
+            'name' => 'افزونهٔ سئو',
+            'slug' => 'legacy-cat-'.uniqid(),
+            'is_active' => true,
+            'sort_order' => 50,
+        ]);
+
+        $package = $this->makePackage([
+            'name' => 'پکیج دستهٔ قدیمی',
+            'slug' => 'legacy-cat-pkg',
+            // ستون متنیِ قدیمی پر است — نباید سئو/صفحه را ۵۰۰ کند
+            'category' => 'افزونهٔ سئو',
+        ]);
+        $package->category_id = $cat->id;
+        $package->save();
+
+        // رابطه با FK صریح category_id باید مدل واقعی برگرداند (نه همیشه null)
+        $this->assertSame('افزونهٔ سئو', $package->categoryModel?->name);
+
+        // متای پکیج: اسکیما باید نام دستهٔ ساختاریافته را بگیرد و صفحه ۲۰۰ باشد
+        $this->get(route('shop.package', 'legacy-cat-pkg'))
+            ->assertOk()
+            ->assertSee('"applicationSubCategory":"افزونهٔ سئو"', false);
     }
 
     public function test_product_meta_fields_take_precedence(): void
