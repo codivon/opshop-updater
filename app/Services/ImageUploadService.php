@@ -50,7 +50,7 @@ class ImageUploadService
     {
         $this->validateImage($file);
 
-        $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $extension = $this->safeExtension($file);
         $filename = $slug.'_thumb_'.time().'_'.Str::random(6).'.'.$extension;
 
         return $this->storeFile($file, self::THUMBNAIL_DIR, $filename);
@@ -64,7 +64,7 @@ class ImageUploadService
     {
         $this->validateImage($file);
 
-        $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $extension = $this->safeExtension($file);
         $filename = 'product_'.Str::slug($slug).'_thumb_'.time().'_'.Str::random(6).'.'.$extension;
 
         return $this->storeFile($file, 'uploads/products/thumbnails', $filename);
@@ -78,7 +78,7 @@ class ImageUploadService
     {
         $this->validateImage($file);
 
-        $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+        $extension = $this->safeExtension($file);
         $filename = 'template_'.Str::slug($slug).'_thumb_'.time().'_'.Str::random(6).'.'.$extension;
 
         return $this->storeFile($file, 'uploads/templates/thumbnails', $filename);
@@ -102,7 +102,7 @@ class ImageUploadService
 
                 $this->validateImage($file);
 
-                $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+                $extension = $this->safeExtension($file);
                 $filename = $package->slug.'_gallery_'.time().'_'.Str::random(6).'.'.$extension;
 
                 // ذخیره اطلاعات قبل از انتقال
@@ -147,7 +147,7 @@ class ImageUploadService
 
                 $this->validateImage($file);
 
-                $extension = strtolower($file->getClientOriginalExtension() ?: 'jpg');
+                $extension = $this->safeExtension($file);
                 $filename = $template->slug.'_gallery_'.time().'_'.Str::random(6).'.'.$extension;
 
                 // ذخیره اطلاعات قبل از انتقال
@@ -377,8 +377,7 @@ class ImageUploadService
             throw new RuntimeException('فرمت تصویر مجاز نیست؛ فقط JPG, PNG, WEBP, GIF.');
         }
 
-        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
-        $ext = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) ? ($ext === 'jpeg' ? 'jpg' : $ext) : 'png';
+        $ext = $this->safeExtension($file);
         $filename = 'slide-'.time().'-'.Str::random(6).'.'.$ext;
 
         return $this->storeFile($file, 'uploads/home-slides', $filename);
@@ -400,8 +399,7 @@ class ImageUploadService
             throw new RuntimeException('فرمت تصویر مجاز نیست؛ فقط JPG, PNG, WEBP, GIF.');
         }
 
-        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
-        $ext = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) ? ($ext === 'jpeg' ? 'jpg' : $ext) : 'png';
+        $ext = $this->safeExtension($file);
         $filename = 'badge-'.time().'-'.Str::random(6).'.'.$ext;
 
         return $this->storeFile($file, 'uploads/footer-badges', $filename);
@@ -429,9 +427,8 @@ class ImageUploadService
             throw new RuntimeException('فرمت لوگو مجاز نیست؛ فقط JPG, PNG, WEBP, SVG.');
         }
 
-        // برای SVG فقط پسوند .svg
-        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
-        $ext = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'], true) ? ($ext === 'jpeg' ? 'jpg' : $ext) : 'png';
+        // Task 85 (H5): پسوند فقط از MIME واقعی — هرگز از نام فایل کاربر
+        $ext = $this->safeExtension($file, allowSvg: true);
         $filename = $key.'-'.time().'-'.Str::random(4).'.'.$ext;
 
         $dir = 'uploads/gateways/logos';
@@ -468,5 +465,32 @@ class ImageUploadService
                 'حجم فایل نباید بیشتر از '.(self::MAX_SIZE_KB / 1024).' مگابایت باشد.'
             );
         }
+    }
+
+    /**
+     * Task 85 — امنیت (H5): پسوند امن بر اساس MIME واقعیِ فایل (نه نامِ ارسالی کاربر).
+     * فایل با هدر GIF و نام «x.php» دیگر هرگز با پسوند .php ذخیره نمی‌شود.
+     */
+    private function safeExtension(UploadedFile $file, bool $allowSvg = false): string
+    {
+        $mime = $file->getMimeType();
+
+        if ($allowSvg && in_array($mime, ['image/svg+xml', 'image/x-svg'], true)) {
+            return 'svg';
+        }
+
+        // درگاه‌هایی که SVG را application/octet-stream می‌شناسند — فقط اگر پسوند client هم svg باشد
+        if ($allowSvg && $mime === 'application/octet-stream'
+            && strtolower($file->getClientOriginalExtension()) === 'svg') {
+            return 'svg';
+        }
+
+        return match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            'image/gif' => 'gif',
+            default => throw new RuntimeException('فرمت فایل مجاز نیست.'),
+        };
     }
 }

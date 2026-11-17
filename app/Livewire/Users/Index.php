@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Users;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\User;
@@ -16,7 +17,8 @@ use Livewire\WithPagination;
 #[Title('کاربران پنل')]
 class Index extends Component
 {
-    use WithPagination, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -35,7 +37,9 @@ class Index extends Component
     public array $form = [];
 
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public ?int $deleteId = null;
 
     public function updatedSearch(): void
@@ -77,7 +81,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD (ported from old UserController)                             */
+    /*  CRUD (ported from old UserController) */
     /* ---------------------------------------------------------------- */
 
     public function openCreate(): void
@@ -121,7 +125,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     public function bulkPageIds(): array
@@ -172,7 +176,7 @@ class Index extends Component
         });
 
         if ($count > 0) {
-            $this->toast(fa_num($count) . ' کاربر حذف شد.');
+            $this->toast(fa_num($count).' کاربر حذف شد.');
         } elseif (! $skipped) {
             $this->toast('کاربری برای حذف انتخاب نشده است.', 'warning');
         }
@@ -225,7 +229,7 @@ class Index extends Component
     protected function rules(): array
     {
         $emailUnique = $this->editingId
-            ? 'unique:users,email,' . $this->editingId
+            ? 'unique:users,email,'.$this->editingId
             : 'unique:users,email';
 
         $password = $this->editingId
@@ -233,25 +237,25 @@ class Index extends Component
             : ['required', 'string', 'min:6'];
 
         return [
-            'form.name'     => ['required', 'string', 'max:255'],
-            'form.email'    => ['required', 'email', 'max:255', $emailUnique],
+            'form.name' => ['required', 'string', 'max:255'],
+            'form.email' => ['required', 'email', 'max:255', $emailUnique],
             'form.password' => $password,
-            'form.role'     => ['required', 'in:admin,operator'],
-            'form.status'   => ['required', 'in:active,inactive'],
+            'form.role' => ['required', 'in:admin,operator'],
+            'form.status' => ['required', 'in:active,inactive'],
         ];
     }
 
     protected function messages(): array
     {
         return [
-            'form.name.required'     => 'نام کاربر الزامی است.',
-            'form.email.required'    => 'ایمیل الزامی است.',
-            'form.email.email'       => 'ایمیل معتبر نیست.',
-            'form.email.unique'      => 'این ایمیل قبلاً استفاده شده است.',
+            'form.name.required' => 'نام کاربر الزامی است.',
+            'form.email.required' => 'ایمیل الزامی است.',
+            'form.email.email' => 'ایمیل معتبر نیست.',
+            'form.email.unique' => 'این ایمیل قبلاً استفاده شده است.',
             'form.password.required' => 'رمز عبور الزامی است.',
-            'form.password.min'      => 'رمز عبور باید حداقل ۶ کاراکتر باشد.',
-            'form.role.required'     => 'نقش کاربر را انتخاب کنید.',
-            'form.status.required'   => 'وضعیت را انتخاب کنید.',
+            'form.password.min' => 'رمز عبور باید حداقل ۶ کاراکتر باشد.',
+            'form.role.required' => 'نقش کاربر را انتخاب کنید.',
+            'form.status.required' => 'وضعیت را انتخاب کنید.',
         ];
     }
 

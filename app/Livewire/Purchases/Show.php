@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Purchases;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\PackagePurchase;
 use Livewire\Attributes\Layout;
@@ -12,6 +13,7 @@ use Livewire\Component;
 #[Title('جزئیات خرید')]
 class Show extends Component
 {
+    use AuthorizesAdmin;
     use WithToasts;
 
     public PackagePurchase $purchase;

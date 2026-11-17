@@ -2,6 +2,7 @@
 
 namespace App\Livewire\SubscriptionRequests;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\SubscriptionRequest;
 use App\Services\SubscriptionService;
@@ -17,6 +18,7 @@ use RuntimeException;
 #[Title('درخواست‌ها و تأییدها')]
 class Index extends Component
 {
+    use AuthorizesAdmin;
     use WithPagination, WithToasts;
 
     #[Url]
@@ -36,14 +38,16 @@ class Index extends Component
 
     /** مودال تأیید و فعال‌سازی */
     public ?int $approveId = null;
+
     public string $adminNote = '';
 
     /** مودال رد درخواست */
     public ?int $rejectId = null;
+
     public string $rejectNote = '';
 
     /* ---------------------------------------------------------------- */
-    /*  فیلترها                                                          */
+    /*  فیلترها */
     /* ---------------------------------------------------------------- */
 
     public function updatedSearch(): void
@@ -73,7 +77,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  داده‌ها                                                           */
+    /*  داده‌ها */
     /* ---------------------------------------------------------------- */
 
     #[Computed]
@@ -97,9 +101,9 @@ class Index extends Component
             ->when($this->payment, fn ($q) => $q->where('payment_status', $this->payment))
             ->when(in_array($this->sort, ['oldest', 'amount_desc', 'amount_asc'], true), function ($q) {
                 match ($this->sort) {
-                    'oldest'      => $q->oldest(),
+                    'oldest' => $q->oldest(),
                     'amount_desc' => $q->orderByDesc('amount'),
-                    'amount_asc'  => $q->orderBy('amount'),
+                    'amount_asc' => $q->orderBy('amount'),
                 };
             }, fn ($q) => $q->latest())
             ->paginate(12);
@@ -115,16 +119,16 @@ class Index extends Component
             ->get(['amount']);
 
         return [
-            'pending_count'          => $pendingSettled->count(),
-            'total_pending_payment'  => (int) $pendingSettled->sum('amount'),
+            'pending_count' => $pendingSettled->count(),
+            'total_pending_payment' => (int) $pendingSettled->sum('amount'),
             'awaiting_payment_count' => SubscriptionRequest::query()
                 ->where('status', SubscriptionRequest::STATUS_PENDING)
                 ->where('payment_status', SubscriptionRequest::PAYMENT_PENDING)
                 ->count(),
-            'approved_count'         => SubscriptionRequest::query()
+            'approved_count' => SubscriptionRequest::query()
                 ->where('status', SubscriptionRequest::STATUS_APPROVED)
                 ->count(),
-            'rejected_count'         => SubscriptionRequest::query()
+            'rejected_count' => SubscriptionRequest::query()
                 ->where('status', SubscriptionRequest::STATUS_REJECTED)
                 ->count(),
         ];
@@ -171,7 +175,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  مودال‌ها / اکشن‌ها                                                */
+    /*  مودال‌ها / اکشن‌ها */
     /* ---------------------------------------------------------------- */
 
     public function viewRequest(int $id): void
@@ -196,7 +200,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  تأیید / رد                                                       */
+    /*  تأیید / رد */
     /* ---------------------------------------------------------------- */
 
     public function approve(): void
@@ -205,8 +209,8 @@ class Index extends Component
         $this->validate([
             'adminNote' => ['nullable', 'string', 'max:1000'],
         ], [
-            'adminNote.string'   => 'یادداشت مدیر باید متن باشد.',
-            'adminNote.max'      => 'یادداشت مدیر حداکثر ۱۰۰۰ حرف است.',
+            'adminNote.string' => 'یادداشت مدیر باید متن باشد.',
+            'adminNote.max' => 'یادداشت مدیر حداکثر ۱۰۰۰ حرف است.',
         ]);
 
         $request = SubscriptionRequest::query()->find($this->approveId ?? 0);
@@ -234,7 +238,7 @@ class Index extends Component
 
         unset($this->records, $this->stats, $this->viewRecord);
 
-        $this->toast('درخواست تأیید و طرح فعال شد — ' . fa_num(count($licenses)) . ' لایسنس صادر شد.');
+        $this->toast('درخواست تأیید و طرح فعال شد — '.fa_num(count($licenses)).' لایسنس صادر شد.');
     }
 
     public function reject(): void
@@ -244,9 +248,9 @@ class Index extends Component
             'rejectNote' => ['required', 'string', 'min:5', 'max:1000'],
         ], [
             'rejectNote.required' => 'برای رد درخواست، ذکر دلیل الزامی است.',
-            'rejectNote.min'      => 'دلیل رد باید حداقل ۵ حرف باشد.',
-            'rejectNote.string'   => 'دلیل رد باید متن باشد.',
-            'rejectNote.max'      => 'دلیل رد حداکثر ۱۰۰۰ حرف است.',
+            'rejectNote.min' => 'دلیل رد باید حداقل ۵ حرف باشد.',
+            'rejectNote.string' => 'دلیل رد باید متن باشد.',
+            'rejectNote.max' => 'دلیل رد حداکثر ۱۰۰۰ حرف است.',
         ]);
 
         $request = SubscriptionRequest::query()->find($this->rejectId ?? 0);

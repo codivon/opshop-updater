@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Tools;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Backup as BackupModel;
 use App\Services\BackupService;
@@ -24,6 +25,7 @@ use Throwable;
 #[Title('پشتیبان‌گیری')]
 class Backup extends Component
 {
+    use AuthorizesAdmin;
     use WithFileUploads, WithToasts;
 
     /** فایل ZIP آپلودشده برای بازیابی */
@@ -50,13 +52,13 @@ class Backup extends Component
     protected function rules(): array
     {
         return [
-            'backupFile' => ['nullable', 'file', 'extensions:zip', 'max:' . $this->maxFileKb],
+            'backupFile' => ['nullable', 'file', 'extensions:zip', 'max:'.$this->maxFileKb],
         ];
     }
 
     protected $messages = [
         'backupFile.extensions' => 'فقط فایل ZIP پشتیبان معتبر است.',
-        'backupFile.max'        => 'حجم فایل نباید بیشتر از ۵۱۲ مگابایت باشد؛ برای فایل حجیم‌تر، آن را از طریق FTP/فایل‌منیجر در پوشهٔ storage/app/backups/incoming آپلود کنید.',
+        'backupFile.max' => 'حجم فایل نباید بیشتر از ۵۱۲ مگابایت باشد؛ برای فایل حجیم‌تر، آن را از طریق FTP/فایل‌منیجر در پوشهٔ storage/app/backups/incoming آپلود کنید.',
     ];
 
     /* ================================================================
@@ -100,9 +102,9 @@ class Backup extends Component
     #[Computed]
     public function stats(): array
     {
-        $tables   = BackupService::tableNames();
-        $rows     = 0;
-        $broken   = [];
+        $tables = BackupService::tableNames();
+        $rows = 0;
+        $broken = [];
         $perTable = [];
 
         foreach ($tables as $table) {
@@ -119,13 +121,13 @@ class Backup extends Component
         $files = BackupService::filesStat();
 
         return [
-            'tables'   => count($tables),
-            'rows'     => $rows,
-            'per_table'=> $perTable,
-            'broken'   => $broken,
-            'driver'   => (string) DB::getDriverName(),
+            'tables' => count($tables),
+            'rows' => $rows,
+            'per_table' => $perTable,
+            'broken' => $broken,
+            'driver' => (string) DB::getDriverName(),
             'files_count' => $files['count'],
-            'files_size'  => $files['size'],
+            'files_size' => $files['size'],
         ];
     }
 
@@ -154,10 +156,10 @@ class Backup extends Component
 
                 if ($record->status === BackupModel::STATUS_COMPLETED) {
                     $this->toast($record->isBackup()
-                        ? 'نسخه پشتیبان «' . $record->name . '.zip» با موفقیت ساخته شد.'
+                        ? 'نسخه پشتیبان «'.$record->name.'.zip» با موفقیت ساخته شد.'
                         : 'بازیابی تکمیل شد؛ گزارش کامل در همین صفحه نمایش داده شده است.', 'success');
                 } elseif ($record->status === BackupModel::STATUS_FAILED) {
-                    $this->toast('عملیات ناموفق بود: ' . ($record->error ?: 'خطای نامشخص'), 'error');
+                    $this->toast('عملیات ناموفق بود: '.($record->error ?: 'خطای نامشخص'), 'error');
                 }
             }
         }
@@ -173,7 +175,7 @@ class Backup extends Component
             $record = BackupService::startBackup($this->includeFiles);
         } catch (Throwable $e) {
             report($e);
-            $this->toast('آغاز پشتیبان‌گیری ناموفق بود: ' . $e->getMessage(), 'error');
+            $this->toast('آغاز پشتیبان‌گیری ناموفق بود: '.$e->getMessage(), 'error');
 
             return;
         }
@@ -208,10 +210,10 @@ class Backup extends Component
                 fpassthru($fp);
                 fclose($fp);
             }
-        }, $record->name . '.zip', [
-            'Content-Type'        => 'application/zip',
-            'Content-Disposition' => 'attachment; filename="' . $record->name . '.zip"',
-            'Cache-Control'       => 'no-store, private',
+        }, $record->name.'.zip', [
+            'Content-Type' => 'application/zip',
+            'Content-Disposition' => 'attachment; filename="'.$record->name.'.zip"',
+            'Cache-Control' => 'no-store, private',
         ]);
     }
 
@@ -248,7 +250,7 @@ class Backup extends Component
                 }
 
                 $original = (string) $this->backupFile->getClientOriginalName();
-                $path     = BackupService::storeIncoming(
+                $path = BackupService::storeIncoming(
                     (string) $this->backupFile->getRealPath(),
                     $original
                 );
@@ -256,10 +258,10 @@ class Backup extends Component
                 $this->reset('backupFile');
             } else {
                 $name = basename((string) $source);
-                $path = BackupService::incomingDir() . '/' . $name;
+                $path = BackupService::incomingDir().'/'.$name;
 
                 if (! is_file($path)) {
-                    $this->toast('فایل «' . $name . '» در پوشهٔ incoming یافت نشد.', 'error');
+                    $this->toast('فایل «'.$name.'» در پوشهٔ incoming یافت نشد.', 'error');
 
                     return;
                 }
@@ -268,7 +270,7 @@ class Backup extends Component
             }
         } catch (Throwable $e) {
             report($e);
-            $this->toast('آغاز بازیابی ناموفق بود: ' . $e->getMessage(), 'error');
+            $this->toast('آغاز بازیابی ناموفق بود: '.$e->getMessage(), 'error');
 
             return;
         }
@@ -312,7 +314,7 @@ class Backup extends Component
             }
         } catch (Throwable $e) {
             report($e);
-            $this->toast('حذف ناموفق بود: ' . $e->getMessage(), 'error');
+            $this->toast('حذف ناموفق بود: '.$e->getMessage(), 'error');
         }
     }
 

@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Subscriptions;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
+use App\Models\Subscription;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
 use App\Services\SubscriptionService;
@@ -18,7 +20,8 @@ use Livewire\WithPagination;
 #[Title('درخواست‌های اشتراک')]
 class Orders extends Component
 {
-    use WithPagination, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -39,6 +42,7 @@ class Orders extends Component
     public string $sort = 'newest';
 
     public ?int $rejectId = null;
+
     public string $rejectReason = '';
 
     public ?int $viewId = null;
@@ -110,7 +114,7 @@ class Orders extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Actions                                                          */
+    /*  Actions */
     /* ---------------------------------------------------------------- */
 
     public function approve(int $id, SubscriptionService $service): void
@@ -148,7 +152,7 @@ class Orders extends Component
     {
         $order = SubscriptionOrder::findOrFail($id);
 
-        if (!$order->transaction_id) {
+        if (! $order->transaction_id) {
             $this->toast('این سفارش تراکنش درگاه ندارد (رایگان).', 'warning');
 
             return;
@@ -175,7 +179,7 @@ class Orders extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     public function bulkPageIds(): array
@@ -189,11 +193,11 @@ class Orders extends Component
 
         // اشتراک‌های صادرشده از این سفارش‌ها هم حذف شوند
         $subscriptionIds = SubscriptionOrder::whereIn('id', $ids)->whereNotNull('subscription_id')->pluck('subscription_id');
-        \App\Models\Subscription::whereIn('id', $subscriptionIds)->delete();
+        Subscription::whereIn('id', $subscriptionIds)->delete();
 
         $count = SubscriptionOrder::query()->whereIn('id', $ids)->delete();
 
-        $this->toast(fa_num($count) . ' سفارش حذف شد.');
+        $this->toast(fa_num($count).' سفارش حذف شد.');
     }
 
     public function render()

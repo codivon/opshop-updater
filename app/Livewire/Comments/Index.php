@@ -2,11 +2,12 @@
 
 namespace App\Livewire\Comments;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Comment;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -14,15 +15,20 @@ use Livewire\WithPagination;
 #[Title('دیدگاه‌ها')]
 class Index extends Component
 {
-    use WithToasts, WithPagination;
+    use AuthorizesAdmin;
+    use WithPagination, WithToasts;
 
     public string $search = '';
+
     public string $statusFilter = '';
+
     public string $typeFilter = '';   // product | package
 
     /** مودال پاسخ مدیر */
     public bool $showReplyModal = false;
+
     public ?int $replyingId = null;
+
     public string $replyText = '';
 
     public function updatingSearch(): void
@@ -59,7 +65,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  پاسخ مدیر                                                        */
+    /*  پاسخ مدیر */
     /* ---------------------------------------------------------------- */
 
     /** باز کردن مودال پاسخ برای یک دیدگاه */
@@ -69,7 +75,7 @@ class Index extends Component
 
         $this->resetErrorBag();
         $this->replyingId = $comment->id;
-        $this->replyText  = (string) ($comment->reply ?? '');
+        $this->replyText = (string) ($comment->reply ?? '');
         $this->showReplyModal = true;
     }
 
@@ -80,8 +86,8 @@ class Index extends Component
             'replyText' => ['required', 'string', 'min:2', 'max:2000'],
         ], [
             'replyText.required' => 'متن پاسخ الزامی است.',
-            'replyText.min'      => 'متن پاسخ خیلی کوتاه است.',
-            'replyText.max'      => 'متن پاسخ حداکثر ۲٬۰۰۰ کاراکتر است.',
+            'replyText.min' => 'متن پاسخ خیلی کوتاه است.',
+            'replyText.max' => 'متن پاسخ حداکثر ۲٬۰۰۰ کاراکتر است.',
         ]);
 
         $comment = Comment::findOrFail($this->replyingId);
@@ -90,7 +96,7 @@ class Index extends Component
 
         $this->showReplyModal = false;
         $this->replyingId = null;
-        $this->replyText  = '';
+        $this->replyText = '';
 
         $this->toast($hadReply ? 'پاسخ مدیر به‌روزرسانی شد.' : 'پاسخ مدیر ثبت شد.');
     }
@@ -105,8 +111,8 @@ class Index extends Component
     public function getTypesProperty(): array
     {
         return [
-            Comment::TYPE_PRODUCT  => 'محصولات (پروژه‌ها)',
-            Comment::TYPE_PACKAGE  => 'پکیج‌ها',
+            Comment::TYPE_PRODUCT => 'محصولات (پروژه‌ها)',
+            Comment::TYPE_PACKAGE => 'پکیج‌ها',
             Comment::TYPE_TEMPLATE => 'قالب‌ها',
         ];
     }

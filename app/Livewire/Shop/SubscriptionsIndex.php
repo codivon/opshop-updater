@@ -449,7 +449,7 @@ class SubscriptionsIndex extends Component
 
         // رایگان → مستقیم صفحه نتیجه (در انتظار تأیید مدیر)
         if (($result['is_free'] ?? false)) {
-            $this->redirect(route('subscription.result', $order), navigate: true);
+            $this->redirect(route('subscription.result', ['order' => $order, 'token' => $order->access_token]), navigate: true);
 
             return;
         }

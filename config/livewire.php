@@ -65,9 +65,10 @@ return [
 
     'temporary_file_upload' => [
         'disk' => null,        // Example: 'local', 's3'              | Default: 'default'
-        'rules' => ['required', 'file', 'max:512000'], // ⚠️ 500MB — پیش‌فرض ۱۲MB بود و فایل‌های نسخه را رد می‌کرد. توجه: php.ini هم باید upload_max_filesize و post_max_size ≥ 512M باشد (لاراگون/سی‌پنل).
+        // Task 85 — امنیت (M7): آپلود موقت لیوایر را محدود کن (قبلاً ۵۰۰ مگابایتِ هر نوع برای مهمان باز بود)
+        'rules' => ['required', 'file', 'max:320000', 'mimes:zip,jpg,jpeg,png,webp,gif'], // حداکثر ۳۲۰ مگابایت — فایل‌های ZIP نسخه + تصاویر. توجه: php.ini هم باید upload_max_filesize و post_max_size ≥ 320M باشد (لاراگون/سی‌پنل).
         'directory' => null,   // Example: 'tmp'                      | Default: 'livewire-tmp'
-        'middleware' => null,  // Example: 'throttle:5,1'             | Default: 'throttle:60,1'
+        'middleware' => 'throttle:10,1',  // Task 85 (M7) — حداکثر ۱۰ آپلود موقت در دقیقه از هر IP
         'preview_mimes' => [   // Supported file types for temporary pre-signed file URLs...
             'png', 'gif', 'bmp', 'svg', 'wav', 'mp4',
             'mov', 'avi', 'wmv', 'mp3', 'm4a',

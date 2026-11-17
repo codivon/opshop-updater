@@ -33,11 +33,27 @@ class PaymentService
         }
     }
 
+    /**
+     * Task 85 — امنیت پرداخت: درگاه آزمایشی «local» در محیط production به‌کلی مسدود است.
+     * درایور local فقط request را می‌بیند و بدون هیچ پرداخت واقعی «موفق» برمی‌گرداند؛
+     * اگر باز بماند، هر کسی می‌تواند بدون پرداخت پول، لایسنس و فایل بگیرد.
+     */
+    private function assertGatewayAllowed(?string $gateway): void
+    {
+        if ($gateway === 'local' && app()->environment('production')) {
+            Log::warning('Blocked test gateway (local) in production', ['gateway' => $gateway]);
+
+            throw new RuntimeException('درگاه آزمایشی در حالت production فعال نیست — درگاه پرداخت واقعی را انتخاب کنید.');
+        }
+    }
+
     public function createPayment(PackagePurchase $purchase, ?string $gateway = null): array
     {
         if ($purchase->amount <= 0) {
             throw new RuntimeException('مبلغ تراکنش باید بزرگ‌تر از صفر باشد.');
         }
+
+        $this->assertGatewayAllowed($gateway);
 
         try {
             // 1️⃣ تنظیمات درگاه (پیش‌فرض: اولین درگاهِ فعال پنل)
@@ -125,6 +141,8 @@ class PaymentService
             throw new RuntimeException('مبلغ تراکنش باید بزرگ‌تر از صفر باشد.');
         }
 
+        $this->assertGatewayAllowed($gateway);
+
         try {
             $gateway = $gateway ?? Gateway::where('is_active', true)->first()?->key ?? 'zarinpal';
             $this->assertDriverExists($gateway);
@@ -202,6 +220,8 @@ class PaymentService
             throw new RuntimeException('مبلغ تراکنش باید بزرگ‌تر از صفر باشد.');
         }
 
+        $this->assertGatewayAllowed($gateway);
+
         try {
             $gateway = $gateway ?? Gateway::where('is_active', true)->first()?->key ?? 'zarinpal';
             $this->assertDriverExists($gateway);
@@ -277,6 +297,8 @@ class PaymentService
         if ($purchase->amount <= 0) {
             throw new RuntimeException('مبلغ تراکنش باید بزرگ‌تر از صفر باشد.');
         }
+
+        $this->assertGatewayAllowed($gateway);
 
         try {
             $gateway = $gateway ?? Gateway::where('is_active', true)->first()?->key ?? 'zarinpal';
@@ -375,6 +397,7 @@ class PaymentService
 
         try {
             $gateway = $order->gateway ?? 'zarinpal';
+            $this->assertGatewayAllowed($gateway);
             $gatewayConfigs = get_gateway_configs($gateway);
 
             // برگرداندن Receipt = موفق (همان قرارداد شتابیت این نسخه)
@@ -510,6 +533,7 @@ class PaymentService
 
         try {
             $gateway = $purchase->gateway ?? 'zarinpal';
+            $this->assertGatewayAllowed($gateway);
             $gatewayConfigs = get_gateway_configs($gateway);
 
             Payment::via($gateway)
@@ -593,6 +617,7 @@ class PaymentService
 
         try {
             $gateway = $purchase->gateway ?? 'zarinpal';
+            $this->assertGatewayAllowed($gateway);
             $gatewayConfigs = get_gateway_configs($gateway);
 
             Payment::via($gateway)
@@ -682,6 +707,7 @@ class PaymentService
         try {
             // 3️⃣ تنظیمات درگاه برای تایید
             $gateway = $purchase->gateway ?? 'zarinpal';
+            $this->assertGatewayAllowed($gateway);
             $gatewayConfigs = get_gateway_configs($gateway);
 
             // 4️⃣ تایید پرداخت

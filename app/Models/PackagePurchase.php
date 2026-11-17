@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPurchaseAccessToken;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,23 +10,28 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class PackagePurchase extends Model
 {
     use HasFactory;
+    use HasPurchaseAccessToken;
 
     protected $fillable = [
         'package_id', 'version_id', 'pricing_plan_id', 'customer_id',
         'license_id', 'transaction_id', 'discount_code_id',
         'original_amount', 'amount', 'discount_amount',
         'callback_url', 'gateway', 'payment_url', 'status', 'paid_at', 'meta',
+        'access_token',
     ];
 
     protected $casts = [
-        'amount'  => 'integer',
+        'amount' => 'integer',
         'paid_at' => 'datetime',
-        'meta'    => 'array',
+        'meta' => 'array',
     ];
 
-    public const STATUS_PENDING  = 'pending';
-    public const STATUS_PAID     = 'paid';
-    public const STATUS_FAILED   = 'failed';
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_PAID = 'paid';
+
+    public const STATUS_FAILED = 'failed';
+
     public const STATUS_REFUNDED = 'refunded';
 
     /* ---------------- Relationships ---------------- */
@@ -75,7 +81,7 @@ class PackagePurchase extends Model
         }
 
         $this->update([
-            'status'  => self::STATUS_PAID,
+            'status' => self::STATUS_PAID,
             'paid_at' => now(),
             'gateway' => $gateway ?? $this->gateway,
         ]);
@@ -86,9 +92,14 @@ class PackagePurchase extends Model
 
     public function markAsFailed(?string $reason = null): void
     {
+        // Task 85 — امنیت: خریدِ پرداخت‌شده هرگز نباید با کال‌بک هم‌زمان به «ناموفق» برگردد
+        if ($this->isPaid()) {
+            return;
+        }
+
         $this->update([
             'status' => self::STATUS_FAILED,
-            'meta'   => array_merge($this->meta ?? [], ['fail_reason' => $reason]),
+            'meta' => array_merge($this->meta ?? [], ['fail_reason' => $reason]),
         ]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Artisan;
@@ -14,6 +15,7 @@ use Livewire\Component;
 #[Title('تنظیمات')]
 class Index extends Component
 {
+    use AuthorizesAdmin;
     use WithToasts;
 
     /** نتیجه تست اتصال به شاپرک */
@@ -69,6 +71,7 @@ class Index extends Component
     ];
 
     public bool $confirmCache = false;
+
     public bool $confirmOptimize = false;
 
     /** کلیدهای بولی فرم (ذخیره ۰/۱ و خواندن bool) */
@@ -133,7 +136,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Actions (پورت‌شده از SettingController)                          */
+    /*  Actions (پورت‌شده از SettingController) */
     /* ---------------------------------------------------------------- */
 
     /** ذخیره تنظیمات عمومی و ایمیل (پورت SettingController@update) */
@@ -156,7 +159,7 @@ class Index extends Component
 
         // کش کلیدهای sms_* (helper setting از کش ۶۰ثانیه‌ای استفاده می‌کند)
         foreach (array_keys(self::GROUPS) as $key) {
-            Cache::forget('setting:' . $key);
+            Cache::forget('setting:'.$key);
         }
 
         $this->toast('تنظیمات با موفقیت ذخیره شد.');
@@ -205,7 +208,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  تست اتصال به شاپرک                                               */
+    /*  تست اتصال به شاپرک */
     /* ---------------------------------------------------------------- */
 
     /**
@@ -230,16 +233,16 @@ class Index extends Component
         }
 
         $host = 'sep.shaparak.ir';
-        $url  = 'https://' . $host . '/Payments/InitPayment.asmx?WSDL';
+        $url = 'https://'.$host.'/Payments/InitPayment.asmx?WSDL';
 
         // ۱) DNS
         $ip = gethostbynamel($host)[0] ?? '';
 
         if ($ip === '' || $ip === $host) {
             $this->shaparakTest = [
-                'ok'      => false,
-                'proxy'   => $proxy,
-                'title'   => 'DNS ناموفق',
+                'ok' => false,
+                'proxy' => $proxy,
+                'title' => 'DNS ناموفق',
                 'message' => 'دامنه sep.shaparak.ir روی سرور شما resolve نشد؛ DNS هاست را بررسی کنید.',
             ];
             $this->testingShaparak = false;
@@ -251,11 +254,11 @@ class Index extends Component
         $ch = curl_init($url);
 
         $options = [
-            CURLOPT_NOBODY         => false,
+            CURLOPT_NOBODY => false,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => 8,
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_IPRESOLVE      => CURL_IPRESOLVE_V4,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
             CURLOPT_SSL_VERIFYPEER => false, // فقط تست اتصال
             CURLOPT_FOLLOWLOCATION => false,
         ];
@@ -270,32 +273,32 @@ class Index extends Component
 
         curl_setopt_array($ch, $options);
 
-        $body     = curl_exec($ch);
+        $body = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        $errno    = (int) curl_errno($ch);
-        $error    = (string) curl_error($ch);
+        $errno = (int) curl_errno($ch);
+        $error = (string) curl_error($ch);
         curl_close($ch);
 
         $usedProxy = $proxy !== '';
 
         if ($body !== false && $httpCode > 0) {
             $this->shaparakTest = [
-                'ok'      => true,
-                'proxy'   => $proxy,
-                'title'   => 'اتصال برقرار است ✓',
-                'message' => 'سرور شما به شاپرک دسترسی دارد' . ($usedProxy ? ' (از طریق پروکسی)' : '') . '. اگر تراکنش هنوز خطا می‌دهد، درگاه را با «سامان SEP (REST)» برای ترمینال‌های جدید (UUID) امتحان کنید.',
+                'ok' => true,
+                'proxy' => $proxy,
+                'title' => 'اتصال برقرار است ✓',
+                'message' => 'سرور شما به شاپرک دسترسی دارد'.($usedProxy ? ' (از طریق پروکسی)' : '').'. اگر تراکنش هنوز خطا می‌دهد، درگاه را با «سامان SEP (REST)» برای ترمینال‌های جدید (UUID) امتحان کنید.',
             ];
         } else {
             $isTimeout = in_array($errno, [CURLE_OPERATION_TIMEDOUT, CURLE_COULDNT_CONNECT, CURLE_COULDNT_RESOLVE_PROXY], true)
                 || str_contains($error, 'timed out');
 
             $this->shaparakTest = [
-                'ok'      => false,
-                'proxy'   => $proxy,
-                'title'   => $isTimeout ? 'سرور به شاپرک دسترسی ندارد (Timeout)' : 'خطای اتصال به شاپرک',
+                'ok' => false,
+                'proxy' => $proxy,
+                'title' => $isTimeout ? 'سرور به شاپرک دسترسی ندارد (Timeout)' : 'خطای اتصال به شاپرک',
                 'message' => $isTimeout
                     ? 'شاپرک به IPهای خارج از ایران پاسخ نمی‌دهد. اگر هاست شما خارج از ایران است: (۱) یک پروکسی/سرور واسط ایرانی تهیه و آدرس آن را در فیلد «پروکسی شاپرک» وارد کنید (مثل http://IP:PORT یا socks5://IP:PORT) و دوباره تست بگیرید؛ (۲) یا پنل را روی هاست ایرانی منتقل کنید.'
-                    : ('خطا: ' . ($error !== '' ? $error : 'unknown') . ' — آدرس IP مقصد: ' . $ip),
+                    : ('خطا: '.($error !== '' ? $error : 'unknown').' — آدرس IP مقصد: '.$ip),
             ];
         }
 

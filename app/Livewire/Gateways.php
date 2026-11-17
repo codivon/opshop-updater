@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Gateway;
@@ -17,6 +18,7 @@ use Livewire\WithFileUploads;
 #[Title('درگاه‌های پرداخت')]
 class Gateways extends Component
 {
+    use AuthorizesAdmin;
     use WithBulkActions, WithFileUploads, WithToasts;
 
     /** @var array<int, array<string, mixed>> */
@@ -51,9 +53,13 @@ class Gateways extends Component
         $this->validate([
             'gateways.*.name' => ['required', 'string', 'max:255'],
             'gateways.*.ordering' => ['nullable', 'integer', 'min:0'],
+            // Task 85 — امنیت (H5): اعتبارسنجی فایل لوگو قبل از آپلود
+            'logoUploads.*' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,svg', 'max:2048'],
         ], [
             'gateways.*.name.required' => 'عنوان درگاه الزامی است.',
             'gateways.*.ordering.integer' => 'ترتیب نمایش باید عدد باشد.',
+            'logoUploads.*.mimes' => 'فرمت لوگو مجاز نیست؛ فقط JPG, PNG, WEBP, SVG.',
+            'logoUploads.*.max' => 'حجم لوگو حداکثر ۲ مگابایت.',
         ]);
 
         foreach ($this->gateways as $gateway) {

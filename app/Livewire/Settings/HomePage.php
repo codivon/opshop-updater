@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\HomeSlide;
 use App\Models\Package;
@@ -39,6 +40,7 @@ use Livewire\WithFileUploads;
 #[Title('صفحهٔ اصلی فروشگاه')]
 class HomePage extends Component
 {
+    use AuthorizesAdmin;
     use WithFileUploads;
     use WithToasts;
 

@@ -194,7 +194,7 @@ class ProductShow extends Component
             $this->toast($couponDiscount > 0
                 ? 'پروژه با کد تخفیف به‌صورت رایگان دریافت شد؛ می‌توانید همین حالا دانلود کنید.'
                 : 'پروژه رایگان دریافت شد؛ می‌توانید همین حالا دانلود کنید.');
-            $this->redirect(route('payment.result.product', $purchase), navigate: true);
+            $this->redirect(route('payment.result.product', ['purchase' => $purchase, 'token' => $purchase->access_token]), navigate: true);
 
             return;
         }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Discounts;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\DiscountCode;
 use Carbon\Carbon;
@@ -16,7 +17,8 @@ use Livewire\WithPagination;
 #[Title('کدهای تخفیف')]
 class Index extends Component
 {
-    use WithToasts, WithPagination;
+    use AuthorizesAdmin;
+    use WithPagination, WithToasts;
 
     public string $search = '';
 
@@ -25,19 +27,21 @@ class Index extends Component
 
     /** فرم مودال ایجاد/ویرایش */
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public array $form = [
-        'code'                   => '',
-        'type'                   => DiscountCode::TYPE_PERCENT,
-        'value'                  => 10,
-        'max_uses'               => '',
-        'expires_at'             => '',
-        'applies_packages'       => true,
-        'applies_products'       => true,
-        'applies_templates'      => true,
-        'applies_subscriptions'  => true,
-        'is_active'              => true,
-        'notes'                  => '',
+        'code' => '',
+        'type' => DiscountCode::TYPE_PERCENT,
+        'value' => 10,
+        'max_uses' => '',
+        'expires_at' => '',
+        'applies_packages' => true,
+        'applies_products' => true,
+        'applies_templates' => true,
+        'applies_subscriptions' => true,
+        'is_active' => true,
+        'notes' => '',
     ];
 
     protected function rules(): array
@@ -49,27 +53,27 @@ class Index extends Component
                 'required', 'string', 'max:64', 'alpha_dash:ascii',
                 Rule::unique('discount_codes', 'code')->ignore($this->editingId),
             ],
-            'form.type'       => ['required', 'in:' . DiscountCode::TYPE_PERCENT . ',' . DiscountCode::TYPE_FIXED],
-            'form.value'      => ['required', 'integer', $isPercent ? 'min:1' : 'min:1000', $isPercent ? 'max:100' : 'max:1000000000'],
-            'form.max_uses'   => ['nullable', 'integer', 'min:1', 'max:1000000'],
+            'form.type' => ['required', 'in:'.DiscountCode::TYPE_PERCENT.','.DiscountCode::TYPE_FIXED],
+            'form.value' => ['required', 'integer', $isPercent ? 'min:1' : 'min:1000', $isPercent ? 'max:100' : 'max:1000000000'],
+            'form.max_uses' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'form.expires_at' => ['nullable', 'date'],
-            'form.applies_packages'      => ['boolean'],
-            'form.applies_products'      => ['boolean'],
-            'form.applies_templates'     => ['boolean'],
+            'form.applies_packages' => ['boolean'],
+            'form.applies_products' => ['boolean'],
+            'form.applies_templates' => ['boolean'],
             'form.applies_subscriptions' => ['boolean'],
             'form.is_active' => ['boolean'],
-            'form.notes'     => ['nullable', 'string', 'max:500'],
+            'form.notes' => ['nullable', 'string', 'max:500'],
         ];
     }
 
     protected $messages = [
-        'form.code.required'   => 'کد تخفیف الزامی است.',
-        'form.code.unique'     => 'این کد قبلاً استفاده شده است؛ کد دیگری وارد کنید.',
+        'form.code.required' => 'کد تخفیف الزامی است.',
+        'form.code.unique' => 'این کد قبلاً استفاده شده است؛ کد دیگری وارد کنید.',
         'form.code.alpha_dash' => 'کد فقط می‌تواند شامل حروف انگلیسی، عدد، خط تیره و زیرخط باشد.',
-        'form.value.required'  => 'مقدار تخفیف الزامی است.',
-        'form.value.min'       => 'مقدار تخفیف نامعتبر است (درصد: حداقل ۱ — مبلغ ثابت: حداقل ۱٬۰۰۰ تومان).',
-        'form.value.max'       => 'مقدار تخفیف بیش از حد مجاز است.',
-        'form.max_uses.min'    => 'حداقل تعداد استفاده باید ۱ باشد.',
+        'form.value.required' => 'مقدار تخفیف الزامی است.',
+        'form.value.min' => 'مقدار تخفیف نامعتبر است (درصد: حداقل ۱ — مبلغ ثابت: حداقل ۱٬۰۰۰ تومان).',
+        'form.value.max' => 'مقدار تخفیف بیش از حد مجاز است.',
+        'form.max_uses.min' => 'حداقل تعداد استفاده باید ۱ باشد.',
         'form.expires_at.date' => 'تاریخ انقضا نامعتبر است.',
     ];
 
@@ -84,7 +88,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD                                                             */
+    /*  CRUD */
     /* ---------------------------------------------------------------- */
 
     public function create(): void
@@ -92,17 +96,17 @@ class Index extends Component
         $this->resetErrorBag();
         $this->editingId = null;
         $this->form = [
-            'code'                   => '',
-            'type'                   => DiscountCode::TYPE_PERCENT,
-            'value'                  => 10,
-            'max_uses'               => '',
-            'expires_at'             => '',
-            'applies_packages'       => true,
-            'applies_products'       => true,
-            'applies_templates'      => true,
-            'applies_subscriptions'  => true,
-            'is_active'              => true,
-            'notes'                  => '',
+            'code' => '',
+            'type' => DiscountCode::TYPE_PERCENT,
+            'value' => 10,
+            'max_uses' => '',
+            'expires_at' => '',
+            'applies_packages' => true,
+            'applies_products' => true,
+            'applies_templates' => true,
+            'applies_subscriptions' => true,
+            'is_active' => true,
+            'notes' => '',
         ];
         $this->showModal = true;
     }
@@ -114,17 +118,17 @@ class Index extends Component
 
         $this->editingId = $code->id;
         $this->form = [
-            'code'                   => $code->code,
-            'type'                   => $code->type,
-            'value'                  => $code->value,
-            'max_uses'               => $code->max_uses !== null ? (string) $code->max_uses : '',
-            'expires_at'             => $code->expires_at?->format('Y-m-d\TH:i') ?? '',
-            'applies_packages'       => $code->applies_packages,
-            'applies_products'       => $code->applies_products,
-            'applies_templates'      => $code->applies_templates,
-            'applies_subscriptions'  => $code->applies_subscriptions,
-            'is_active'              => $code->is_active,
-            'notes'                  => (string) ($code->notes ?? ''),
+            'code' => $code->code,
+            'type' => $code->type,
+            'value' => $code->value,
+            'max_uses' => $code->max_uses !== null ? (string) $code->max_uses : '',
+            'expires_at' => $code->expires_at?->format('Y-m-d\TH:i') ?? '',
+            'applies_packages' => $code->applies_packages,
+            'applies_products' => $code->applies_products,
+            'applies_templates' => $code->applies_templates,
+            'applies_subscriptions' => $code->applies_subscriptions,
+            'is_active' => $code->is_active,
+            'notes' => (string) ($code->notes ?? ''),
         ];
         $this->showModal = true;
     }
@@ -133,7 +137,7 @@ class Index extends Component
     public function generateCode(): void
     {
         $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // بدون I,O,0,1
-        $code     = '';
+        $code = '';
 
         do {
             $code = substr(str_shuffle(str_repeat($alphabet, 3)), 0, 8);
@@ -152,25 +156,26 @@ class Index extends Component
         $data = $this->validate();
 
         // حداقل یک محدوده باید انتخاب شده باشد
-        if (!$data['form']['applies_packages'] && !$data['form']['applies_products'] && !$data['form']['applies_templates'] && !$data['form']['applies_subscriptions']) {
+        if (! $data['form']['applies_packages'] && ! $data['form']['applies_products'] && ! $data['form']['applies_templates'] && ! $data['form']['applies_subscriptions']) {
             $this->addError('form.applies_packages', 'حداقل یکی از محدوده‌های اعتبار (پکیج/محصول/قالب/اشتراک) باید فعال باشد.');
+
             return;
         }
 
         $payload = [
-            'code'                   => DiscountCode::normalize($data['form']['code']),
-            'type'                   => $data['form']['type'],
-            'value'                  => (int) $data['form']['value'],
-            'max_uses'               => $data['form']['max_uses'] !== '' && $data['form']['max_uses'] !== null
+            'code' => DiscountCode::normalize($data['form']['code']),
+            'type' => $data['form']['type'],
+            'value' => (int) $data['form']['value'],
+            'max_uses' => $data['form']['max_uses'] !== '' && $data['form']['max_uses'] !== null
                                         ? (int) $data['form']['max_uses']
                                         : null,
-            'expires_at'             => filled($data['form']['expires_at']) ? Carbon::parse($data['form']['expires_at']) : null,
-            'applies_packages'       => (bool) $data['form']['applies_packages'],
-            'applies_products'       => (bool) $data['form']['applies_products'],
-            'applies_templates'      => (bool) $data['form']['applies_templates'],
-            'applies_subscriptions'  => (bool) $data['form']['applies_subscriptions'],
-            'is_active'              => (bool) $data['form']['is_active'],
-            'notes'                  => $data['form']['notes'] ?: null,
+            'expires_at' => filled($data['form']['expires_at']) ? Carbon::parse($data['form']['expires_at']) : null,
+            'applies_packages' => (bool) $data['form']['applies_packages'],
+            'applies_products' => (bool) $data['form']['applies_products'],
+            'applies_templates' => (bool) $data['form']['applies_templates'],
+            'applies_subscriptions' => (bool) $data['form']['applies_subscriptions'],
+            'is_active' => (bool) $data['form']['is_active'],
+            'notes' => $data['form']['notes'] ?: null,
         ];
 
         $id = $this->editingId;
@@ -184,7 +189,7 @@ class Index extends Component
     public function toggleActive(int $id): void
     {
         $code = DiscountCode::findOrFail($id);
-        $code->update(['is_active' => !$code->is_active]);
+        $code->update(['is_active' => ! $code->is_active]);
 
         $this->toast($code->is_active ? 'کد تخفیف فعال شد.' : 'کد تخفیف غیرفعال شد.');
     }
@@ -199,17 +204,17 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Computed                                                         */
+    /*  Computed */
     /* ---------------------------------------------------------------- */
 
     public function getStatusesProperty(): array
     {
         return [
-            ''         => 'همه وضعیت‌ها',
-            'active'   => 'فعال و قابل استفاده',
+            '' => 'همه وضعیت‌ها',
+            'active' => 'فعال و قابل استفاده',
             'inactive' => 'غیرفعال',
-            'expired'  => 'منقضی شده',
-            'full'     => 'تکمیل ظرفیت',
+            'expired' => 'منقضی شده',
+            'full' => 'تکمیل ظرفیت',
         ];
     }
 
@@ -221,14 +226,14 @@ class Index extends Component
         return DiscountCode::query()
             ->withCount(['packagePurchases', 'productPurchases', 'subscriptionOrders'])
             ->when($this->search !== '', fn ($q) => $q->where(fn ($w) => $w
-                ->where('code', 'like', '%' . strtoupper(trim($this->search)) . '%')
+                ->where('code', 'like', '%'.strtoupper(trim($this->search)).'%')
                 ->orWhere('notes', 'like', "%{$this->search}%")))
             ->when($this->statusFilter, function ($q) use ($now) {
                 match ($this->statusFilter) {
                     'inactive' => $q->where('is_active', false),
-                    'expired'  => $q->whereNotNull('expires_at')->where('expires_at', '<=', $now),
-                    'full'     => $q->whereNotNull('max_uses')->whereColumn('used_count', '>=', 'max_uses'),
-                    default    => $q->where('is_active', true)
+                    'expired' => $q->whereNotNull('expires_at')->where('expires_at', '<=', $now),
+                    'full' => $q->whereNotNull('max_uses')->whereColumn('used_count', '>=', 'max_uses'),
+                    default => $q->where('is_active', true)
                         ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>', $now))
                         ->where(fn ($w) => $w->whereNull('max_uses')->orWhereColumn('used_count', '<', 'max_uses')),
                 };

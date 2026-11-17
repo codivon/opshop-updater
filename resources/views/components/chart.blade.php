@@ -3,7 +3,7 @@
     <x-chart :title="$chart['title']" :series="$chart['series']" color="brand" />
     series item: ['label' => ..., 'value' => int, 'secondary' => int (tooltip)]
 --}}
-@props(['title' => null, 'series' => [], 'color' => 'brand', 'height' => 160, 'showValues' => true])
+@props(['title' => null, 'series' => [], 'color' => 'brand', 'height' => 160, 'showValues' => true, 'secondaryFormat' => 'money'])
 
 @php
     $colors = [
@@ -55,7 +55,7 @@
                         @endif
                         <div class="w-full max-w-10 rounded-t-lg transition-all duration-300 group-hover:opacity-80"
                              style="height: {{ max(2, ($item['value'] ?? 0) / $max * 100) }}%; background: linear-gradient(to top, {{ $c['barLight'] }}, {{ $c['bar'] }});"
-                             title="{{ $item['label'] }}: {{ fa_num($item['value']) }}{{ isset($item['secondary']) ? ' / ' . money($item['secondary']) : '' }}">
+                             title="{{ $item['label'] }}: {{ fa_num($item['value']) }}{{ isset($item['secondary']) ? ' / ' . ($secondaryFormat === 'money' ? money($item['secondary']) : fa_num($item['secondary'])) : '' }}">
                         </div>
                     </div>
                 @endforeach

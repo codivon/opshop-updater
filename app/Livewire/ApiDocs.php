@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -20,6 +21,8 @@ use Livewire\Component;
 #[Title('مستندات API')]
 class ApiDocs extends Component
 {
+    use AuthorizesAdmin;
+
     /** Base URL واقعی API (پویا — در هر هاستی درست نمایش داده می‌شود) */
     public function baseUrl(): string
     {
@@ -779,7 +782,7 @@ JSON,
 
         return [
             'laravel' => $this->laravelSample(strtolower($method), $origin.$path, $query, $body, $headers, $binary),
-            'guzzle'  => $this->guzzleSample($origin, $path, $query, $body, $headers, strtolower($method), $binary),
+            'guzzle' => $this->guzzleSample($origin, $path, $query, $body, $headers, strtolower($method), $binary),
         ];
     }
 
@@ -839,7 +842,7 @@ JSON,
                 : "'".$url."', ".$this->phpArray($query, 4);
         }
         $call = $chainParts === []
-            ? "Http::".$verb."(".$args.')'
+            ? 'Http::'.$verb.'('.$args.')'
             : 'Http::'.implode('->', $chainParts).'->'.$verb.'('.$args.')';
 
         $trailer = $binary !== null
@@ -871,11 +874,11 @@ JSON,
         }
 
         $opts = $parts === [] ? '' : ", [\n    ".implode(",\n    ", $parts).",\n]";
-        $call = "\$client->".$method."('".addslashes($path)."'".$opts.')';
+        $call = '$client->'.$method."('".addslashes($path)."'".$opts.')';
 
         $trailer = $binary !== null
             ? "\necho \$response->getHeaderLine('X-Package-Version');\n// صحت فایل: hash_file('sha256', '".addslashes($binary)."') را با هدر X-Package-Hash مقایسه کنید"
-            : "\$data = json_decode((string) \$response->getBody(), true);";
+            : '$data = json_decode((string) $response->getBody(), true);';
 
         return 'use GuzzleHttp\\Client;'."\n\n\$client = new Client(['base_uri' => '".$origin."', 'timeout' => 30]);\n\n\$response = ".$call.";\n\n".$trailer;
     }

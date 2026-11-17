@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Licenses;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\PackageLicense;
 use Livewire\Attributes\Computed;
@@ -13,6 +14,7 @@ use Livewire\Component;
 #[Title('جزئیات لایسنس')]
 class Show extends Component
 {
+    use AuthorizesAdmin;
     use WithToasts;
 
     public PackageLicense $license;
@@ -27,7 +29,7 @@ class Show extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Actions (ported from old PackageLicenseController)               */
+    /*  Actions (ported from old PackageLicenseController) */
     /* ---------------------------------------------------------------- */
 
     public function revoke(): void

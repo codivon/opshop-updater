@@ -3,7 +3,6 @@
 namespace App\Livewire\Shop;
 
 use App\Livewire\Concerns\WithToasts;
-use App\Models\Comment;
 use App\Models\Customer;
 use App\Models\Package;
 use App\Models\PackageLicense;
@@ -12,6 +11,7 @@ use App\Models\Ticket;
 use App\Models\TicketReply;
 use App\Services\SubscriptionService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -40,9 +40,9 @@ class CustomerProfile extends Component
 
     /* ---- form: مشخصات ---- */
     public array $form = [
-        'name'        => '',
-        'email'       => '',
-        'phone'       => '',
+        'name' => '',
+        'email' => '',
+        'phone' => '',
         'website_url' => '',
     ];
 
@@ -64,19 +64,20 @@ class CustomerProfile extends Component
     {
         $customer = $this->customer();
 
-        if (!$customer) {
+        if (! $customer) {
             $this->redirect(route('shop.login', ['redirect' => url()->current()]), navigate: true);
+
             return;
         }
 
         $this->form = [
-            'name'        => (string) $customer->name,
-            'email'       => (string) $customer->email,
-            'phone'       => (string) $customer->phone,
+            'name' => (string) $customer->name,
+            'email' => (string) $customer->email,
+            'phone' => (string) $customer->phone,
             'website_url' => (string) $customer->website_url,
         ];
 
-        if (!in_array($this->tab, self::TABS, true)) {
+        if (! in_array($this->tab, self::TABS, true)) {
             $this->tab = 'purchases';
         }
     }
@@ -105,7 +106,7 @@ class CustomerProfile extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  ویرایش مشخصات                                                    */
+    /*  ویرایش مشخصات */
     /* ---------------------------------------------------------------- */
 
     protected function rules(): array
@@ -114,27 +115,28 @@ class CustomerProfile extends Component
         $customer = auth('customer')->user();
 
         return [
-            'form.name'        => ['required', 'string', 'max:120'],
-            'form.email'       => ['nullable', 'email', 'max:190'],
-            'form.phone'       => ['nullable', 'string', 'max:20'],
+            'form.name' => ['required', 'string', 'max:120'],
+            // Task 85 — ایمیل مشتری یکتا باشد (ولی خالی هم مجاز)
+            'form.email' => ['nullable', 'email', 'max:190', Rule::unique('customers', 'email')->ignore($customer?->id)],
+            'form.phone' => ['nullable', 'string', 'max:20'],
             'form.website_url' => ['nullable', 'string', 'max:190'],
         ];
     }
 
     protected $messages = [
         'form.name.required' => 'نام الزامی است.',
-        'form.email.email'   => 'ایمیل معتبر نیست.',
+        'form.email.email' => 'ایمیل معتبر نیست.',
     ];
 
     public function saveInfo(): void
     {
-        $data   = $this->validate();
+        $data = $this->validate();
         $customer = $this->customer();
 
         $customer->update([
-            'name'        => trim($data['form']['name']),
-            'email'       => trim($data['form']['email']) ?: null,
-            'phone'       => trim($data['form']['phone']) ?: null,
+            'name' => trim($data['form']['name']),
+            'email' => trim($data['form']['email']) ?: null,
+            'phone' => trim($data['form']['phone']) ?: null,
             'website_url' => trim($data['form']['website_url']) ?: null,
         ]);
 
@@ -152,7 +154,7 @@ class CustomerProfile extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  تیکت‌های پشتیبانی (گات: فقط با اشتراک فعال)                       */
+    /*  تیکت‌های پشتیبانی (گات: فقط با اشتراک فعال) */
     /* ---------------------------------------------------------------- */
 
     /** پیام یکسان گات — هم در UI هم در اکشن‌ها */
@@ -163,7 +165,7 @@ class CustomerProfile extends Component
 
     public function openTicketForm(): void
     {
-        if (!$this->canUseTickets()) {
+        if (! $this->canUseTickets()) {
             $this->toast(self::ticketGateMessage(), 'error');
 
             return;
@@ -181,7 +183,7 @@ class CustomerProfile extends Component
     /** ثبت تیکت جدید (سؤال اصلی + اولین پاسخ مشتری) */
     public function createTicket(): void
     {
-        if (!$this->canUseTickets()) {
+        if (! $this->canUseTickets()) {
             $this->toast(self::ticketGateMessage(), 'error');
 
             return;
@@ -189,30 +191,30 @@ class CustomerProfile extends Component
 
         $data = $this->validate([
             'ticketSubject' => ['required', 'string', 'min:3', 'max:150'],
-            'ticketBody'    => ['required', 'string', 'min:10', 'max:5000'],
+            'ticketBody' => ['required', 'string', 'min:10', 'max:5000'],
         ], [
             'ticketSubject.required' => 'موضوع تیکت الزامی است.',
-            'ticketSubject.min'      => 'موضوع تیکت حداقل ۳ حرف است.',
-            'ticketSubject.max'      => 'موضوع تیکت حداکثر ۱۵۰ حرف است.',
-            'ticketBody.required'    => 'متن تیکت الزامی است.',
-            'ticketBody.min'         => 'متن تیکت حداقل ۱۰ حرف است — مشکل را کامل توضیح دهید.',
-            'ticketBody.max'         => 'متن تیکت حداکثر ۵۰۰۰ حرف است.',
+            'ticketSubject.min' => 'موضوع تیکت حداقل ۳ حرف است.',
+            'ticketSubject.max' => 'موضوع تیکت حداکثر ۱۵۰ حرف است.',
+            'ticketBody.required' => 'متن تیکت الزامی است.',
+            'ticketBody.min' => 'متن تیکت حداقل ۱۰ حرف است — مشکل را کامل توضیح دهید.',
+            'ticketBody.max' => 'متن تیکت حداکثر ۵۰۰۰ حرف است.',
         ]);
 
         $customer = $this->customer();
         $subscription = app(SubscriptionService::class)->activePlanSubscriptions($customer)->first();
 
         $ticket = Ticket::create([
-            'customer_id'    => $customer->id,
+            'customer_id' => $customer->id,
             'subscription_id' => $subscription?->id,
-            'subject'        => trim($data['ticketSubject']),
-            'status'         => Ticket::STATUS_OPEN,
+            'subject' => trim($data['ticketSubject']),
+            'status' => Ticket::STATUS_OPEN,
         ]);
 
         TicketReply::create([
-            'ticket_id'   => $ticket->id,
+            'ticket_id' => $ticket->id,
             'author_type' => TicketReply::AUTHOR_CUSTOMER,
-            'body'        => trim($data['ticketBody']),
+            'body' => trim($data['ticketBody']),
         ]);
 
         $this->reset('ticketSubject', 'ticketBody', 'showTicketForm');
@@ -235,7 +237,7 @@ class CustomerProfile extends Component
         $customer = $this->customer();
 
         // گات: پاسخ‌دادن هم مثل ثبت تیکت نیاز به اشتراک فعال دارد
-        if (!$customer || !app(SubscriptionService::class)->canCreateTicket($customer)) {
+        if (! $customer || ! app(SubscriptionService::class)->canCreateTicket($customer)) {
             $this->toast(self::ticketGateMessage(), 'error');
 
             return;
@@ -245,7 +247,7 @@ class CustomerProfile extends Component
             ->where('customer_id', $customer->id)
             ->find($ticketId);
 
-        if (!$ticket) {
+        if (! $ticket) {
             $this->toast('تیکت یافت نشد.', 'error');
 
             return;
@@ -261,14 +263,14 @@ class CustomerProfile extends Component
             'replyBody' => ['required', 'string', 'min:2', 'max:5000'],
         ], [
             'replyBody.required' => 'متن پاسخ الزامی است.',
-            'replyBody.min'      => 'متن پاسخ حداقل ۲ حرف است.',
-            'replyBody.max'      => 'متن پاسخ حداکثر ۵۰۰۰ حرف است.',
+            'replyBody.min' => 'متن پاسخ حداقل ۲ حرف است.',
+            'replyBody.max' => 'متن پاسخ حداکثر ۵۰۰۰ حرف است.',
         ]);
 
         TicketReply::create([
-            'ticket_id'   => $ticket->id,
+            'ticket_id' => $ticket->id,
             'author_type' => TicketReply::AUTHOR_CUSTOMER,
-            'body'        => trim($data['replyBody']),
+            'body' => trim($data['replyBody']),
         ]);
 
         // پاسخ مشتری → وضعیت برمی‌گردد به «در انتظار پاسخ»
@@ -289,7 +291,7 @@ class CustomerProfile extends Component
             ->where('customer_id', $customer?->id ?? 0)
             ->find($ticketId);
 
-        if (!$ticket || $ticket->isClosed()) {
+        if (! $ticket || $ticket->isClosed()) {
             $this->toast('این تیکت بسته است.', 'warning');
 
             return;
@@ -302,7 +304,7 @@ class CustomerProfile extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Computed                                                         */
+    /*  Computed */
     /* ---------------------------------------------------------------- */
 
     /**
@@ -315,7 +317,7 @@ class CustomerProfile extends Component
     {
         $customer = $this->customer();
 
-        if (!$customer) {
+        if (! $customer) {
             return PackagePurchase::query()->whereRaw('1 = 0')->paginate(10, pageName: 'purchasesPage');
         }
 
@@ -373,7 +375,7 @@ class CustomerProfile extends Component
     {
         $customer = $this->customer();
 
-        if (!$customer) {
+        if (! $customer) {
             return Ticket::query()->whereRaw('1 = 0')->paginate(8, pageName: 'ticketsPage');
         }
 
@@ -397,19 +399,19 @@ class CustomerProfile extends Component
     {
         $customer = $this->customer();
 
-        if (!$customer) {
+        if (! $customer) {
             return ['purchases' => 0, 'licenses' => 0, 'licenses_total' => 0, 'spent' => 0];
         }
 
         return [
             // تعداد پکیج‌های متمایز خریده‌شده (بدون تکرار خریدهای مجدد یک پکیج)
-            'purchases'      => $customer->purchases()
+            'purchases' => $customer->purchases()
                 ->where('status', PackagePurchase::STATUS_PAID)
                 ->distinct('package_id')
                 ->count('package_id'),
-            'licenses'       => $customer->licenses()->where('status', PackageLicense::STATUS_ACTIVE)->count(),
+            'licenses' => $customer->licenses()->where('status', PackageLicense::STATUS_ACTIVE)->count(),
             'licenses_total' => $customer->licenses()->count(),
-            'spent'          => (int) $customer->purchases()->where('status', PackagePurchase::STATUS_PAID)->sum('amount'),
+            'spent' => (int) $customer->purchases()->where('status', PackagePurchase::STATUS_PAID)->sum('amount'),
         ];
     }
 

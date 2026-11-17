@@ -2,14 +2,13 @@
 
 namespace App\Livewire;
 
-use App\Livewire\Concerns\WithToasts;
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Models\Customer;
 use App\Models\Package;
 use App\Models\PackageLicense;
 use App\Models\PackagePurchase;
 use App\Models\Product;
 use App\Models\ProductPurchase;
-use App\Models\Project;
 use App\Models\Subscription;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
@@ -22,12 +21,16 @@ use App\Services\LicenseSigningKeyService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Livewire\Component;
 
-#[\Livewire\Attributes\Layout('components.layouts.app')]
-#[\Livewire\Attributes\Title('داشبورد')]
+#[Layout('components.layouts.app')]
+#[Title('داشبورد')]
 class Dashboard extends Component
 {
+    use AuthorizesAdmin;
+
     /** هشدار کلید امضای لایسنس — بدون این کلید نصب/بروزرسانی پکیج در فروشگاه‌ها با 500 شکست می‌خورد */
     public bool $licenseKeyMissing = false;
 
@@ -41,8 +44,8 @@ class Dashboard extends Component
         // دسترسی API از قبل بر اساس تاریخ کنترل می‌شود؛ این فقط وضعیت ذخیره‌شده را صادقانه می‌کند.
         Subscription::query()
             ->where('status', 'active')
-            ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
-            ->whereRaw("COALESCE(expires_at, end_date) < ?", [now()])
+            ->whereRaw('COALESCE(expires_at, end_date) IS NOT NULL')
+            ->whereRaw('COALESCE(expires_at, end_date) < ?', [now()])
             ->update(['status' => 'expired']);
 
         // هشدار داشبورد: کلید امضای لایسنس تنظیم/معتبر نیست؟ (منبع حقیقت: فایل .env)
@@ -55,7 +58,7 @@ class Dashboard extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Stats                                                              */
+    /*  Stats */
     /* ------------------------------------------------------------------ */
 
     #[Computed]
@@ -67,7 +70,7 @@ class Dashboard extends Component
                 'value' => Customer::count(),
                 'icon' => 'users',
                 'variant' => 'primary',
-                'hint' => Customer::where('status', 'active')->count() . ' فعال',
+                'hint' => Customer::where('status', 'active')->count().' فعال',
                 'href' => route('admin.customers.index'),
             ],
             [
@@ -75,7 +78,7 @@ class Dashboard extends Component
                 'value' => Package::count(),
                 'icon' => 'package',
                 'variant' => 'info',
-                'hint' => Package::where('status', Package::STATUS_ACTIVE)->count() . ' منتشر شده',
+                'hint' => Package::where('status', Package::STATUS_ACTIVE)->count().' منتشر شده',
                 'href' => route('admin.packages.index'),
             ],
             [
@@ -83,7 +86,7 @@ class Dashboard extends Component
                 'value' => Product::count(),
                 'icon' => 'shopping-bag',
                 'variant' => 'violet',
-                'hint' => Product::where('status', Product::STATUS_ACTIVE)->count() . ' فعال در فروشگاه',
+                'hint' => Product::where('status', Product::STATUS_ACTIVE)->count().' فعال در فروشگاه',
                 'href' => route('admin.products.index'),
             ],
             [
@@ -91,7 +94,7 @@ class Dashboard extends Component
                 'value' => Template::count(),
                 'icon' => 'layout-template',
                 'variant' => 'warning',
-                'hint' => Template::where('status', Template::STATUS_ACTIVE)->where('is_sold_exclusively', false)->count() . ' قابل فروش',
+                'hint' => Template::where('status', Template::STATUS_ACTIVE)->where('is_sold_exclusively', false)->count().' قابل فروش',
                 'href' => route('admin.templates.index'),
             ],
             [
@@ -101,7 +104,7 @@ class Dashboard extends Component
                     ->count(),
                 'icon' => 'key',
                 'variant' => 'warning',
-                'hint' => PackageLicense::count() . ' کل',
+                'hint' => PackageLicense::count().' کل',
                 'href' => route('admin.licenses.index'),
             ],
             [
@@ -109,7 +112,7 @@ class Dashboard extends Component
                 'value' => Update::count(),
                 'icon' => 'git-branch',
                 'variant' => 'violet',
-                'hint' => fa_num(Update::where('status', Update::STATUS_ACTIVE)->count()) . ' فعال',
+                'hint' => fa_num(Update::where('status', Update::STATUS_ACTIVE)->count()).' فعال',
                 'href' => route('admin.updates.index'),
             ],
             [
@@ -119,7 +122,7 @@ class Dashboard extends Component
                     ->count(),
                 'icon' => 'ticket',
                 'variant' => 'neutral',
-                'hint' => Subscription::count() . ' کل',
+                'hint' => Subscription::count().' کل',
                 'href' => route('admin.subscriptions.index'),
             ],
             [
@@ -129,7 +132,7 @@ class Dashboard extends Component
                     ->count(),
                 'icon' => 'hourglass',
                 'variant' => 'warning',
-                'hint' => fa_num(SubscriptionPlan::where('is_active', true)->count()) . ' طرح فعال',
+                'hint' => fa_num(SubscriptionPlan::where('is_active', true)->count()).' طرح فعال',
                 'href' => route('admin.subscriptions.orders'),
             ],
             [
@@ -137,7 +140,7 @@ class Dashboard extends Component
                 'value' => User::count(),
                 'icon' => 'shield-check',
                 'variant' => 'danger',
-                'hint' => User::where('status', 'active')->count() . ' فعال',
+                'hint' => User::where('status', 'active')->count().' فعال',
                 'href' => route('admin.users.index'),
             ],
         ];
@@ -165,7 +168,7 @@ class Dashboard extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Subscription plans                                                 */
+    /*  Subscription plans */
     /* ------------------------------------------------------------------ */
 
     /** خلاصه آمار طرح‌های اشتراک (سفارش‌ها، درآمد، اشتراک‌های فعال) */
@@ -213,7 +216,7 @@ class Dashboard extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Charts                                                             */
+    /*  Charts */
     /* ------------------------------------------------------------------ */
 
     #[Computed]
@@ -284,7 +287,7 @@ class Dashboard extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Recent lists                                                       */
+    /*  Recent lists */
     /* ------------------------------------------------------------------ */
 
     #[Computed]
@@ -353,7 +356,7 @@ class Dashboard extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  License expiry health (در حال اتمام / منقضی‌شده)                   */
+    /*  License expiry health (در حال اتمام / منقضی‌شده) */
     /* ------------------------------------------------------------------ */
 
     /** آستانهٔ «در حال اتمام» از تنظیمات «امنیت و امکانات» (روز، بین ۱ تا ۳۶۵) */
@@ -422,8 +425,8 @@ class Dashboard extends Component
         $days = (int) ceil($diff / 86400);
 
         return [
-            'label' => fa_num($days) . ' روز مانده',
-            'tone'  => $days <= 3 ? 'danger' : 'warning',
+            'label' => fa_num($days).' روز مانده',
+            'tone' => $days <= 3 ? 'danger' : 'warning',
         ];
     }
 
@@ -433,13 +436,13 @@ class Dashboard extends Component
         $days = (int) floor((now()->getTimestamp() - $expiresAt->getTimestamp()) / 86400);
 
         return [
-            'label' => $days <= 0 ? 'امروز منقضی شد' : fa_num($days) . ' روز پیش',
-            'tone'  => 'danger',
+            'label' => $days <= 0 ? 'امروز منقضی شد' : fa_num($days).' روز پیش',
+            'tone' => 'danger',
         ];
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Subscription expiry health (در حال اتمام / منقضی‌شده)              */
+    /*  Subscription expiry health (در حال اتمام / منقضی‌شده) */
     /* ------------------------------------------------------------------ */
 
     /** آستانهٔ «در حال اتمام» اشتراک‌ها از تنظیمات (روز، بین ۱ تا ۳۶۵) */
@@ -458,9 +461,9 @@ class Dashboard extends Component
         return Subscription::query()
             ->with(['customer:id,name', 'project:id,name', 'plan:id,name'])
             ->where('status', 'active')
-            ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
-            ->whereRaw("COALESCE(expires_at, end_date) BETWEEN ? AND ?", [now(), now()->addDays($this->subscriptionExpiryDays)])
-            ->orderByRaw("COALESCE(expires_at, end_date)")
+            ->whereRaw('COALESCE(expires_at, end_date) IS NOT NULL')
+            ->whereRaw('COALESCE(expires_at, end_date) BETWEEN ? AND ?', [now(), now()->addDays($this->subscriptionExpiryDays)])
+            ->orderByRaw('COALESCE(expires_at, end_date)')
             ->limit(6)
             ->get();
     }
@@ -472,9 +475,9 @@ class Dashboard extends Component
         return Subscription::query()
             ->with(['customer:id,name', 'project:id,name', 'plan:id,name'])
             ->whereIn('status', ['active', 'expired'])
-            ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
-            ->whereRaw("COALESCE(expires_at, end_date) < ?", [now()])
-            ->orderByRaw("COALESCE(expires_at, end_date) DESC")
+            ->whereRaw('COALESCE(expires_at, end_date) IS NOT NULL')
+            ->whereRaw('COALESCE(expires_at, end_date) < ?', [now()])
+            ->orderByRaw('COALESCE(expires_at, end_date) DESC')
             ->limit(6)
             ->get();
     }
@@ -486,13 +489,13 @@ class Dashboard extends Component
         return [
             'expiring' => Subscription::query()
                 ->where('status', 'active')
-                ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
-                ->whereRaw("COALESCE(expires_at, end_date) BETWEEN ? AND ?", [now(), now()->addDays($this->subscriptionExpiryDays)])
+                ->whereRaw('COALESCE(expires_at, end_date) IS NOT NULL')
+                ->whereRaw('COALESCE(expires_at, end_date) BETWEEN ? AND ?', [now(), now()->addDays($this->subscriptionExpiryDays)])
                 ->count(),
             'expired' => Subscription::query()
                 ->whereIn('status', ['active', 'expired'])
-                ->whereRaw("COALESCE(expires_at, end_date) IS NOT NULL")
-                ->whereRaw("COALESCE(expires_at, end_date) < ?", [now()])
+                ->whereRaw('COALESCE(expires_at, end_date) IS NOT NULL')
+                ->whereRaw('COALESCE(expires_at, end_date) < ?', [now()])
                 ->count(),
         ];
     }

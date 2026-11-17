@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Attributes\Layout;
@@ -20,6 +21,7 @@ use Livewire\Component;
 #[Title('پروفایل مدیر')]
 class Profile extends Component
 {
+    use AuthorizesAdmin;
     use WithToasts;
 
     /* --- فرم اطلاعات حساب --- */
@@ -52,7 +54,7 @@ class Profile extends Component
         $this->validate($this->profileRules(), $this->messages());
 
         auth()->user()?->update([
-            'name'  => $this->name,
+            'name' => $this->name,
             'email' => mb_strtolower($this->email),
         ]);
 
@@ -83,13 +85,13 @@ class Profile extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  قواعد اعتبارسنجی                                                   */
+    /*  قواعد اعتبارسنجی */
     /* ------------------------------------------------------------------ */
 
     protected function profileRules(): array
     {
         return [
-            'name'  => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:190', 'unique:users,email,'.(auth()->id() ?? 'NULL')],
         ];
     }
@@ -115,17 +117,17 @@ class Profile extends Component
     {
         return [
             'name.required' => 'نام نمایشی الزامی است.',
-            'name.max'      => 'نام نمایشی حداکثر ۲۵۵ کاراکتر است.',
+            'name.max' => 'نام نمایشی حداکثر ۲۵۵ کاراکتر است.',
 
             'email.required' => 'ایمیل الزامی است.',
-            'email.email'    => 'ایمیل معتبر نیست.',
-            'email.max'      => 'ایمیل حداکثر ۱۹۰ کاراکتر است.',
-            'email.unique'   => 'این ایمیل قبلاً برای کاربر دیگری ثبت شده است.',
+            'email.email' => 'ایمیل معتبر نیست.',
+            'email.max' => 'ایمیل حداکثر ۱۹۰ کاراکتر است.',
+            'email.unique' => 'این ایمیل قبلاً برای کاربر دیگری ثبت شده است.',
 
             'current_password.required' => 'رمز عبور فعلی را وارد کنید.',
 
-            'password.required'  => 'رمز عبور جدید الزامی است.',
-            'password.min'       => 'رمز عبور باید حداقل ۶ کاراکتر باشد.',
+            'password.required' => 'رمز عبور جدید الزامی است.',
+            'password.min' => 'رمز عبور باید حداقل ۶ کاراکتر باشد.',
             'password.confirmed' => 'تکرار رمز عبور با رمز جدید یکسان نیست.',
         ];
     }

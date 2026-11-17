@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Front;
 
 use App\Http\Controllers\Controller;
+use App\Models\Gateway;
 use App\Models\PackagePurchase;
 use App\Models\ProductPurchase;
 use App\Models\SubscriptionOrder;
 use App\Models\TemplatePurchase;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 /**
  * سرو کردن فرم پرداختِ درایورهای فرم‌محور و درگاه آزمایشی local.
@@ -26,7 +26,7 @@ class PaymentFormController extends Controller
     public function show(Request $request, PackagePurchase $purchase)
     {
         // اعتبارسنجی امضای URL (۳۰ دقیقه اعتبار)
-        if (!$request->hasValidSignature()) {
+        if (! $request->hasValidSignature()) {
             abort(403, 'لینک پرداخت نامعتبر یا منقضی شده است.');
         }
 
@@ -44,7 +44,7 @@ class PaymentFormController extends Controller
         // ۲) درایورهای فرم‌محور واقعی: HTML ذخیره‌شده را برگردان
         $formHtml = $purchase->meta['payment_form'] ?? null;
 
-        if (!$formHtml) {
+        if (! $formHtml) {
             abort(410, 'فرم پرداخت یافت نشد یا منقضی شده است. لطفاً خرید را دوباره آغاز کنید.');
         }
 
@@ -57,12 +57,12 @@ class PaymentFormController extends Controller
      */
     public function showSubscription(Request $request, SubscriptionOrder $order)
     {
-        if (!$request->hasValidSignature()) {
+        if (! $request->hasValidSignature()) {
             abort(403, 'لینک پرداخت نامعتبر یا منقضی شده است.');
         }
 
         if ($order->status !== SubscriptionOrder::STATUS_PENDING) {
-            return redirect()->route('subscription.result', $order)
+            return redirect()->route('subscription.result', ['order' => $order, 'token' => $order->access_token])
                 ->with('error', 'این تراکنش پرداخت دیگر در وضعیت انتظار نیست.');
         }
 
@@ -74,7 +74,7 @@ class PaymentFormController extends Controller
         // ۲) درایورهای فرم‌محور واقعی: HTML ذخیره‌شده را برگردان
         $formHtml = $order->meta['payment_form'] ?? null;
 
-        if (!$formHtml) {
+        if (! $formHtml) {
             abort(410, 'فرم پرداخت یافت نشد یا منقضی شده است. لطفاً خرید را دوباره آغاز کنید.');
         }
 
@@ -93,19 +93,19 @@ class PaymentFormController extends Controller
         $separator = str_contains($callback, '?') ? '&' : '?';
         $trx = (string) $purchase->transaction_id;
 
-        $gateway = \App\Models\Gateway::where('key', 'local')->first();
+        $gateway = Gateway::where('key', 'local')->first();
 
         return [
-            'purchase'   => $purchase,
-            'package'    => $purchase->package,
-            'plan'       => $purchase->pricingPlan,
-            'amount'     => $purchase->amount,
-            'title'      => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
-            'subtitle'   => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',
-            'payButton'  => $gateway?->config('payButton') ?? 'پرداخت (موفق)',
+            'purchase' => $purchase,
+            'package' => $purchase->package,
+            'plan' => $purchase->pricingPlan,
+            'amount' => $purchase->amount,
+            'title' => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
+            'subtitle' => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',
+            'payButton' => $gateway?->config('payButton') ?? 'پرداخت (موفق)',
             'cancelButton' => $gateway?->config('cancelButton') ?? 'لغو پرداخت',
-            'successUrl' => $callback . $separator . http_build_query(['transactionId' => $trx]),
-            'cancelUrl'  => $callback . $separator . http_build_query(['transactionId' => $trx, 'cancel' => 'true']),
+            'successUrl' => $callback.$separator.http_build_query(['transactionId' => $trx]),
+            'cancelUrl' => $callback.$separator.http_build_query(['transactionId' => $trx, 'cancel' => 'true']),
         ];
     }
 
@@ -114,13 +114,13 @@ class PaymentFormController extends Controller
      */
     public function showProduct(Request $request, ProductPurchase $productPurchase)
     {
-        if (!$request->hasValidSignature()) {
+        if (! $request->hasValidSignature()) {
             abort(403, 'لینک پرداخت نامعتبر یا منقضی شده است.');
         }
 
         if ($productPurchase->status !== ProductPurchase::STATUS_PENDING) {
             return redirect()
-                ->route('payment.result.product', $productPurchase)
+                ->route('payment.result.product', ['purchase' => $productPurchase, 'token' => $productPurchase->access_token])
                 ->with('error', 'این تراکنش پرداخت دیگر در وضعیت انتظار نیست.');
         }
 
@@ -132,7 +132,7 @@ class PaymentFormController extends Controller
         // ۲) درایورهای فرم‌محور واقعی: HTML ذخیره‌شده را برگردان
         $formHtml = $productPurchase->meta['payment_form'] ?? null;
 
-        if (!$formHtml) {
+        if (! $formHtml) {
             abort(410, 'فرم پرداخت یافت نشد یا منقضی شده است. لطفاً خرید را دوباره آغاز کنید.');
         }
 
@@ -148,20 +148,20 @@ class PaymentFormController extends Controller
         $separator = str_contains($callback, '?') ? '&' : '?';
         $trx = (string) $purchase->transaction_id;
 
-        $gateway = \App\Models\Gateway::where('key', 'local')->first();
+        $gateway = Gateway::where('key', 'local')->first();
 
         return [
-            'purchase'   => $purchase,
-            'package'    => null,
-            'plan'       => null,
-            'product'    => $purchase->product,
-            'amount'     => $purchase->amount,
-            'title'      => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
-            'subtitle'   => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',
-            'payButton'  => $gateway?->config('payButton') ?? 'پرداخت (موفق)',
+            'purchase' => $purchase,
+            'package' => null,
+            'plan' => null,
+            'product' => $purchase->product,
+            'amount' => $purchase->amount,
+            'title' => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
+            'subtitle' => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',
+            'payButton' => $gateway?->config('payButton') ?? 'پرداخت (موفق)',
             'cancelButton' => $gateway?->config('cancelButton') ?? 'لغو پرداخت',
-            'successUrl' => $callback . $separator . http_build_query(['transactionId' => $trx]),
-            'cancelUrl'  => $callback . $separator . http_build_query(['transactionId' => $trx, 'cancel' => 'true']),
+            'successUrl' => $callback.$separator.http_build_query(['transactionId' => $trx]),
+            'cancelUrl' => $callback.$separator.http_build_query(['transactionId' => $trx, 'cancel' => 'true']),
         ];
     }
 
@@ -170,13 +170,13 @@ class PaymentFormController extends Controller
      */
     public function showTemplate(Request $request, TemplatePurchase $templatePurchase)
     {
-        if (!$request->hasValidSignature()) {
+        if (! $request->hasValidSignature()) {
             abort(403, 'لینک پرداخت نامعتبر یا منقضی شده است.');
         }
 
         if ($templatePurchase->status !== TemplatePurchase::STATUS_PENDING) {
             return redirect()
-                ->route('payment.result.template', $templatePurchase)
+                ->route('payment.result.template', ['purchase' => $templatePurchase, 'token' => $templatePurchase->access_token])
                 ->with('error', 'این تراکنش پرداخت دیگر در وضعیت انتظار نیست.');
         }
 
@@ -188,7 +188,7 @@ class PaymentFormController extends Controller
         // ۲) درایورهای فرم‌محور واقعی: HTML ذخیره‌شده را برگردان
         $formHtml = $templatePurchase->meta['payment_form'] ?? null;
 
-        if (!$formHtml) {
+        if (! $formHtml) {
             abort(410, 'فرم پرداخت یافت نشد یا منقضی شده است. لطفاً خرید را دوباره آغاز کنید.');
         }
 
@@ -204,21 +204,21 @@ class PaymentFormController extends Controller
         $separator = str_contains($callback, '?') ? '&' : '?';
         $trx = (string) $purchase->transaction_id;
 
-        $gateway = \App\Models\Gateway::where('key', 'local')->first();
+        $gateway = Gateway::where('key', 'local')->first();
 
         return [
-            'purchase'   => $purchase,
-            'package'    => null,
-            'plan'       => null,
-            'product'    => null,
-            'template'   => $purchase->template,
-            'amount'     => $purchase->amount,
-            'title'      => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
-            'subtitle'   => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',
-            'payButton'  => $gateway?->config('payButton') ?? 'پرداخت (موفق)',
+            'purchase' => $purchase,
+            'package' => null,
+            'plan' => null,
+            'product' => null,
+            'template' => $purchase->template,
+            'amount' => $purchase->amount,
+            'title' => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
+            'subtitle' => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',
+            'payButton' => $gateway?->config('payButton') ?? 'پرداخت (موفق)',
             'cancelButton' => $gateway?->config('cancelButton') ?? 'لغو پرداخت',
-            'successUrl' => $callback . $separator . http_build_query(['transactionId' => $trx]),
-            'cancelUrl'  => $callback . $separator . http_build_query(['transactionId' => $trx, 'cancel' => 'true']),
+            'successUrl' => $callback.$separator.http_build_query(['transactionId' => $trx]),
+            'cancelUrl' => $callback.$separator.http_build_query(['transactionId' => $trx, 'cancel' => 'true']),
         ];
     }
 
@@ -232,21 +232,21 @@ class PaymentFormController extends Controller
         $separator = str_contains($callback, '?') ? '&' : '?';
         $trx = (string) $order->transaction_id;
 
-        $gateway = \App\Models\Gateway::where('key', 'local')->first();
+        $gateway = Gateway::where('key', 'local')->first();
 
         return [
-            'purchase'   => $order,
-            'package'    => null,
-            'plan'       => null,
+            'purchase' => $order,
+            'package' => null,
+            'plan' => null,
             'subscriptionPlan' => $order->plan,
-            'order'      => $order,
-            'amount'     => $order->final_amount,
-            'title'      => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
-            'subtitle'   => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',
-            'payButton'  => $gateway?->config('payButton') ?? 'پرداخت (موفق)',
+            'order' => $order,
+            'amount' => $order->final_amount,
+            'title' => $gateway?->config('title') ?? 'درگاه پرداخت آزمایشی',
+            'subtitle' => $gateway?->config('description') ?? 'این درگاه فقط برای تست جریان پرداخت است — پول واقعی کم نمی‌شود',
+            'payButton' => $gateway?->config('payButton') ?? 'پرداخت (موفق)',
             'cancelButton' => $gateway?->config('cancelButton') ?? 'لغو پرداخت',
-            'successUrl' => $callback . $separator . http_build_query(['transactionId' => $trx]),
-            'cancelUrl'  => $callback . $separator . http_build_query(['transactionId' => $trx, 'cancel' => 'true']),
+            'successUrl' => $callback.$separator.http_build_query(['transactionId' => $trx]),
+            'cancelUrl' => $callback.$separator.http_build_query(['transactionId' => $trx, 'cancel' => 'true']),
         ];
     }
 }

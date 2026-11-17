@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\SmsLog;
 use App\Models\User;
 use App\Support\Features;
 use Illuminate\Support\Facades\Cache;
@@ -46,10 +47,10 @@ class TwoFactorService
         $sent = $this->deliver($user, $code);
 
         if (! $sent) {
-            // کانال پشتیبان نهایی — مدیر قفل نشود (هشدار: فقط هنگام خرابی ارسال)
-            Log::warning('2FA: ارسال کد ورود دومرحله‌ای ناموفق بود — کد پشتیبان', [
+            // Task 85 — امنیت (M6): کد هرگز در لاگ نوشته نمی‌شود (هر کسی با دسترسی
+            // به لاگ‌ها می‌توانست با آن وارد شود). مدیر می‌تواند از «ورود مجدد» کد تازه بگیرد.
+            Log::warning('2FA: ارسال کد ورود دومرحله‌ای ناموفق بود — مدیر باید دوباره تلاش کند', [
                 'user_id' => $user->id,
-                'code'    => $code,
             ]);
         }
 
@@ -62,7 +63,7 @@ class TwoFactorService
     public function deliver(User $user, string $code): bool
     {
         $channel = Features::twofaChannel();
-        $sent    = false;
+        $sent = false;
 
         if (in_array($channel, ['email', 'both'], true)) {
             try {
@@ -85,7 +86,7 @@ class TwoFactorService
                     'code' => $code,
                 ]);
 
-                $sent = $sent || ($log !== null && $log->status === \App\Models\SmsLog::STATUS_SENT);
+                $sent = $sent || ($log !== null && $log->status === SmsLog::STATUS_SENT);
             } catch (Throwable $e) {
                 Log::warning('2FA: ارسال پیامک ناموفق', ['error' => $e->getMessage()]);
             }
@@ -100,7 +101,7 @@ class TwoFactorService
     public function verify(User $user, mixed $input): bool
     {
         $cached = Cache::get($this->cacheKey($user->id));
-        $given  = (string) en_num(trim((string) $input));
+        $given = (string) en_num(trim((string) $input));
 
         if ($cached === null || ! Hash::check($given, $cached)) {
             return false;

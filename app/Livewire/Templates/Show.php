@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Templates;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Comment;
 use App\Models\Template;
@@ -9,7 +10,6 @@ use App\Models\TemplateImage;
 use App\Models\TemplateLicense;
 use App\Models\TemplateVersion;
 use App\Services\ImageUploadService;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -24,7 +24,8 @@ use RuntimeException;
 #[Title('جزئیات قالب')]
 class Show extends Component
 {
-    use WithToasts, WithFileUploads, WithPagination;
+    use AuthorizesAdmin;
+    use WithFileUploads, WithPagination, WithToasts;
 
     public Template $template;
 
@@ -33,8 +34,11 @@ class Show extends Component
 
     /* ================= Template edit modal (مثل Packages\Show) ================= */
     public bool $showModal = false;
+
     public array $form = [];
+
     public bool $removeThumbnail = false;
+
     public $thumbnailFile = null;
 
     /** شمارنده برای رندر مجدد input تصویر (رفع باگ «تصویر قالب تغییر نمی‌کند») */
@@ -45,44 +49,48 @@ class Show extends Component
 
     /** تصاویر گالری جدید (چندتایی) */
     public array $newImages = [];
+
     public ?int $deleteImageId = null;
 
     /* ================= Version form ================= */
     public bool $showVersionModal = false;
+
     public ?int $editingVersionId = null;
+
     public $versionFile; // UploadedFile ZIP
+
     public array $versionForm = [
-        'version'      => '',
-        'type'         => TemplateVersion::TYPE_MINOR,
-        'changelog'    => '',
-        'what_added'   => '',
+        'version' => '',
+        'type' => TemplateVersion::TYPE_MINOR,
+        'changelog' => '',
+        'what_added' => '',
         'what_changed' => '',
-        'what_fixed'   => '',
+        'what_fixed' => '',
         'is_mandatory' => false,
-        'status'       => TemplateVersion::STATUS_ACTIVE,
+        'status' => TemplateVersion::STATUS_ACTIVE,
         'release_date' => '',
     ];
 
     protected function rules(): array
     {
         return [
-            'versionForm.version'      => ['required', 'string', 'max:50'],
-            'versionForm.type'         => ['required', 'in:major,minor,patch'],
-            'versionForm.changelog'    => ['nullable', 'string', 'max:10000'],
-            'versionForm.what_added'   => ['nullable', 'string', 'max:10000'],
+            'versionForm.version' => ['required', 'string', 'max:50'],
+            'versionForm.type' => ['required', 'in:major,minor,patch'],
+            'versionForm.changelog' => ['nullable', 'string', 'max:10000'],
+            'versionForm.what_added' => ['nullable', 'string', 'max:10000'],
             'versionForm.what_changed' => ['nullable', 'string', 'max:10000'],
-            'versionForm.what_fixed'   => ['nullable', 'string', 'max:10000'],
+            'versionForm.what_fixed' => ['nullable', 'string', 'max:10000'],
             'versionForm.is_mandatory' => ['boolean'],
-            'versionForm.status'       => ['required', 'in:draft,active,archived'],
+            'versionForm.status' => ['required', 'in:draft,active,archived'],
             'versionForm.release_date' => ['nullable', 'date'],
-            'versionFile'              => ['nullable', 'file', 'mimes:zip', 'max:327680'],
+            'versionFile' => ['nullable', 'file', 'mimes:zip', 'max:327680'],
         ];
     }
 
     protected $messages = [
         'versionForm.version.required' => 'شماره نسخه الزامی است.',
-        'versionFile.mimes'            => 'فقط فایل ZIP مجاز است.',
-        'versionFile.max'              => 'حجم فایل حداکثر ۳۲۰ مگابایت.',
+        'versionFile.mimes' => 'فقط فایل ZIP مجاز است.',
+        'versionFile.max' => 'حجم فایل حداکثر ۳۲۰ مگابایت.',
     ];
 
     public function mount(Template $template): void
@@ -109,6 +117,7 @@ class Show extends Component
             'name', 'slug', 'short_description', 'description',
             'price', 'discount', 'exclusive_price', 'exclusive_discount',
             'exclusive_note', 'is_free', 'status', 'sort_order',
+            'meta_title', 'meta_description',
         ]);
         $this->form['category_id'] = (string) ($this->template->category_id ?? '');
         $this->thumbnailFile = null;
@@ -120,25 +129,30 @@ class Show extends Component
     public function saveTemplate(ImageUploadService $uploader): void
     {
         $validated = $this->validate([
-            'form.name'               => ['required', 'string', 'max:190'],
-            'form.slug'               => ['nullable', 'string', 'max:190', 'alpha_dash:ascii', 'unique:templates,slug,' . $this->template->id],
-            'form.category_id'        => ['nullable', 'exists:categories,id'],
-            'form.short_description'  => ['nullable', 'string', 'max:10000'],
-            'form.description'        => ['nullable', 'string', 'max:100000'],
-            'form.price'              => ['nullable', 'integer', 'min:0'],
-            'form.discount'           => ['nullable', 'integer', 'min:0', 'max:100'],
-            'form.exclusive_price'    => ['nullable', 'integer', 'min:0'],
+            'form.name' => ['required', 'string', 'max:190'],
+            'form.slug' => ['nullable', 'string', 'max:190', 'alpha_dash:ascii', 'unique:templates,slug,'.$this->template->id],
+            'form.category_id' => ['nullable', 'exists:categories,id'],
+            'form.short_description' => ['nullable', 'string', 'max:10000'],
+            'form.description' => ['nullable', 'string', 'max:100000'],
+            'form.price' => ['nullable', 'integer', 'min:0'],
+            'form.discount' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'form.exclusive_price' => ['nullable', 'integer', 'min:0'],
             'form.exclusive_discount' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'form.exclusive_note'     => ['nullable', 'string', 'max:2000'],
-            'form.is_free'            => ['nullable', 'boolean'],
-            'form.status'             => ['required', 'in:draft,active,archived'],
-            'form.sort_order'         => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'thumbnailFile'           => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
-            'newImages'               => ['nullable', 'array', 'max:10'],
-            'newImages.*'             => ['image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
+            'form.exclusive_note' => ['nullable', 'string', 'max:2000'],
+            'form.is_free' => ['nullable', 'boolean'],
+            'form.status' => ['required', 'in:draft,active,archived'],
+            'form.sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+
+            // سئوی اختصاصی قالب (Task 84)
+            'form.meta_title' => ['nullable', 'string', 'max:200'],
+            'form.meta_description' => ['nullable', 'string', 'max:500'],
+
+            'thumbnailFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
+            'newImages' => ['nullable', 'array', 'max:10'],
+            'newImages.*' => ['image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
         ], [
             'form.name.required' => 'نام قالب الزامی است.',
-            'form.slug.unique'   => 'این نامک قبلاً استفاده شده است.',
+            'form.slug.unique' => 'این نامک قبلاً استفاده شده است.',
             'form.status.required' => 'وضعیت را انتخاب کنید.',
         ]);
 
@@ -155,6 +169,8 @@ class Show extends Component
         $form['exclusive_price'] = (int) ($form['exclusive_price'] ?? 0);
         $form['exclusive_discount'] = (int) ($form['exclusive_discount'] ?? 0);
         $form['exclusive_note'] = ($form['exclusive_note'] ?? '') ?: null;
+        $form['meta_title'] = ($form['meta_title'] ?? '') ?: null;
+        $form['meta_description'] = ($form['meta_description'] ?? '') ?: null;
         $form['sort_order'] = (int) ($form['sort_order'] ?? 0);
         $form['category_id'] = filled($form['category_id'] ?? '') ? (int) $form['category_id'] : null;
 
@@ -185,6 +201,7 @@ class Show extends Component
             }
         } catch (RuntimeException $e) {
             $this->toast($e->getMessage(), 'error');
+
             return;
         }
 
@@ -211,14 +228,15 @@ class Show extends Component
     {
         if ($this->template->is_sold_exclusively) {
             $this->toast('این قالب قبلاً واگذار شده است.', 'warning');
+
             return;
         }
 
         $label = trim($this->buyerLabel) ?: null;
 
         $this->template->update([
-            'is_sold_exclusively'   => true,
-            'sold_exclusively_at'   => now(),
+            'is_sold_exclusively' => true,
+            'sold_exclusively_at' => now(),
             'exclusive_buyer_label' => $label,
         ]);
 
@@ -231,12 +249,13 @@ class Show extends Component
     {
         if (! $this->template->is_sold_exclusively) {
             $this->toast('این قالب در حالت عمومی است.', 'warning');
+
             return;
         }
 
         $this->template->update([
-            'is_sold_exclusively'   => false,
-            'sold_exclusively_at'   => null,
+            'is_sold_exclusively' => false,
+            'sold_exclusively_at' => null,
             'exclusive_buyer_label' => null,
         ]);
 
@@ -269,23 +288,24 @@ class Show extends Component
     public function uploadImages(ImageUploadService $uploader): void
     {
         $this->validate([
-            'newImages'   => ['required', 'array', 'max:10'],
+            'newImages' => ['required', 'array', 'max:10'],
             'newImages.*' => ['image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
         ], [
             'newImages.required' => 'ابتدا تصاویر را انتخاب کنید.',
-            'newImages.max'      => 'حداکثر ۱۰ تصویر در هر بار.',
+            'newImages.max' => 'حداکثر ۱۰ تصویر در هر بار.',
         ]);
 
         try {
             $uploader->uploadTemplateGalleryImages($this->newImages, $this->template);
         } catch (RuntimeException $e) {
             $this->toast($e->getMessage(), 'error');
+
             return;
         }
 
         $count = count($this->newImages);
         $this->newImages = [];
-        $this->toast('تعداد ' . fa_num($count) . ' تصویر به گالری اضافه شد.');
+        $this->toast('تعداد '.fa_num($count).' تصویر به گالری اضافه شد.');
     }
 
     public function deleteImage(ImageUploadService $uploader): void
@@ -346,14 +366,14 @@ class Show extends Component
         $this->editingVersionId = null;
         $this->versionFile = null;
         $this->versionForm = [
-            'version'      => $this->nextVersionSuggestion(),
-            'type'         => TemplateVersion::TYPE_MINOR,
-            'changelog'    => '',
-            'what_added'   => '',
+            'version' => $this->nextVersionSuggestion(),
+            'type' => TemplateVersion::TYPE_MINOR,
+            'changelog' => '',
+            'what_added' => '',
             'what_changed' => '',
-            'what_fixed'   => '',
+            'what_fixed' => '',
             'is_mandatory' => false,
-            'status'       => TemplateVersion::STATUS_ACTIVE,
+            'status' => TemplateVersion::STATUS_ACTIVE,
             'release_date' => now()->format('Y-m-d'),
         ];
         $this->showVersionModal = true;
@@ -367,14 +387,14 @@ class Show extends Component
         $this->editingVersionId = $version->id;
         $this->versionFile = null;
         $this->versionForm = [
-            'version'      => $version->version,
-            'type'         => $version->type,
-            'changelog'    => (string) $version->changelog,
-            'what_added'   => (string) $version->what_added,
+            'version' => $version->version,
+            'type' => $version->type,
+            'changelog' => (string) $version->changelog,
+            'what_added' => (string) $version->what_added,
             'what_changed' => (string) $version->what_changed,
-            'what_fixed'   => (string) $version->what_fixed,
+            'what_fixed' => (string) $version->what_fixed,
             'is_mandatory' => $version->is_mandatory,
-            'status'       => $version->status,
+            'status' => $version->status,
             'release_date' => $version->release_date?->format('Y-m-d'),
         ];
         $this->showVersionModal = true;
@@ -389,14 +409,14 @@ class Show extends Component
                 $version = TemplateVersion::where('template_id', $this->template->id)->findOrFail($this->editingVersionId);
 
                 $payload = [
-                    'version'      => trim($data['versionForm']['version']),
-                    'type'         => $data['versionForm']['type'],
-                    'changelog'    => $data['versionForm']['changelog'] ?: null,
-                    'what_added'   => $data['versionForm']['what_added'] ?: null,
+                    'version' => trim($data['versionForm']['version']),
+                    'type' => $data['versionForm']['type'],
+                    'changelog' => $data['versionForm']['changelog'] ?: null,
+                    'what_added' => $data['versionForm']['what_added'] ?: null,
                     'what_changed' => $data['versionForm']['what_changed'] ?: null,
-                    'what_fixed'   => $data['versionForm']['what_fixed'] ?: null,
+                    'what_fixed' => $data['versionForm']['what_fixed'] ?: null,
                     'is_mandatory' => (bool) $data['versionForm']['is_mandatory'],
-                    'status'       => $data['versionForm']['status'],
+                    'status' => $data['versionForm']['status'],
                     'release_date' => $data['versionForm']['release_date'] ?: null,
                 ];
 
@@ -415,14 +435,14 @@ class Show extends Component
                 ];
 
                 $version = $this->template->versions()->create([
-                    'version'      => trim($data['versionForm']['version']),
-                    'type'         => $data['versionForm']['type'],
-                    'changelog'    => $data['versionForm']['changelog'] ?: null,
-                    'what_added'   => $data['versionForm']['what_added'] ?: null,
+                    'version' => trim($data['versionForm']['version']),
+                    'type' => $data['versionForm']['type'],
+                    'changelog' => $data['versionForm']['changelog'] ?: null,
+                    'what_added' => $data['versionForm']['what_added'] ?: null,
                     'what_changed' => $data['versionForm']['what_changed'] ?: null,
-                    'what_fixed'   => $data['versionForm']['what_fixed'] ?: null,
+                    'what_fixed' => $data['versionForm']['what_fixed'] ?: null,
                     'is_mandatory' => (bool) $data['versionForm']['is_mandatory'],
-                    'status'       => $data['versionForm']['status'],
+                    'status' => $data['versionForm']['status'],
                     'release_date' => $data['versionForm']['release_date'] ?: now(),
                     ...$stored,
                 ]);
@@ -431,7 +451,8 @@ class Show extends Component
             }
         } catch (\Throwable $e) {
             report($e);
-            $this->toast('ذخیره نسخه ناموفق بود: ' . $e->getMessage(), 'error');
+            $this->toast('ذخیره نسخه ناموفق بود: '.$e->getMessage(), 'error');
+
             return;
         }
 
@@ -446,6 +467,7 @@ class Show extends Component
 
         if ($version->purchases()->where('status', 'paid')->exists()) {
             $this->toast('این نسخه خرید موفق دارد؛ ابتدا وضعیت آن را «آرشیو» کنید.', 'error');
+
             return;
         }
 
@@ -492,17 +514,17 @@ class Show extends Component
 
     private function storeVersionFile($file, string $version): array
     {
-        if (!$file || !$file->isValid()) {
-            throw new \RuntimeException('فایل ZIP معتبر نیست.');
+        if (! $file || ! $file->isValid()) {
+            throw new RuntimeException('فایل ZIP معتبر نیست.');
         }
 
-        $filename = $this->template->slug . '-v' . Str::replace([' ', '/'], ['-', ''], $version) . '-' . time() . '.zip';
+        $filename = $this->template->slug.'-v'.Str::replace([' ', '/'], ['-', ''], $version).'-'.time().'.zip';
 
         // ذخیره روی disk «local» (storage/app/private/templates/{slug}/)
         $path = $file->storeAs("templates/{$this->template->slug}", $filename, 'local');
 
         $absolute = Storage::disk('local')->path($path);
-        $hash     = hash_file('sha256', $absolute);
+        $hash = hash_file('sha256', $absolute);
 
         return [
             'file_path' => $path,
@@ -522,11 +544,11 @@ class Show extends Component
     {
         $last = $this->template->versions()->orderByDesc('id')->first();
 
-        if (!$last || !preg_match('/^(\d+)\.(\d+)\.(\d+)/', (string) $last->version, $m)) {
+        if (! $last || ! preg_match('/^(\d+)\.(\d+)\.(\d+)/', (string) $last->version, $m)) {
             return '1.0.0';
         }
 
-        return "{$m[1]}." . ((int) $m[2] + 1) . ".0";
+        return "{$m[1]}.".((int) $m[2] + 1).'.0';
     }
 
     /* ================= Computed ================= */
@@ -576,10 +598,10 @@ class Show extends Component
         $paid = $this->template->purchases()->where('status', 'paid');
 
         return [
-            'normal_sales'    => (clone $paid)->where('purchase_type', 'normal')->count(),
+            'normal_sales' => (clone $paid)->where('purchase_type', 'normal')->count(),
             'exclusive_sales' => (clone $paid)->where('purchase_type', 'exclusive')->count(),
-            'revenue'         => (int) $paid->sum('amount'),
-            'licenses'        => $this->template->licenses()->where('status', TemplateLicense::STATUS_ACTIVE)->count(),
+            'revenue' => (int) $paid->sum('amount'),
+            'licenses' => $this->template->licenses()->where('status', TemplateLicense::STATUS_ACTIVE)->count(),
         ];
     }
 

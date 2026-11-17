@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Services\LicenseSigningKeyService;
 use App\Support\EnvEditor;
@@ -38,6 +39,7 @@ use Livewire\Component;
 #[Title('تنظیمات برنامه‌نویس')]
 class Developer extends Component
 {
+    use AuthorizesAdmin;
     use WithToasts;
 
     /** مقادیر مجاز APP_ENV (مطابق عرف لاراول — production تنها مقدار «زنده» است) */

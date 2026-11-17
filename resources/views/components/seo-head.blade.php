@@ -62,10 +62,10 @@
 
 {{-- دادهٔ ساخت‌یافته: اسکیمای پایه سایت (همهٔ صفحات) --}}
 @foreach($siteSchemas as $schema)
-    <script type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+    <script type="application/ld+json">{!! json_encode($schema, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) !!}</script>
 @endforeach
 
 {{-- دادهٔ ساخت‌یافتهٔ اختصاصی صفحه (SoftwareApplication + BreadcrumbList و...) --}}
 @foreach($seo['jsonld'] as $schema)
-    <script type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+    <script type="application/ld+json">{!! json_encode($schema, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) !!}</script>
 @endforeach

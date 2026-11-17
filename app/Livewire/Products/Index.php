@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Products;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Category;
 use App\Models\Product;
@@ -17,6 +18,7 @@ use Livewire\WithPagination;
 #[Title('محصولات (پروژه‌های قابل‌فروش)')]
 class Index extends Component
 {
+    use AuthorizesAdmin;
     use WithFileUploads, WithPagination, WithToasts;
 
     public string $search = '';

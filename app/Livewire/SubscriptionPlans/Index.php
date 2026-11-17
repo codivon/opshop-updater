@@ -2,6 +2,7 @@
 
 namespace App\Livewire\SubscriptionPlans;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Package;
 use App\Models\SubscriptionPlan;
@@ -16,6 +17,7 @@ use Livewire\WithPagination;
 #[Title('پلن‌ها و طرح‌های اشتراک')]
 class Index extends Component
 {
+    use AuthorizesAdmin;
     use WithPagination, WithToasts;
 
     #[Url]
@@ -40,7 +42,9 @@ class Index extends Component
     public string $packageToAdd = '';
 
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public ?int $deleteId = null;
 
     public function updatedSearch(): void
@@ -99,7 +103,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD                                                             */
+    /*  CRUD */
     /* ---------------------------------------------------------------- */
 
     public function openCreate(): void
@@ -107,15 +111,15 @@ class Index extends Component
         $this->resetValidation();
         $this->editingId = null;
         $this->form = [
-            'name'            => '',
-            'description'     => '',
+            'name' => '',
+            'description' => '',
             'duration_months' => '1',
-            'price'           => '0',
-            'discount_price'  => '',
-            'is_free'         => false,
-            'is_one_time'     => false,
-            'is_active'       => true,
-            'sort_order'      => '0',
+            'price' => '0',
+            'discount_price' => '',
+            'is_free' => false,
+            'is_one_time' => false,
+            'is_active' => true,
+            'sort_order' => '0',
         ];
         $this->formFeatures = [''];
         $this->formPackages = [];
@@ -129,15 +133,15 @@ class Index extends Component
         $this->resetValidation();
         $this->editingId = $plan->id;
         $this->form = [
-            'name'            => (string) $plan->name,
-            'description'     => (string) ($plan->description ?? ''),
+            'name' => (string) $plan->name,
+            'description' => (string) ($plan->description ?? ''),
             'duration_months' => (string) $plan->duration_months,
-            'price'           => (string) $plan->price,
-            'discount_price'  => $plan->discount_price === null ? '' : (string) $plan->discount_price,
-            'is_free'         => (bool) $plan->is_free,
-            'is_one_time'     => (bool) $plan->is_one_time,
-            'is_active'       => (bool) $plan->is_active,
-            'sort_order'      => (string) $plan->sort_order,
+            'price' => (string) $plan->price,
+            'discount_price' => $plan->discount_price === null ? '' : (string) $plan->discount_price,
+            'is_free' => (bool) $plan->is_free,
+            'is_one_time' => (bool) $plan->is_one_time,
+            'is_active' => (bool) $plan->is_active,
+            'sort_order' => (string) $plan->sort_order,
         ];
         $this->formFeatures = collect($plan->features ?? [])->map(fn ($f) => (string) $f)->values()->all();
         if ($this->formFeatures === []) {
@@ -145,7 +149,7 @@ class Index extends Component
         }
         $this->formPackages = $plan->packages
             ->map(fn ($p) => [
-                'package_id'     => (string) $p->id,
+                'package_id' => (string) $p->id,
                 'duration_months' => $p->pivot->duration_months === null ? '' : (string) $p->pivot->duration_months,
             ])
             ->values()
@@ -212,7 +216,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Repeater: قابلیت‌ها                                               */
+    /*  Repeater: قابلیت‌ها */
     /* ---------------------------------------------------------------- */
 
     public function addFeature(): void
@@ -227,7 +231,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Packages editor                                                  */
+    /*  Packages editor */
     /* ---------------------------------------------------------------- */
 
     public function addPackage(): void
@@ -249,61 +253,61 @@ class Index extends Component
     protected function rules(): array
     {
         return [
-            'form.name'            => ['required', 'string', 'max:100'],
-            'form.description'     => ['nullable', 'string', 'max:1000'],
+            'form.name' => ['required', 'string', 'max:100'],
+            'form.description' => ['nullable', 'string', 'max:1000'],
             'form.duration_months' => ['required', 'integer', 'min:0', 'max:120'],
-            'form.price'           => ['required', 'integer', 'min:0'],
-            'form.discount_price'  => ['nullable', 'integer', 'min:0', 'lt:form.price'],
-            'form.is_free'         => ['boolean'],
-            'form.is_one_time'     => ['boolean'],
-            'form.is_active'       => ['boolean'],
-            'form.sort_order'      => ['nullable', 'integer', 'min:0'],
+            'form.price' => ['required', 'integer', 'min:0'],
+            'form.discount_price' => ['nullable', 'integer', 'min:0', 'lt:form.price'],
+            'form.is_free' => ['boolean'],
+            'form.is_one_time' => ['boolean'],
+            'form.is_active' => ['boolean'],
+            'form.sort_order' => ['nullable', 'integer', 'min:0'],
 
-            'formFeatures'    => ['array'],
-            'formFeatures.*'  => ['nullable', 'string', 'max:150'],
+            'formFeatures' => ['array'],
+            'formFeatures.*' => ['nullable', 'string', 'max:150'],
 
-            'formPackages'                          => ['array'],
-            'formPackages.*.package_id'             => ['required', 'integer', 'distinct', 'exists:packages,id'],
-            'formPackages.*.duration_months'        => ['nullable', 'integer', 'min:0', 'max:120'],
+            'formPackages' => ['array'],
+            'formPackages.*.package_id' => ['required', 'integer', 'distinct', 'exists:packages,id'],
+            'formPackages.*.duration_months' => ['nullable', 'integer', 'min:0', 'max:120'],
         ];
     }
 
     protected function messages(): array
     {
         return [
-            'form.name.required'            => 'نام طرح الزامی است.',
-            'form.name.string'              => 'نام طرح باید متن باشد.',
-            'form.name.max'                 => 'نام طرح حداکثر ۱۰۰ کاراکتر باشد.',
-            'form.description.string'       => 'توضیحات باید متن باشد.',
-            'form.description.max'          => 'توضیحات حداکثر ۱۰۰۰ کاراکتر باشد.',
+            'form.name.required' => 'نام طرح الزامی است.',
+            'form.name.string' => 'نام طرح باید متن باشد.',
+            'form.name.max' => 'نام طرح حداکثر ۱۰۰ کاراکتر باشد.',
+            'form.description.string' => 'توضیحات باید متن باشد.',
+            'form.description.max' => 'توضیحات حداکثر ۱۰۰۰ کاراکتر باشد.',
             'form.duration_months.required' => 'مدت اعتبار طرح را انتخاب کنید.',
-            'form.duration_months.integer'  => 'مدت اعتبار باید عدد صحیح باشد.',
-            'form.duration_months.min'      => 'مدت اعتبار حداقل ۰ است (۰ = نامحدود).',
-            'form.duration_months.max'      => 'مدت اعتبار حداکثر ۱۲۰ ماه است.',
-            'form.price.required'           => 'قیمت طرح الزامی است.',
-            'form.price.integer'            => 'قیمت باید عدد صحیح (تومان) باشد.',
-            'form.price.min'                => 'قیمت نمی‌تواند منفی باشد.',
-            'form.discount_price.integer'   => 'قیمت با تخفیف باید عدد صحیح باشد.',
-            'form.discount_price.min'       => 'قیمت با تخفیف نمی‌تواند منفی باشد.',
-            'form.discount_price.lt'        => 'قیمت با تخفیف باید کمتر از قیمت اصلی باشد.',
-            'form.is_free.boolean'          => 'مقدار گزینه «رایگان» نامعتبر است.',
-            'form.is_one_time.boolean'      => 'مقدار گزینه «یک‌بار مصرف» نامعتبر است.',
-            'form.is_active.boolean'        => 'مقدار گزینه «فعال» نامعتبر است.',
-            'form.sort_order.integer'       => 'ترتیب نمایش باید عدد صحیح باشد.',
-            'form.sort_order.min'           => 'ترتیب نمایش نمی‌تواند منفی باشد.',
+            'form.duration_months.integer' => 'مدت اعتبار باید عدد صحیح باشد.',
+            'form.duration_months.min' => 'مدت اعتبار حداقل ۰ است (۰ = نامحدود).',
+            'form.duration_months.max' => 'مدت اعتبار حداکثر ۱۲۰ ماه است.',
+            'form.price.required' => 'قیمت طرح الزامی است.',
+            'form.price.integer' => 'قیمت باید عدد صحیح (تومان) باشد.',
+            'form.price.min' => 'قیمت نمی‌تواند منفی باشد.',
+            'form.discount_price.integer' => 'قیمت با تخفیف باید عدد صحیح باشد.',
+            'form.discount_price.min' => 'قیمت با تخفیف نمی‌تواند منفی باشد.',
+            'form.discount_price.lt' => 'قیمت با تخفیف باید کمتر از قیمت اصلی باشد.',
+            'form.is_free.boolean' => 'مقدار گزینه «رایگان» نامعتبر است.',
+            'form.is_one_time.boolean' => 'مقدار گزینه «یک‌بار مصرف» نامعتبر است.',
+            'form.is_active.boolean' => 'مقدار گزینه «فعال» نامعتبر است.',
+            'form.sort_order.integer' => 'ترتیب نمایش باید عدد صحیح باشد.',
+            'form.sort_order.min' => 'ترتیب نمایش نمی‌تواند منفی باشد.',
 
-            'formFeatures.array'     => 'ساختار قابلیت‌ها نامعتبر است.',
-            'formFeatures.*.string'  => 'هر قابلیت باید متن باشد.',
-            'formFeatures.*.max'     => 'هر قابلیت حداکثر ۱۵۰ کاراکتر باشد.',
+            'formFeatures.array' => 'ساختار قابلیت‌ها نامعتبر است.',
+            'formFeatures.*.string' => 'هر قابلیت باید متن باشد.',
+            'formFeatures.*.max' => 'هر قابلیت حداکثر ۱۵۰ کاراکتر باشد.',
 
-            'formPackages.array'                        => 'ساختار پکیج‌های طرح نامعتبر است.',
-            'formPackages.*.package_id.required'        => 'پکیج هر ردیف را انتخاب کنید.',
-            'formPackages.*.package_id.integer'         => 'پکیج انتخاب‌شده معتبر نیست.',
-            'formPackages.*.package_id.distinct'        => 'این پکیج قبلاً به طرح اضافه شده است.',
-            'formPackages.*.package_id.exists'          => 'پکیج انتخاب‌شده معتبر نیست.',
-            'formPackages.*.duration_months.integer'    => 'مدت پکیج باید عدد صحیح (ماه) باشد.',
-            'formPackages.*.duration_months.min'        => 'مدت پکیج حداقل ۰ است (۰ = نامحدود).',
-            'formPackages.*.duration_months.max'        => 'مدت پکیج حداکثر ۱۲۰ ماه است.',
+            'formPackages.array' => 'ساختار پکیج‌های طرح نامعتبر است.',
+            'formPackages.*.package_id.required' => 'پکیج هر ردیف را انتخاب کنید.',
+            'formPackages.*.package_id.integer' => 'پکیج انتخاب‌شده معتبر نیست.',
+            'formPackages.*.package_id.distinct' => 'این پکیج قبلاً به طرح اضافه شده است.',
+            'formPackages.*.package_id.exists' => 'پکیج انتخاب‌شده معتبر نیست.',
+            'formPackages.*.duration_months.integer' => 'مدت پکیج باید عدد صحیح (ماه) باشد.',
+            'formPackages.*.duration_months.min' => 'مدت پکیج حداقل ۰ است (۰ = نامحدود).',
+            'formPackages.*.duration_months.max' => 'مدت پکیج حداکثر ۱۲۰ ماه است.',
         ];
     }
 

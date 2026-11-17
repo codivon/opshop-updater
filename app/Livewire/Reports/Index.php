@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Reports;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Models\Package;
@@ -20,6 +21,7 @@ use App\Models\Update;
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -31,6 +33,7 @@ use Livewire\WithPagination;
 #[Title('گزارش‌ها')]
 class Index extends Component
 {
+    use AuthorizesAdmin;
     use WithPagination, WithToasts;
 
     /** تب مشتریان: بازه تاریخ عضویت */
@@ -86,7 +89,7 @@ class Index extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  تب «فروش» — فیلتر بازه زمانی                                       */
+    /*  تب «فروش» — فیلتر بازه زمانی */
     /* ------------------------------------------------------------------ */
 
     public function updatedPeriod(): void
@@ -107,7 +110,7 @@ class Index extends Component
     /** کلیک روی دکمه‌های سریع بازه — بازه دلخواه را پاک می‌کند */
     public function setPeriod(string $period): void
     {
-        if (!in_array($period, ['today', 'week', 'month', 'year', 'custom', 'all'], true)) {
+        if (! in_array($period, ['today', 'week', 'month', 'year', 'custom', 'all'], true)) {
             return;
         }
 
@@ -130,7 +133,7 @@ class Index extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  تب «نمای کلی»                                                      */
+    /*  تب «نمای کلی» */
     /* ------------------------------------------------------------------ */
 
     #[Computed]
@@ -160,7 +163,7 @@ class Index extends Component
                 'value' => $totalCustomers,
                 'icon' => 'users',
                 'variant' => 'primary',
-                'hint' => fa_num($activeCustomers) . ' فعال',
+                'hint' => fa_num($activeCustomers).' فعال',
                 'href' => route('admin.customers.index'),
             ],
             [
@@ -168,7 +171,7 @@ class Index extends Component
                 'value' => $activeUpdates,
                 'icon' => 'git-branch',
                 'variant' => 'info',
-                'hint' => 'از ' . fa_num($totalUpdates) . ' آپدیت',
+                'hint' => 'از '.fa_num($totalUpdates).' آپدیت',
                 'href' => route('admin.updates.index'),
             ],
             [
@@ -176,7 +179,7 @@ class Index extends Component
                 'value' => $activeSubscriptions,
                 'icon' => 'ticket',
                 'variant' => 'warning',
-                'hint' => 'از ' . fa_num($totalSubscriptions) . ' اشتراک',
+                'hint' => 'از '.fa_num($totalSubscriptions).' اشتراک',
                 'href' => route('admin.subscriptions.index'),
             ],
             [
@@ -184,7 +187,7 @@ class Index extends Component
                 'value' => Template::where('status', Template::STATUS_ACTIVE)->where('is_sold_exclusively', false)->count(),
                 'icon' => 'layout-template',
                 'variant' => 'violet',
-                'hint' => 'درآمد: ' . money($templateRevenue, false) . ' تومان',
+                'hint' => 'درآمد: '.money($templateRevenue, false).' تومان',
                 'href' => route('admin.templates.index'),
             ],
             [
@@ -192,7 +195,7 @@ class Index extends Component
                 'value' => Product::where('status', Product::STATUS_ACTIVE)->count(),
                 'icon' => 'shopping-bag',
                 'variant' => 'info',
-                'hint' => 'درآمد: ' . money($productRevenue, false) . ' تومان',
+                'hint' => 'درآمد: '.money($productRevenue, false).' تومان',
                 'href' => route('admin.products.index'),
             ],
             [
@@ -200,7 +203,7 @@ class Index extends Component
                 'value' => $this->licensesStats['package']['active'] + $this->licensesStats['template']['active'],
                 'icon' => 'key',
                 'variant' => 'warning',
-                'hint' => fa_num($this->licensesStats['template']['active']) . ' قالب + ' . fa_num($this->licensesStats['package']['active']) . ' پکیج',
+                'hint' => fa_num($this->licensesStats['template']['active']).' قالب + '.fa_num($this->licensesStats['package']['active']).' پکیج',
                 'href' => route('admin.licenses.index'),
             ],
             [
@@ -216,7 +219,7 @@ class Index extends Component
                 'value' => PackagePurchase::where('status', PackagePurchase::STATUS_PAID)->count(),
                 'icon' => 'package',
                 'variant' => 'neutral',
-                'hint' => PackagePurchase::where('status', PackagePurchase::STATUS_PENDING)->count() . ' در انتظار پرداخت',
+                'hint' => PackagePurchase::where('status', PackagePurchase::STATUS_PENDING)->count().' در انتظار پرداخت',
                 'href' => route('admin.purchases.index'),
             ],
             [
@@ -224,7 +227,7 @@ class Index extends Component
                 'value' => $planStats['total_orders'],
                 'icon' => 'crown',
                 'variant' => 'warning',
-                'hint' => fa_num($planStats['pending_orders']) . ' در انتظار تأیید',
+                'hint' => fa_num($planStats['pending_orders']).' در انتظار تأیید',
                 'href' => route('admin.subscriptions.orders'),
             ],
             [
@@ -363,7 +366,7 @@ class Index extends Component
                 'rows' => [
                     ['label' => 'خرید موفق', 'value' => fa_num(TemplatePurchase::where('status', TemplatePurchase::STATUS_PAID)->count())],
                     ['label' => 'درآمد کل', 'value' => money($templateRevenue)],
-                    ['label' => 'فروش اختصاصی', 'value' => fa_num(TemplatePurchase::where('status', TemplatePurchase::STATUS_PAID)->where('purchase_type', TemplatePurchase::TYPE_EXCLUSIVE)->count()) . ' (' . money($templateExclusiveRevenue) . ')'],
+                    ['label' => 'فروش اختصاصی', 'value' => fa_num(TemplatePurchase::where('status', TemplatePurchase::STATUS_PAID)->where('purchase_type', TemplatePurchase::TYPE_EXCLUSIVE)->count()).' ('.money($templateExclusiveRevenue).')'],
                     ['label' => 'قالب واگذارشده', 'value' => fa_num(Template::where('is_sold_exclusively', true)->count())],
                 ],
             ],
@@ -380,8 +383,8 @@ class Index extends Component
                 'icon' => 'key',
                 'title' => 'لایسنس‌ها',
                 'rows' => [
-                    ['label' => 'لایسنس پکیج (فعال)', 'value' => fa_num($licStats['package']['active']) . ' از ' . fa_num($licStats['package']['total'])],
-                    ['label' => 'لایسنس قالب (فعال)', 'value' => fa_num($licStats['template']['active']) . ' از ' . fa_num($licStats['template']['total'])],
+                    ['label' => 'لایسنس پکیج (فعال)', 'value' => fa_num($licStats['package']['active']).' از '.fa_num($licStats['package']['total'])],
+                    ['label' => 'لایسنس قالب (فعال)', 'value' => fa_num($licStats['template']['active']).' از '.fa_num($licStats['template']['total'])],
                     ['label' => 'باطل‌شده', 'value' => fa_num($licStats['package']['revoked'] + $licStats['template']['revoked'])],
                     ['label' => 'منقضی', 'value' => fa_num($licStats['package']['expired'] + $licStats['template']['expired'])],
                 ],
@@ -390,7 +393,7 @@ class Index extends Component
                 'icon' => 'crown',
                 'title' => 'طرح‌های اشتراک',
                 'rows' => [
-                    ['label' => 'طرح فعال', 'value' => fa_num($planStats['active_plans']) . ' از ' . fa_num(SubscriptionPlan::count()) . ' طرح'],
+                    ['label' => 'طرح فعال', 'value' => fa_num($planStats['active_plans']).' از '.fa_num(SubscriptionPlan::count()).' طرح'],
                     ['label' => 'سفارش تأییدشده', 'value' => fa_num($planStats['approved_orders'])],
                     ['label' => 'در انتظار تأیید', 'value' => fa_num($planStats['pending_orders'])],
                     ['label' => 'ردشده', 'value' => fa_num($planStats['rejected_orders'])],
@@ -413,7 +416,7 @@ class Index extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  تب «مشتریان»                                                       */
+    /*  تب «مشتریان» */
     /* ------------------------------------------------------------------ */
 
     #[Computed]
@@ -436,7 +439,7 @@ class Index extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  تب «آپدیت‌ها»                                                      */
+    /*  تب «آپدیت‌ها» */
     /* ------------------------------------------------------------------ */
 
     #[Computed]
@@ -457,11 +460,12 @@ class Index extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  تب «فروش» — بازه، ردیف‌ها و آمار                                    */
+    /*  تب «فروش» — بازه، ردیف‌ها و آمار */
     /* ------------------------------------------------------------------ */
 
     /**
      * بازه زمانی فعلی تب فروش.
+     *
      * @return array{0: ?Carbon, 1: ?Carbon, 2: string} [از، تا، برچسب]
      */
     private function salesRange(): array
@@ -480,7 +484,7 @@ class Index extends Component
 
             case 'custom':
                 $from = jalali_to_carbon($this->salesFrom);
-                $to   = jalali_to_carbon($this->salesTo, endOfDay: true);
+                $to = jalali_to_carbon($this->salesTo, endOfDay: true);
 
                 if ($from && $to && $from->gt($to)) {
                     [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
@@ -488,7 +492,7 @@ class Index extends Component
 
                 $label = 'بازه دلخواه';
                 if ($from || $to) {
-                    $label = ($from ? verta_date($from) : '…') . ' تا ' . ($to ? verta_date($to) : '…');
+                    $label = ($from ? verta_date($from) : '…').' تا '.($to ? verta_date($to) : '…');
                 }
 
                 return [$from, $to, $label];
@@ -504,7 +508,7 @@ class Index extends Component
 
     /** همه فروش‌های پرداخت‌شده در بازه — یکپارچه از ۴ منبع */
     #[Computed]
-    public function salesRows(): \Illuminate\Support\Collection
+    public function salesRows(): Collection
     {
         [$from, $to] = $this->salesRange();
 
@@ -523,17 +527,17 @@ class Index extends Component
 
         foreach ($packagePurchases as $p) {
             $rows->push([
-                'type'        => 'package',
-                'type_label'  => 'پکیج',
-                'title'       => $p->package?->name ?? '—',
-                'customer'    => $p->customer?->name ?? '—',
+                'type' => 'package',
+                'type_label' => 'پکیج',
+                'title' => $p->package?->name ?? '—',
+                'customer' => $p->customer?->name ?? '—',
                 'base_amount' => (int) $p->original_amount,
-                'discount'    => (int) $p->discount_amount,
-                'amount'      => (int) $p->amount,
-                'gateway'     => $p->gateway ?? '—',
+                'discount' => (int) $p->discount_amount,
+                'amount' => (int) $p->amount,
+                'gateway' => $p->gateway ?? '—',
                 'discount_code' => $p->discountCode?->code,
-                'paid_at'     => $p->paid_at ?? $p->created_at,
-                'href'        => route('admin.purchases.show', $p),
+                'paid_at' => $p->paid_at ?? $p->created_at,
+                'href' => route('admin.purchases.show', $p),
             ]);
         }
 
@@ -546,17 +550,17 @@ class Index extends Component
 
         foreach ($productPurchases as $p) {
             $rows->push([
-                'type'        => 'product',
-                'type_label'  => 'محصول',
-                'title'       => $p->product?->name ?? '—',
-                'customer'    => $p->customer?->name ?? 'مهمان',
+                'type' => 'product',
+                'type_label' => 'محصول',
+                'title' => $p->product?->name ?? '—',
+                'customer' => $p->customer?->name ?? 'مهمان',
                 'base_amount' => (int) $p->original_amount,
-                'discount'    => (int) $p->discount_amount,
-                'amount'      => (int) $p->amount,
-                'gateway'     => $p->gateway ?? '—',
+                'discount' => (int) $p->discount_amount,
+                'amount' => (int) $p->amount,
+                'gateway' => $p->gateway ?? '—',
                 'discount_code' => $p->discountCode?->code,
-                'paid_at'     => $p->paid_at ?? $p->created_at,
-                'href'        => null,
+                'paid_at' => $p->paid_at ?? $p->created_at,
+                'href' => null,
             ]);
         }
 
@@ -569,17 +573,17 @@ class Index extends Component
 
         foreach ($templatePurchases as $p) {
             $rows->push([
-                'type'        => 'template',
-                'type_label'  => 'قالب',
-                'title'       => $p->template?->name ?? '—',
-                'customer'    => $p->customer?->name ?? 'مهمان',
+                'type' => 'template',
+                'type_label' => 'قالب',
+                'title' => $p->template?->name ?? '—',
+                'customer' => $p->customer?->name ?? 'مهمان',
                 'base_amount' => (int) $p->original_amount,
-                'discount'    => (int) $p->discount_amount,
-                'amount'      => (int) $p->amount,
-                'gateway'     => $p->gateway ?? '—',
+                'discount' => (int) $p->discount_amount,
+                'amount' => (int) $p->amount,
+                'gateway' => $p->gateway ?? '—',
                 'discount_code' => $p->discountCode?->code,
-                'paid_at'     => $p->paid_at ?? $p->created_at,
-                'href'        => null,
+                'paid_at' => $p->paid_at ?? $p->created_at,
+                'href' => null,
                 'purchase_type' => $p->purchase_type,
             ]);
         }
@@ -593,18 +597,18 @@ class Index extends Component
 
         foreach ($subscriptionOrders as $o) {
             $rows->push([
-                'type'        => 'subscription',
-                'type_label'  => 'اشتراک',
-                'title'       => $o->plan?->name ?? '—',
-                'customer'    => $o->customer?->name ?? '—',
+                'type' => 'subscription',
+                'type_label' => 'اشتراک',
+                'title' => $o->plan?->name ?? '—',
+                'customer' => $o->customer?->name ?? '—',
                 // توجه: در SubscriptionOrder نام فیلدها amount (پایه) و discount است
                 'base_amount' => (int) $o->amount,
-                'discount'    => (int) $o->discount,
-                'amount'      => (int) $o->final_amount,
-                'gateway'     => $o->gateway ?? '—',
+                'discount' => (int) $o->discount,
+                'amount' => (int) $o->final_amount,
+                'gateway' => $o->gateway ?? '—',
                 'discount_code' => $o->discountCode?->code,
-                'paid_at'     => $o->paid_at ?? $o->created_at,
-                'href'        => route('admin.subscriptions.orders'),
+                'paid_at' => $o->paid_at ?? $o->created_at,
+                'href' => route('admin.subscriptions.orders'),
             ]);
         }
 
@@ -616,7 +620,7 @@ class Index extends Component
     public function salesTable(): LengthAwarePaginator
     {
         $rows = $this->salesRows;
-        $per  = 12;
+        $per = 12;
         $page = LengthAwarePaginator::resolveCurrentPage('salesPage');
 
         return new LengthAwarePaginator(
@@ -635,9 +639,9 @@ class Index extends Component
         [$from, $to, $label] = $this->salesRange();
         $rows = $this->salesRows;
 
-        $revenue      = (int) $rows->sum('amount');
-        $discount     = (int) $rows->sum('discount');
-        $count        = $rows->count();
+        $revenue = (int) $rows->sum('amount');
+        $discount = (int) $rows->sum('discount');
+        $count = $rows->count();
 
         // رشد نسبت به دورهٔ قبل (هم‌طول)
         $prevRevenue = null;
@@ -667,8 +671,8 @@ class Index extends Component
         foreach (['package' => 'پکیج‌ها', 'product' => 'محصولات', 'template' => 'قالب‌ها', 'subscription' => 'اشتراک‌ها'] as $type => $typeLabel) {
             $subset = $rows->where('type', $type);
             $byType[$type] = [
-                'label'   => $typeLabel,
-                'count'   => $subset->count(),
+                'label' => $typeLabel,
+                'count' => $subset->count(),
                 'revenue' => (int) $subset->sum('amount'),
             ];
         }
@@ -692,8 +696,8 @@ class Index extends Component
                 for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
                     $day = $bucket->get($d->format('Y-m-d'));
                     $series->push([
-                        'label'     => verta_date($d->copy(), 'm/d'),
-                        'value'     => $day ? $day->count() : 0,
+                        'label' => verta_date($d->copy(), 'm/d'),
+                        'value' => $day ? $day->count() : 0,
                         'secondary' => $day ? (int) $day->sum('amount') : 0,
                     ]);
                 }
@@ -703,8 +707,8 @@ class Index extends Component
                 for ($d = $from->copy()->startOfMonth(); $d->lte($to); $d->addMonth()) {
                     $month = $bucket->get($d->format('Y-m'));
                     $series->push([
-                        'label'     => verta_date($d->copy(), 'Y/m'),
-                        'value'     => $month ? $month->count() : 0,
+                        'label' => verta_date($d->copy(), 'Y/m'),
+                        'value' => $month ? $month->count() : 0,
                         'secondary' => $month ? (int) $month->sum('amount') : 0,
                     ]);
                 }
@@ -718,8 +722,8 @@ class Index extends Component
                     && $r['paid_at']->month === $date->month);
 
                 return [
-                    'label'     => verta_date($date, 'Y/m'),
-                    'value'     => $subset->count(),
+                    'label' => verta_date($date, 'Y/m'),
+                    'value' => $subset->count(),
                     'secondary' => (int) $subset->sum('amount'),
                 ];
             });
@@ -728,20 +732,20 @@ class Index extends Component
         }
 
         return [
-            'label'           => $label,
-            'revenue'         => $revenue,
-            'discount'        => $discount,
-            'count'           => $count,
-            'avg_order'       => $count > 0 ? (int) round($revenue / $count) : 0,
-            'prev_revenue'    => $prevRevenue,
-            'growth'          => $growth,
-            'by_type'         => $byType,
-            'by_gateway'      => $byGateway,
-            'discount_used'   => $rows->where('discount', '>', 0)->count(),
-            'chart'           => [
-                'title'  => 'فروش در بازه: ' . $label,
+            'label' => $label,
+            'revenue' => $revenue,
+            'discount' => $discount,
+            'count' => $count,
+            'avg_order' => $count > 0 ? (int) round($revenue / $count) : 0,
+            'prev_revenue' => $prevRevenue,
+            'growth' => $growth,
+            'by_type' => $byType,
+            'by_gateway' => $byGateway,
+            'discount_used' => $rows->where('discount', '>', 0)->count(),
+            'chart' => [
+                'title' => 'فروش در بازه: '.$label,
                 'series' => $series->all(),
-                'color'  => 'teal',
+                'color' => 'teal',
             ],
         ];
     }
@@ -783,18 +787,18 @@ class Index extends Component
 
         return [
             'package' => [
-                'total'   => PackageLicense::count(),
-                'active'  => (clone $packageActive)->count(),
+                'total' => PackageLicense::count(),
+                'active' => (clone $packageActive)->count(),
                 'expired' => PackageLicense::where('status', PackageLicense::STATUS_EXPIRED)->count(),
                 'revoked' => PackageLicense::where('status', PackageLicense::STATUS_REVOKED)->count(),
-                'issued'  => $issuedIn(PackageLicense::query())->count(),
+                'issued' => $issuedIn(PackageLicense::query())->count(),
             ],
             'template' => [
-                'total'   => TemplateLicense::count(),
-                'active'  => (clone $templateActive)->count(),
+                'total' => TemplateLicense::count(),
+                'active' => (clone $templateActive)->count(),
                 'expired' => TemplateLicense::where('status', TemplateLicense::STATUS_EXPIRED)->count(),
                 'revoked' => TemplateLicense::where('status', TemplateLicense::STATUS_REVOKED)->count(),
-                'issued'  => $issuedIn(TemplateLicense::query())->count(),
+                'issued' => $issuedIn(TemplateLicense::query())->count(),
             ],
         ];
     }
@@ -860,7 +864,7 @@ class Index extends Component
     }
 
     /* ------------------------------------------------------------------ */
-    /*  تب «فروش» — خروجی CSV                                              */
+    /*  تب «فروش» — خروجی CSV */
     /* ------------------------------------------------------------------ */
 
     /** خروجی CSV از فروش‌های بازه فعلی (سازگار با اکسل — UTF-8 BOM) */
@@ -895,13 +899,13 @@ class Index extends Component
             }
 
             fclose($out);
-        }, 'sales-report-' . now()->format('Ymd-His') . '.csv', [
+        }, 'sales-report-'.now()->format('Ymd-His').'.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  تب «طرح‌های اشتراک»                                                */
+    /*  تب «طرح‌های اشتراک» */
     /* ------------------------------------------------------------------ */
 
     /** خلاصه آمار طرح‌های اشتراک (همان planStats داشبورد) */

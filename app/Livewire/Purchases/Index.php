@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Purchases;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\PackagePurchase;
@@ -16,7 +17,8 @@ use Livewire\WithPagination;
 #[Title('خریدها')]
 class Index extends Component
 {
-    use WithPagination, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -69,7 +71,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection + delete (WithBulkActions)                        */
+    /*  Bulk selection + delete (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     public function bulkPageIds(): array
@@ -84,7 +86,7 @@ class Index extends Component
         // حذف خرید امن است: لایسنس‌های مرتبط با purchase_id=null باقی می‌مانند (nullOnDelete)
         $count = PackagePurchase::query()->whereIn('id', $ids)->delete();
 
-        $this->toast(fa_num($count) . ' خرید حذف شد.');
+        $this->toast(fa_num($count).' خرید حذف شد.');
     }
 
     /** حذف تکی خرید */
@@ -96,7 +98,7 @@ class Index extends Component
         $purchase->delete();
 
         $this->deleteId = null;
-        $this->toast('خرید #' . fa_num($id) . ' حذف شد.');
+        $this->toast('خرید #'.fa_num($id).' حذف شد.');
     }
 
     #[Computed]
@@ -105,7 +107,7 @@ class Index extends Component
         return [
             'revenue' => (int) PackagePurchase::where('status', PackagePurchase::STATUS_PAID)->sum('amount'),
             'pending' => PackagePurchase::where('status', PackagePurchase::STATUS_PENDING)->count(),
-            'failed'  => PackagePurchase::where('status', PackagePurchase::STATUS_FAILED)->count(),
+            'failed' => PackagePurchase::where('status', PackagePurchase::STATUS_FAILED)->count(),
         ];
     }
 

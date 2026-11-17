@@ -3,8 +3,10 @@
 namespace App\Livewire\Shop;
 
 use App\Livewire\Concerns\WithToasts;
+use App\Models\TemplateLicense;
 use App\Models\TemplatePurchase;
 use App\Services\PaymentService;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -20,16 +22,19 @@ class TemplatePaymentResult extends Component
     /** لینک دانلود یک‌بارمصرف تولیدشده برای همین رندر */
     public ?string $downloadUrl = null;
 
-    public function mount(TemplatePurchase $purchase): void
+    public function mount(TemplatePurchase $purchase, string $token): void
     {
+        // Task 85 — امنیت: صفحهٔ نتیجهٔ پرداخت (لینک دانلود + لایسنس) فقط با توکن محرمانهٔ خرید باز می‌شود
+        abort_unless($purchase->hasValidAccessToken($token), 404);
+
         $purchase->load(['template:id,name,slug,thumbnail', 'version:id,template_id,version,file_size', 'license:id,purchase_id,license_key,status,purchase_type']);
 
         $this->purchase = $purchase;
     }
 
-    /** لایسنس خرید (پس از پرداخت موفق صادر می‌شود) */
-    #[Livewire\Attributes\Computed]
-    public function license(): ?\App\Models\TemplateLicense
+    /** لایسنس خرید (پس از پرداخت موفق صادر می‌شود) — باگ قدیمی: attribute بدون use هرگز resolve نمی‌شد و صفحه ۵۰۰ می‌داد */
+    #[Computed]
+    public function license(): ?TemplateLicense
     {
         return $this->purchase->license;
     }
@@ -41,11 +46,13 @@ class TemplatePaymentResult extends Component
     {
         if ($this->purchase->status !== TemplatePurchase::STATUS_PENDING) {
             $this->toast('این خرید در انتظار تأیید نیست.');
+
             return;
         }
 
-        if (!$this->purchase->transaction_id) {
+        if (! $this->purchase->transaction_id) {
             $this->toast('شناسه تراکنش برای این خرید ثبت نشده است.', 'error');
+
             return;
         }
 
@@ -66,15 +73,17 @@ class TemplatePaymentResult extends Component
      */
     public function getDownload(): void
     {
-        if (!$this->purchase->isPaid()) {
+        if (! $this->purchase->isPaid()) {
             $this->toast('ابتدا پرداخت باید با موفقیت انجام شود.', 'error');
+
             return;
         }
 
         $token = $this->purchase->createDownloadToken();
 
-        if (!$token) {
+        if (! $token) {
             $this->toast('فایل نسخه قالب یافت نشد. لطفاً با پشتیبانی تماس بگیرید.', 'error');
+
             return;
         }
 

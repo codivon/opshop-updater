@@ -411,7 +411,7 @@ class PackageShow extends Component
             session()->put('shop_update_code', trim($this->updateCode));
 
             $this->toast('پکیج رایگان با موفقیت دریافت شد؛ لایسنس صادر شد.');
-            $this->redirect(route('payment.result', $purchase), navigate: true);
+            $this->redirect(route('payment.result', ['purchase' => $purchase, 'token' => $purchase->access_token]), navigate: true);
 
             return;
         }
@@ -553,7 +553,7 @@ class PackageShow extends Component
         session()->put('shop_update_code', trim($this->updateCode));
 
         $this->toast('پکیج با اشتراک رایگان فعال شد.');
-        $this->redirect(route('payment.result', $purchase), navigate: true);
+        $this->redirect(route('payment.result', ['purchase' => $purchase, 'token' => $purchase->access_token]), navigate: true);
     }
 
     /** اولین اشتراک فعالِ طرح‌محور مشتری (با plan.packages eager) */

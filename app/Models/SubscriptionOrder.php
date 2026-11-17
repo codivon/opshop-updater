@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPurchaseAccessToken;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,13 +19,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class SubscriptionOrder extends Model
 {
     use HasFactory;
+    use HasPurchaseAccessToken;
 
     public const STATUS_PENDING = 'pending';
-    public const STATUS_PAID    = 'paid';
-    public const STATUS_FAILED  = 'failed';
 
-    public const ADMIN_STATUS_PENDING  = 'pending';
+    public const STATUS_PAID = 'paid';
+
+    public const STATUS_FAILED = 'failed';
+
+    public const ADMIN_STATUS_PENDING = 'pending';
+
     public const ADMIN_STATUS_APPROVED = 'approved';
+
     public const ADMIN_STATUS_REJECTED = 'rejected';
 
     protected $fillable = [
@@ -48,22 +54,23 @@ class SubscriptionOrder extends Model
         'starts_at',
         'expires_at',
         'meta',
+        'access_token',
     ];
 
     protected $casts = [
-        'amount'       => 'integer',
-        'discount'     => 'integer',
+        'amount' => 'integer',
+        'discount' => 'integer',
         'final_amount' => 'integer',
-        'paid_at'      => 'datetime',
-        'approved_at'  => 'datetime',
-        'rejected_at'  => 'datetime',
-        'starts_at'    => 'datetime',
-        'expires_at'   => 'datetime',
-        'meta'         => 'array',
+        'paid_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'starts_at' => 'datetime',
+        'expires_at' => 'datetime',
+        'meta' => 'array',
     ];
 
     /* ---------------------------------------------------------------- */
-    /*  Relations                                                        */
+    /*  Relations */
     /* ---------------------------------------------------------------- */
 
     /** طرح خریداری‌شده (ممکن است حذف شده باشد → snapshot در meta) */
@@ -88,7 +95,7 @@ class SubscriptionOrder extends Model
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Status helpers                                                   */
+    /*  Status helpers */
     /* ---------------------------------------------------------------- */
 
     public function isPaid(): bool
@@ -104,9 +111,9 @@ class SubscriptionOrder extends Model
         }
 
         $this->update([
-            'status'   => self::STATUS_PAID,
-            'paid_at'  => now(),
-            'gateway'  => $gateway ?? $this->gateway,
+            'status' => self::STATUS_PAID,
+            'paid_at' => now(),
+            'gateway' => $gateway ?? $this->gateway,
         ]);
 
         // شمارنده استفاده از کد تخفیف فقط یک‌بار (همزمان با تأیید پرداخت) مصرف می‌شود
@@ -115,6 +122,11 @@ class SubscriptionOrder extends Model
 
     public function markAsFailed(?string $reason = null): void
     {
+        // Task 85 — امنیت: سفارشِ پرداخت‌شده هرگز نباید با کال‌بک هم‌زمان به «ناموفق» برگردد
+        if ($this->isPaid()) {
+            return;
+        }
+
         $this->update([
             'status' => self::STATUS_FAILED,
         ]);
@@ -128,9 +140,9 @@ class SubscriptionOrder extends Model
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
-            self::STATUS_PAID    => 'پرداخت شده',
-            self::STATUS_FAILED  => 'ناموفق',
-            default              => 'در انتظار پرداخت',
+            self::STATUS_PAID => 'پرداخت شده',
+            self::STATUS_FAILED => 'ناموفق',
+            default => 'در انتظار پرداخت',
         };
     }
 
@@ -140,7 +152,7 @@ class SubscriptionOrder extends Model
         return match ($this->admin_status) {
             self::ADMIN_STATUS_APPROVED => 'تأیید شده',
             self::ADMIN_STATUS_REJECTED => 'رد شده',
-            default                     => 'در انتظار تأیید مدیر',
+            default => 'در انتظار تأیید مدیر',
         };
     }
 
@@ -170,9 +182,9 @@ class SubscriptionOrder extends Model
 
         return match (true) {
             $months === null => '—',
-            $months === 0    => 'نامحدود',
-            $months === 1    => '۱ ماه',
-            default          => fa_num($months) . ' ماه',
+            $months === 0 => 'نامحدود',
+            $months === 1 => '۱ ماه',
+            default => fa_num($months).' ماه',
         };
     }
 }

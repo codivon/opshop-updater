@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Licenses;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Package;
+use App\Models\PackageDownloadToken;
 use App\Models\PackageLicense;
 use App\Models\Template;
 use App\Models\TemplateLicense;
@@ -20,7 +22,8 @@ use Livewire\WithPagination;
 #[Title('لایسنس‌ها')]
 class Index extends Component
 {
-    use WithPagination, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -94,7 +97,7 @@ class Index extends Component
     /** سوییچ تب لایسنس‌ها */
     public function switchType(string $type): void
     {
-        if (!in_array($type, ['package', 'template'], true)) {
+        if (! in_array($type, ['package', 'template'], true)) {
             return;
         }
 
@@ -131,7 +134,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Actions — لایسنس‌های قالب                                        */
+    /*  Actions — لایسنس‌های قالب */
     /* ---------------------------------------------------------------- */
 
     public function revokeTemplateLicense(): void
@@ -163,7 +166,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     public function bulkPageIds(): array
@@ -176,15 +179,15 @@ class Index extends Component
         $ids = array_map('intval', $this->selectedIds);
 
         // توکن‌های دانلود مرتبط (FK cascade نیست در برخی ست‌آپ‌ها → دستی برای اطمینان)
-        \App\Models\PackageDownloadToken::whereIn('license_id', $ids)->delete();
+        PackageDownloadToken::whereIn('license_id', $ids)->delete();
 
         $count = PackageLicense::query()->whereIn('id', $ids)->delete();
 
-        $this->toast(fa_num($count) . ' لایسنس حذف شد.');
+        $this->toast(fa_num($count).' لایسنس حذف شد.');
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Actions (ported from old PackageLicenseController)               */
+    /*  Actions (ported from old PackageLicenseController) */
     /* ---------------------------------------------------------------- */
 
     public function revoke(): void
@@ -211,7 +214,7 @@ class Index extends Component
     {
         $license = PackageLicense::findOrFail($this->deleteId ?? 0);
 
-        \App\Models\PackageDownloadToken::where('license_id', $license->id)->delete();
+        PackageDownloadToken::where('license_id', $license->id)->delete();
 
         $key = $license->license_key;
         $license->delete();
@@ -224,7 +227,7 @@ class Index extends Component
     {
         $count = app(LicenseService::class)->expireOldLicenses();
 
-        $this->toast(fa_num($count) . ' لایسنس منقضی به‌روزرسانی شد.');
+        $this->toast(fa_num($count).' لایسنس منقضی به‌روزرسانی شد.');
     }
 
     public function render()

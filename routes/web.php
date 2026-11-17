@@ -76,12 +76,13 @@ Route::get('shop/templates', TemplatesIndex::class)->name('shop.templates');
 
 // قالب‌های قابل‌فروش (خرید مهمان بدون ثبت‌نام — مانند محصولات)
 Route::get('templates/{slug}', TemplateShow::class)->name('shop.template');
-Route::get('payment/result/template/{purchase}', TemplatePaymentResult::class)->name('payment.result.template');
+// Task 85 — امنیت: توکن محرمانهٔ هر خرید در مسیر الزامی است (بدون آن 404)
+Route::get('payment/result/template/{purchase}/{token}', TemplatePaymentResult::class)->name('payment.result.template');
 Route::get('templates/download/{token}', [TemplateDownloadController::class, 'download'])->name('templates.download');
 
 // محصولات قابل‌فروش (پروژه‌ها — خرید مهمان بدون ثبت‌نام)
 Route::get('products/{slug}', ProductShow::class)->name('shop.product');
-Route::get('payment/result/product/{purchase}', ProductPaymentResult::class)->name('payment.result.product');
+Route::get('payment/result/product/{purchase}/{token}', ProductPaymentResult::class)->name('payment.result.product');
 Route::get('products/download/{token}', [ProductDownloadController::class, 'download'])->name('products.download');
 
 /*
@@ -114,15 +115,15 @@ Route::get('customer/profile', CustomerProfile::class)
 
 // طرح‌های اشتراک (فروش عمومی + نتیجه خرید اشتراک)
 Route::get('subscriptions', SubscriptionsIndex::class)->name('shop.subscriptions');
-Route::get('subscription/result/{order}', SubscriptionResult::class)->name('subscription.result');
+Route::get('subscription/result/{order}/{token}', SubscriptionResult::class)->name('subscription.result');
 
 // صفحهٔ عمومی تغییرات (changelog) — از پنل «امنیت و امکانات» قابل خاموش‌کردن (خاموش = 404)
 Route::get('changelog', Changelog::class)->name('shop.changelog');
 
-// پرداخت (عمومی)
-Route::get('payment/callback', [WebPaymentController::class, 'callback'])->name('payment.callback');
-Route::post('payment/callback', [WebPaymentController::class, 'callback'])->name('payment.callback.post');
-Route::get('payment/result/{purchase}', PaymentResult::class)->name('payment.result');
+// پرداخت (عمومی) — Task 85: throttle روی کال‌بک (جلوگیری از هجوم/اسکن تراکنش‌ها)
+Route::get('payment/callback', [WebPaymentController::class, 'callback'])->middleware('throttle:30,1')->name('payment.callback');
+Route::post('payment/callback', [WebPaymentController::class, 'callback'])->middleware('throttle:30,1')->name('payment.callback.post');
+Route::get('payment/result/{purchase}/{token}', PaymentResult::class)->name('payment.result');
 
 // صفحه تسویه خریدهای API (مرحله میانی پیش از درگاه):
 // نام/تصویر پکیج + طرح انتخابی + کد تخفیف + دکمه پرداخت/انصراف
@@ -133,11 +134,11 @@ Route::get('checkout/package/{purchase}', PackageCheckout::class)
 
 // صفحه «نتیجه پرداخت» (مرحله میانی پس از درگاه):
 // وضعیت پرداخت + شمارش معکوس ۱۰ ثانیه‌ای + دکمه بازگشت به callback_url فروشگاه
-Route::get('payment/return/{purchase}', [PaymentReturnController::class, 'show'])
+Route::get('payment/return/{purchase}/{token}', [PaymentReturnController::class, 'show'])
     ->name('payment.return');
 
 // همان صفحه برای سفارش‌های اشتراک (API با callback_url بیرونی)
-Route::get('payment/return/subscription/{order}', [PaymentReturnController::class, 'showSubscription'])
+Route::get('payment/return/subscription/{order}/{token}', [PaymentReturnController::class, 'showSubscription'])
     ->name('payment.return.subscription');
 
 // فرم پرداخت درایورهای فرم‌محور + شبیه‌ساز درگاه آزمایشی (local)
@@ -182,9 +183,11 @@ Route::get('captcha/refresh', function () {
     CaptchaService::fresh(in_array($spot, ['admin_login', 'admin_register', 'customer_login', 'comments', 'contact', 'checkout'], true) ? $spot : null);
 
     return back();
-})->name('captcha.refresh');
+})->name('captcha.refresh')->middleware('throttle:60,1');
 
-Auth::routes();
+// Task 85 — امنیت: ثبت‌نام عمومیِ پنل حذف شد (ثبت‌نام آزاد یعنی هر کسی می‌توانست
+// با role پیش‌فرض به پنل راه‌پیدا کند). حساب‌های مدیریتی فقط از داخل پنل توسط مدیر ساخته می‌شوند.
+Auth::routes(['register' => false]);
 
 /*
 |--------------------------------------------------------------------------
@@ -247,6 +250,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', EnsureAdminRole::cla
 
     // سیستم
     Route::get('reports', App\Livewire\Reports\Index::class)->name('reports.index');
+
+    // درآمد — گزارش کلی و جزئی همهٔ فروش‌ها با نمودار (Task 85)
+    Route::get('revenue', App\Livewire\Revenue\Index::class)->name('revenue.index');
+
     Route::get('logs', App\Livewire\Logs\Index::class)->name('logs.index');
     Route::get('api-docs', ApiDocs::class)->name('api-docs');
 

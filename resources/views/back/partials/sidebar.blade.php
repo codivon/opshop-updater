@@ -72,6 +72,12 @@
 
             <li class="menu-title">گزارشات</li>
             <li>
+                <a href="{{ route('admin.revenue.index') }}" class="{{ request()->routeIs('admin.revenue.*') ? 'active' : '' }}">
+                    <i>💰</i>
+                    <span>درآمد</span>
+                </a>
+            </li>
+            <li>
                 <a href="{{ route('admin.reports.index') }}" class="{{ request()->routeIs('admin.reports.*') ? 'active' : '' }}">
                     <i>📈</i>
                     <span>گزارش‌گیری</span>

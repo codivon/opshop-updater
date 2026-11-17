@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Setting;
 use App\Support\Seo;
@@ -23,6 +24,7 @@ use Livewire\Component;
 #[Title('سئو')]
 class SeoSettings extends Component
 {
+    use AuthorizesAdmin;
     use WithToasts;
 
     public array $form = [];

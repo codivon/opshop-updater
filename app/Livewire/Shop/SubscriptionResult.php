@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Shop;
 
-use App\Livewire\Concerns\WithToasts;
+use App\Models\PackageLicense;
 use App\Models\SubscriptionOrder;
 use App\Services\SubscriptionService;
 use Livewire\Attributes\Computed;
@@ -16,8 +16,11 @@ class SubscriptionResult extends Component
 {
     public SubscriptionOrder $order;
 
-    public function mount(SubscriptionOrder $order): void
+    public function mount(SubscriptionOrder $order, string $token): void
     {
+        // Task 85 — امنیت: صفحهٔ نتیجهٔ اشتراک (لایسنس‌ها) فقط با توکن محرمانهٔ سفارش باز می‌شود
+        abort_unless($order->hasValidAccessToken($token), 404);
+
         $order->load(['plan:id,name,slug,duration_months,features', 'customer:id,name', 'subscription']);
 
         // اگر پرداخت هنوز pending است (کال‌بک دیر رسیده) یک‌بار بررسی می‌کنیم
@@ -44,11 +47,11 @@ class SubscriptionResult extends Component
             return collect();
         }
 
-        return \App\Models\PackageLicense::query()
+        return PackageLicense::query()
             ->with('package:id,name,slug')
             ->where('customer_id', $this->order->customer_id)
             ->whereIn('package_id', $packageIds)
-            ->where('status', \App\Models\PackageLicense::STATUS_ACTIVE)
+            ->where('status', PackageLicense::STATUS_ACTIVE)
             ->latest('id')
             ->get()
             ->unique('package_id')
@@ -57,7 +60,7 @@ class SubscriptionResult extends Component
 
     public function recheck(): void
     {
-        if (!$this->order->transaction_id) {
+        if (! $this->order->transaction_id) {
             $this->toast('این سفارش تراکنش درگاه ندارد.', 'warning');
 
             return;

@@ -127,8 +127,15 @@ class CustomerLogin extends Component
 
         $this->toast('خوش آمدید، '.$customer->name.'!');
 
-        $target = ($this->redirect !== '' && str_starts_with($this->redirect, '/'))
-            ? $this->redirect
+        // Task 85 — امنیت (M1): فقط مسیرهای داخلی واقعی؛ //evil.com و /\evil.com را رد کن
+        $redirect = $this->redirect;
+        $isSafeInternalPath = $redirect !== ''
+            && str_starts_with($redirect, '/')
+            && ! str_starts_with($redirect, '//')
+            && ! str_starts_with($redirect, '/\\');
+
+        $target = $isSafeInternalPath
+            ? $redirect
             : route('customer.profile');
 
         $this->redirect($target, navigate: true);

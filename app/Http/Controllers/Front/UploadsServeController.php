@@ -28,33 +28,41 @@ class UploadsServeController extends Controller
             abort(404);
         }
 
-        $fallback = storage_path('app/' . self::FALLBACK_ROOT . '/' . $path);
+        $fallback = storage_path('app/'.self::FALLBACK_ROOT.'/'.$path);
 
-        if (!is_file($fallback)) {
+        if (! is_file($fallback)) {
             abort(404);
         }
 
         // فقط پسوندهای مجاز (ایمنی)
         $allowed = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'zip', 'svg'];
-        $ext     = strtolower(pathinfo($fallback, PATHINFO_EXTENSION));
+        $ext = strtolower(pathinfo($fallback, PATHINFO_EXTENSION));
 
-        if (!in_array($ext, $allowed, true)) {
+        if (! in_array($ext, $allowed, true)) {
             abort(403, 'نوع فایل مجاز نیست.');
         }
 
         $mime = match ($ext) {
-            'png'  => 'image/png',
+            'png' => 'image/png',
             'jpg', 'jpeg' => 'image/jpeg',
             'webp' => 'image/webp',
-            'gif'  => 'image/gif',
-            'svg'  => 'image/svg+xml',
+            'gif' => 'image/gif',
+            'svg' => 'image/svg+xml',
             default => 'application/octet-stream',
         };
 
+        $headers = [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'public, max-age=86400',
+        ];
+
+        // Task 85 — امنیت (LOW1): SVG/ZIP اجراشدنی/اجراشدنی نیستند به‌صورت inline؛
+        // SVG حاوی script می‌تواند XSS در دامنهٔ سایت باشد — فقط دانلود.
+        if (in_array($ext, ['svg', 'zip'], true)) {
+            $headers['Content-Disposition'] = 'attachment; filename="'.basename($fallback).'"';
+        }
+
         return response()
-            ->file($fallback, [
-                'Content-Type'  => $mime,
-                'Cache-Control' => 'public, max-age=86400',
-            ]);
+            ->file($fallback, $headers);
     }
 }

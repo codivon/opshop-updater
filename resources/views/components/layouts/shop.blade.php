@@ -287,7 +287,7 @@
          خزنده‌ها HTML سرورساید هر URL را با متاهای درست می‌گیرند (سئوی SPA سالم است)؛
          این اسکریپت فقط برای تجربهٔ کاربری است: هنگام ناوبری Livewire، description/canonical/
          og/twitter از JSON همین صفحه در head مرورگر به‌روز می‌شوند (title را خود Livewire عوض می‌کند). --}}
-    <script type="application/json" id="seo-page-meta">{!! json_encode(array_filter($seo, fn ($v, $k) => in_array($k, ['description', 'canonical', 'image', 'ogType', 'title'], true), ARRAY_FILTER_USE_BOTH), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+    <script type="application/json" id="seo-page-meta">{!! json_encode(array_filter($seo, fn ($v, $k) => in_array($k, ['description', 'canonical', 'image', 'ogType', 'title'], true), ARRAY_FILTER_USE_BOTH), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) !!}</script>
     <script>
         (function () {
             function applySeoMeta() {

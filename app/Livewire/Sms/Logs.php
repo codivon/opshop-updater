@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Sms;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\SmsLog;
 use Livewire\Attributes\Computed;
@@ -15,6 +16,7 @@ use Livewire\WithPagination;
 #[Title('لاگ پیامک‌ها')]
 class Logs extends Component
 {
+    use AuthorizesAdmin;
     use WithPagination, WithToasts;
 
     #[Url]

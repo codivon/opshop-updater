@@ -6,14 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Gateway;
 use App\Models\Template;
+use App\Models\TemplateDownloadToken;
 use App\Models\TemplateImage;
 use App\Models\TemplatePurchase;
+use App\Models\TemplateVersion;
 use App\Services\PackageApiAuthService;
 use App\Services\PaymentService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -54,9 +56,9 @@ class ApiTemplateController extends Controller
                     'data' => [],
                     'meta' => [
                         'current_page' => 1,
-                        'last_page'    => 1,
-                        'total'        => 0,
-                        'per_page'     => (int) $request->input('per_page', 15),
+                        'last_page' => 1,
+                        'total' => 0,
+                        'per_page' => (int) $request->input('per_page', 15),
                     ],
                     'gateways' => $this->presentGateways(),
                 ]);
@@ -90,9 +92,9 @@ class ApiTemplateController extends Controller
                     ->values(),
                 'meta' => [
                     'current_page' => $templates->currentPage(),
-                    'last_page'    => $templates->lastPage(),
-                    'total'        => $templates->total(),
-                    'per_page'     => $templates->perPage(),
+                    'last_page' => $templates->lastPage(),
+                    'total' => $templates->total(),
+                    'per_page' => $templates->perPage(),
                 ],
                 // درگاه‌های فعال — برای نمایش کارت انتخاب درگاه در فروشگاه خریدار
                 'gateways' => $this->presentGateways(),
@@ -117,7 +119,7 @@ class ApiTemplateController extends Controller
                 ->where('status', Template::STATUS_ACTIVE)
                 ->first();
 
-            if (!$template) {
+            if (! $template) {
                 return response()->json(['error' => 'قالب یافت نشد.'], 404);
             }
 
@@ -150,8 +152,9 @@ class ApiTemplateController extends Controller
     public function purchase(Request $request, string $slug): JsonResponse
     {
         $request->validate([
-            'callback_url'  => 'nullable|url',
-            'gateway'       => 'nullable|string|max:32',
+            // Task 85 — امنیت (H2): callback_url فقط http(s)، بدون تگ/کوتیشن — ضد XSS در صفحهٔ بازگشت پرداخت
+            'callback_url' => ['nullable', 'url:http,https', 'max:500', 'not_regex:[<>"\'\\\\]'],
+            'gateway' => 'nullable|string|max:32',
             'purchase_type' => 'nullable|in:normal,exclusive',
         ]);
 
@@ -168,7 +171,7 @@ class ApiTemplateController extends Controller
                     ->where('is_active', true)
                     ->exists();
 
-                if (!$gatewayActive) {
+                if (! $gatewayActive) {
                     return response()->json([
                         'error' => "درگاه «{$gatewayKey}» وجود ندارد یا فعال نیست. درگاه‌های فعال را از فهرست قالب‌ها یا پنل بررسی کنید.",
                     ], 422);
@@ -184,7 +187,7 @@ class ApiTemplateController extends Controller
                 ->where('status', Template::STATUS_ACTIVE)
                 ->first();
 
-            if (!$template) {
+            if (! $template) {
                 return response()->json(['error' => 'قالب یافت نشد.'], 404);
             }
 
@@ -205,7 +208,7 @@ class ApiTemplateController extends Controller
 
             $latestVersion = $template->latestVersion()->first();
 
-            if (!$latestVersion) {
+            if (! $latestVersion) {
                 return response()->json(['error' => 'نسخه فعالی برای این قالب وجود ندارد.'], 422);
             }
 
@@ -222,48 +225,48 @@ class ApiTemplateController extends Controller
                     ->where(fn ($q) => $q->whereNull('version_id')->orWhere('version_id', $latestVersion->id))
                     ->exists()) {
                 return response()->json([
-                    'is_free'       => $template->is_effectively_free,
-                    'is_purchased'  => true,
+                    'is_free' => $template->is_effectively_free,
+                    'is_purchased' => true,
                     'download_token' => $this->createDownloadToken($customer, $template, $latestVersion),
-                    'version'       => $latestVersion->version,
-                    'message'       => 'شما قبلاً این قالب را خریداری کرده‌اید؛ مستقیم دانلود کنید.',
+                    'version' => $latestVersion->version,
+                    'message' => 'شما قبلاً این قالب را خریداری کرده‌اید؛ مستقیم دانلود کنید.',
                 ]);
             }
 
             // ---------- مسیر رایگان: نیازی به پرداخت نیست (فقط خرید معمولی) ----------
             if ($purchaseType === Template::PURCHASE_NORMAL && $template->is_effectively_free) {
                 $purchase = TemplatePurchase::create([
-                    'template_id'   => $template->id,
-                    'version_id'    => $latestVersion->id,
-                    'customer_id'   => $customer->id,
+                    'template_id' => $template->id,
+                    'version_id' => $latestVersion->id,
+                    'customer_id' => $customer->id,
                     'purchase_type' => $purchaseType,
-                    'amount'        => 0,
-                    'status'        => TemplatePurchase::STATUS_PAID,
-                    'paid_at'       => now(),
+                    'amount' => 0,
+                    'status' => TemplatePurchase::STATUS_PAID,
+                    'paid_at' => now(),
                 ]);
 
                 return response()->json([
-                    'is_free'        => true,
-                    'purchase_id'    => $purchase->id,
-                    'version'        => $latestVersion->version,
+                    'is_free' => true,
+                    'purchase_id' => $purchase->id,
+                    'version' => $latestVersion->version,
                     'download_token' => $this->createDownloadToken($customer, $template, $latestVersion),
                 ]);
             }
 
             // ---------- مسیر پولی: بازگشت از درگاه به سایت مشتری الزامی است ----------
-            if (!$request->filled('callback_url')) {
+            if (! $request->filled('callback_url')) {
                 return response()->json(['error' => 'آدرس بازگشت (callback_url) برای پرداخت الزامی است.'], 422);
             }
 
             // ایجاد رکورد purchase
             $purchase = TemplatePurchase::create([
-                'template_id'   => $template->id,
-                'version_id'    => $latestVersion->id,
-                'customer_id'   => $customer->id,
+                'template_id' => $template->id,
+                'version_id' => $latestVersion->id,
+                'customer_id' => $customer->id,
                 'purchase_type' => $purchaseType,
-                'callback_url'  => $request->callback_url,
-                'amount'        => $amount,
-                'status'        => TemplatePurchase::STATUS_PENDING,
+                'callback_url' => $request->callback_url,
+                'amount' => $amount,
+                'status' => TemplatePurchase::STATUS_PENDING,
             ]);
 
             // ایجاد پرداخت در درگاه (gateway اختیاری کلاینت یا پیش‌فرض)
@@ -276,11 +279,11 @@ class ApiTemplateController extends Controller
             }
 
             return response()->json([
-                'payment_url'    => $payment['payment_url'],
+                'payment_url' => $payment['payment_url'],
                 'transaction_id' => $payment['transaction_id'],
-                'amount'         => $payment['amount'],
-                'gateway'        => $payment['gateway'],
-                'purchase_id'    => $purchase->id,
+                'amount' => $payment['amount'],
+                'gateway' => $payment['gateway'],
+                'purchase_id' => $purchase->id,
             ]);
         } catch (RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -301,10 +304,10 @@ class ApiTemplateController extends Controller
                 ->where('customer_id', $customer->id)
                 ->first();
 
-            if (!$purchase) {
+            if (! $purchase) {
                 return response()->json([
-                    'paid'   => false,
-                    'error'  => 'تراکنش یافت نشد.',
+                    'paid' => false,
+                    'error' => 'تراکنش یافت نشد.',
                 ], 404);
             }
 
@@ -313,15 +316,15 @@ class ApiTemplateController extends Controller
                 $latestVersion = $purchase->template->latestVersion()->first();
 
                 return response()->json([
-                    'paid'           => true,
-                    'purchase_id'    => $purchase->id,
-                    'amount'         => (int) $purchase->amount,
-                    'paid_at'        => $purchase->paid_at?->toDateTimeString(),
+                    'paid' => true,
+                    'purchase_id' => $purchase->id,
+                    'amount' => (int) $purchase->amount,
+                    'paid_at' => $purchase->paid_at?->toDateTimeString(),
                     'download_token' => $latestVersion
                         ? $this->createDownloadToken($customer, $purchase->template, $latestVersion)
                         : null,
-                    'signature'      => $latestVersion?->file_hash,
-                    'version'        => $latestVersion?->version,
+                    'signature' => $latestVersion?->file_hash,
+                    'version' => $latestVersion?->version,
                 ]);
             }
 
@@ -334,27 +337,27 @@ class ApiTemplateController extends Controller
                     $latestVersion = $purchase->template->latestVersion()->first();
 
                     return response()->json([
-                        'paid'           => true,
-                        'purchase_id'    => $purchase->id,
-                        'amount'         => (int) $purchase->amount,
-                        'paid_at'        => $purchase->paid_at?->toDateTimeString(),
+                        'paid' => true,
+                        'purchase_id' => $purchase->id,
+                        'amount' => (int) $purchase->amount,
+                        'paid_at' => $purchase->paid_at?->toDateTimeString(),
                         'download_token' => $latestVersion
                             ? $this->createDownloadToken($customer, $purchase->template, $latestVersion)
                             : null,
-                        'signature'      => $latestVersion?->file_hash,
-                        'version'        => $latestVersion?->version,
+                        'signature' => $latestVersion?->file_hash,
+                        'version' => $latestVersion?->version,
                     ]);
                 }
 
                 return response()->json([
-                    'paid'   => false,
-                    'error'  => $result['message'] ?? 'پرداخت هنوز تأیید نشده است.',
+                    'paid' => false,
+                    'error' => $result['message'] ?? 'پرداخت هنوز تأیید نشده است.',
                 ], 400);
             }
 
             return response()->json([
-                'paid'   => false,
-                'error'  => 'وضعیت تراکنش: ' . $purchase->status,
+                'paid' => false,
+                'error' => 'وضعیت تراکنش: '.$purchase->status,
             ], 400);
         } catch (RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], exception_status($e, 500));
@@ -380,31 +383,31 @@ class ApiTemplateController extends Controller
                 ->where('status', Template::STATUS_ACTIVE)
                 ->first();
 
-            if (!$template) {
+            if (! $template) {
                 return response()->json(['error' => 'قالب یافت نشد.'], 404);
             }
 
             $latestVersion = $template->latestVersion()->first();
 
-            if (!$latestVersion) {
+            if (! $latestVersion) {
                 return response()->json([
                     'has_update' => false,
-                    'message'    => 'نسخه فعالی موجود نیست.',
+                    'message' => 'نسخه فعالی موجود نیست.',
                 ]);
             }
 
             $hasUpdate = version_compare($latestVersion->version, $request->current_version, '>');
 
             return response()->json([
-                'has_update'      => $hasUpdate,
-                'latest_version'  => $latestVersion->version,
+                'has_update' => $hasUpdate,
+                'latest_version' => $latestVersion->version,
                 'current_version' => $request->current_version,
-                'is_mandatory'    => $hasUpdate && $latestVersion->is_mandatory,
-                'changelog'       => $latestVersion->changelog,
-                'what_added'      => $latestVersion->what_added,
-                'what_changed'    => $latestVersion->what_changed,
-                'what_fixed'      => $latestVersion->what_fixed,
-                'file_size'       => $latestVersion->file_size,
+                'is_mandatory' => $hasUpdate && $latestVersion->is_mandatory,
+                'changelog' => $latestVersion->changelog,
+                'what_added' => $latestVersion->what_added,
+                'what_changed' => $latestVersion->what_changed,
+                'what_fixed' => $latestVersion->what_fixed,
+                'file_size' => $latestVersion->file_size,
             ]);
         } catch (RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], exception_status($e, 403));
@@ -422,9 +425,9 @@ class ApiTemplateController extends Controller
             ->orderBy('name')
             ->get(['id', 'key', 'name', 'logo', 'ordering'])
             ->map(fn (Gateway $gateway) => [
-                'key'   => $gateway->key,
+                'key' => $gateway->key,
                 'title' => $gateway->name,
-                'logo'  => gateway_logo_url($gateway->key, $gateway->logo),
+                'logo' => gateway_logo_url($gateway->key, $gateway->logo),
                 'is_test' => $gateway->key === 'local',
             ])
             ->values()
@@ -470,8 +473,8 @@ class ApiTemplateController extends Controller
             // گالری تصاویر فعال — مرتب بر اساس sort_order
             'gallery' => $template->activeImages
                 ->map(fn (TemplateImage $image) => [
-                    'id'         => $image->id,
-                    'url'        => $image->url,
+                    'id' => $image->id,
+                    'url' => $image->url,
                     'sort_order' => $image->sort_order,
                 ])
                 ->values()
@@ -479,9 +482,9 @@ class ApiTemplateController extends Controller
             'is_purchased' => $purchase !== null,
             // تعداد خریدهای موفق (چند نفر این قالب را خریده‌اند/استفاده می‌کنند)
             'purchases_count' => (int) ($template->purchases_count ?? 0),
-            'purchased'     => $purchase ? [
+            'purchased' => $purchase ? [
                 'purchase_id' => $purchase->id,
-                'version_id'  => $purchase->version_id,
+                'version_id' => $purchase->version_id,
                 // نام قدیمی برای سازگاری با الگوی پکیج‌ها
                 'installed_license' => null,
             ] : null,
@@ -491,14 +494,14 @@ class ApiTemplateController extends Controller
     /* ===================================================================
      *  Helper - ساخت download token موقت (15 دقیقه، یک‌بارمصرف)
      * =================================================================== */
-    private function createDownloadToken(Customer $customer, Template $template, \App\Models\TemplateVersion $version): string
+    private function createDownloadToken(Customer $customer, Template $template, TemplateVersion $version): string
     {
-        $token = \App\Models\TemplateDownloadToken::create([
-            'token'               => \Illuminate\Support\Str::random(64),
-            'template_id'         => $template->id,
+        $token = TemplateDownloadToken::create([
+            'token' => Str::random(64),
+            'template_id' => $template->id,
             'template_version_id' => $version->id,
-            'customer_id'         => $customer->id,
-            'expires_at'          => now()->addMinutes(15),
+            'customer_id' => $customer->id,
+            'expires_at' => now()->addMinutes(15),
         ]);
 
         return $token->token;

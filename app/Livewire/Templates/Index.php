@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Templates;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Category;
 use App\Models\Template;
@@ -18,6 +19,7 @@ use Livewire\WithPagination;
 #[Title('قالب‌ها')]
 class Index extends Component
 {
+    use AuthorizesAdmin;
     use WithFileUploads, WithPagination, WithToasts;
 
     public string $search = '';

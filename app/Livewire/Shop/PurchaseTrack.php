@@ -5,7 +5,6 @@ namespace App\Livewire\Shop;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\ProductPurchase;
 use App\Models\TemplatePurchase;
-use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
@@ -24,6 +23,7 @@ class PurchaseTrack extends Component
 
         if ($trx === '') {
             $this->toast('شماره تراکنش را وارد کنید.', 'error');
+
             return;
         }
 
@@ -31,18 +31,20 @@ class PurchaseTrack extends Component
         $purchase = TemplatePurchase::query()->where('transaction_id', $trx)->first();
 
         if ($purchase) {
-            $this->redirect(route('payment.result.template', $purchase), navigate: true);
+            $this->redirect(route('payment.result.template', ['purchase' => $purchase, 'token' => $purchase->access_token]), navigate: true);
+
             return;
         }
 
         $purchase = ProductPurchase::query()->where('transaction_id', $trx)->first();
 
-        if (!$purchase) {
+        if (! $purchase) {
             $this->toast('خریدی با این شماره تراکنش یافت نشد.', 'error');
+
             return;
         }
 
-        $this->redirect(route('payment.result.product', $purchase), navigate: true);
+        $this->redirect(route('payment.result.product', ['purchase' => $purchase, 'token' => $purchase->access_token]), navigate: true);
     }
 
     public function render()

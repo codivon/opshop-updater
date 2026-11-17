@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Packages;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Category;
 use App\Models\Package;
@@ -26,6 +27,7 @@ use RuntimeException;
 #[Title('جزئیات پکیج')]
 class Show extends Component
 {
+    use AuthorizesAdmin;
     use WithFileUploads, WithPagination, WithToasts;
 
     public Package $package;

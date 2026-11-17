@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Setting;
 use App\Support\Features;
@@ -21,6 +22,7 @@ use Livewire\Component;
 #[Title('امنیت و امکانات')]
 class Security extends Component
 {
+    use AuthorizesAdmin;
     use WithToasts;
 
     public array $form = [];

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Subscriptions;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
@@ -19,7 +20,8 @@ use Livewire\WithPagination;
 #[Title('اشتراک‌ها')]
 class Index extends Component
 {
-    use WithPagination, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -41,11 +43,14 @@ class Index extends Component
     public array $form = [];
 
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public ?int $deleteId = null;
 
     /** مودال تمدید */
     public ?int $extendId = null;
+
     public int $extendMonths = 12;
 
     public function updatedSearch(): void
@@ -112,7 +117,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD                                                             */
+    /*  CRUD */
     /* ---------------------------------------------------------------- */
 
     public function openCreate(): void
@@ -180,7 +185,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  تمدید اشتراک                                                     */
+    /*  تمدید اشتراک */
     /* ---------------------------------------------------------------- */
 
     public function openExtend(int $id): void
@@ -218,11 +223,11 @@ class Index extends Component
         ]);
 
         $this->extendId = null;
-        $this->toast('اشتراک تا ' . fa_num(verta_date($newExpiry)) . ' تمدید شد.');
+        $this->toast('اشتراک تا '.fa_num(verta_date($newExpiry)).' تمدید شد.');
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     public function bulkPageIds(): array
@@ -236,7 +241,7 @@ class Index extends Component
 
         $count = Subscription::query()->whereIn('id', $ids)->delete();
 
-        $this->toast(fa_num($count) . ' اشتراک حذف شد.');
+        $this->toast(fa_num($count).' اشتراک حذف شد.');
     }
 
     public function delete(): void

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Logs;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -18,7 +19,8 @@ use Livewire\WithPagination;
 #[Title('لاگ‌های سیستم')]
 class Index extends Component
 {
-    use WithPagination, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -64,7 +66,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Data                                                             */
+    /*  Data */
     /* ---------------------------------------------------------------- */
 
     /**
@@ -137,7 +139,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Actions (پورت‌شده از LogController)                              */
+    /*  Actions (پورت‌شده از LogController) */
     /* ---------------------------------------------------------------- */
 
     /** دانلود فایل لاگ (پورت LogController@download) */
@@ -168,7 +170,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     /** کلید ردیف‌های صفحه‌ی جاری (اندیس‌های آرایه‌ی parsed به‌صورت رشته) */
@@ -226,13 +228,13 @@ class Index extends Component
             $blocks[] = $block;
         }
 
-        File::put($this->logPath(), $blocks === [] ? '' : implode("\n\n", $blocks) . "\n");
+        File::put($this->logPath(), $blocks === [] ? '' : implode("\n\n", $blocks)."\n");
 
         $this->parsedCache = null;
         unset($this->records, $this->levels, $this->fileSize);
         $this->resetPage();
 
-        $this->toast(fa_num(count($keys)) . ' ورودی لاگ حذف شد.');
+        $this->toast(fa_num(count($keys)).' ورودی لاگ حذف شد.');
     }
 
     public function render()
@@ -241,7 +243,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Helpers                                                          */
+    /*  Helpers */
     /* ---------------------------------------------------------------- */
 
     protected function logPath(): string

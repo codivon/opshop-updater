@@ -17,7 +17,7 @@ use Tests\TestCase;
  */
 class ProductPurchaseTest extends TestCase
 {
-    use RefreshDatabase, MakesShopData;
+    use MakesShopData, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -33,7 +33,7 @@ class ProductPurchaseTest extends TestCase
 
         Livewire::test(ProductShow::class, ['slug' => $product->slug])
             ->call('buy')
-            ->assertRedirect(route('payment.result.product', ProductPurchase::first()));
+            ->assertRedirect(route('payment.result.product', ['purchase' => $p = ProductPurchase::first(), 'token' => $p->access_token]));
 
         $purchase = ProductPurchase::first();
 
@@ -67,10 +67,10 @@ class ProductPurchaseTest extends TestCase
         $this->makeProductVersion($product);
 
         $coupon = $this->makeCoupon([
-            'code'             => 'FULL100',
-            'type'             => DiscountCode::TYPE_PERCENT,
-            'value'            => 100,
-            'max_uses'         => 5,
+            'code' => 'FULL100',
+            'type' => DiscountCode::TYPE_PERCENT,
+            'value' => 100,
+            'max_uses' => 5,
             'applies_packages' => false,
         ]);
 
@@ -130,16 +130,16 @@ class ProductPurchaseTest extends TestCase
 
     public function test_mark_as_paid_is_idempotent_for_coupon_counter(): void
     {
-        $product  = $this->makeProduct(['price' => 50000]);
-        $coupon   = $this->makeCoupon(['code' => 'IDEM001', 'max_uses' => 5]);
+        $product = $this->makeProduct(['price' => 50000]);
+        $coupon = $this->makeCoupon(['code' => 'IDEM001', 'max_uses' => 5]);
 
         $purchase = ProductPurchase::create([
-            'product_id'       => $product->id,
+            'product_id' => $product->id,
             'discount_code_id' => $coupon->id,
-            'original_amount'  => 50000,
-            'amount'           => 40000, // بعد از ۲۰٪ تخفیف
-            'discount_amount'  => 10000,
-            'status'           => ProductPurchase::STATUS_PENDING,
+            'original_amount' => 50000,
+            'amount' => 40000, // بعد از ۲۰٪ تخفیف
+            'discount_amount' => 10000,
+            'status' => ProductPurchase::STATUS_PENDING,
         ]);
 
         // شبیه‌سازی کال‌بک تکراری درگاه

@@ -20,8 +20,11 @@ class ProductPaymentResult extends Component
     /** لینک دانلود یک‌بارمصرف تولیدشده برای همین رندر */
     public ?string $downloadUrl = null;
 
-    public function mount(ProductPurchase $purchase): void
+    public function mount(ProductPurchase $purchase, string $token): void
     {
+        // Task 85 — امنیت: صفحهٔ نتیجهٔ پرداخت (لینک دانلود) فقط با توکن محرمانهٔ خرید باز می‌شود
+        abort_unless($purchase->hasValidAccessToken($token), 404);
+
         $purchase->load(['product:id,name,slug,thumbnail', 'version:id,product_id,version,file_size']);
 
         $this->purchase = $purchase;
@@ -34,11 +37,13 @@ class ProductPaymentResult extends Component
     {
         if ($this->purchase->status !== ProductPurchase::STATUS_PENDING) {
             $this->toast('این خرید در انتظار تأیید نیست.');
+
             return;
         }
 
-        if (!$this->purchase->transaction_id) {
+        if (! $this->purchase->transaction_id) {
             $this->toast('شناسه تراکنش برای این خرید ثبت نشده است.', 'error');
+
             return;
         }
 
@@ -59,15 +64,17 @@ class ProductPaymentResult extends Component
      */
     public function getDownload(): void
     {
-        if (!$this->purchase->isPaid()) {
+        if (! $this->purchase->isPaid()) {
             $this->toast('ابتدا پرداخت باید با موفقیت انجام شود.', 'error');
+
             return;
         }
 
         $token = $this->purchase->createDownloadToken();
 
-        if (!$token) {
+        if (! $token) {
             $this->toast('فایل نسخه محصول یافت نشد. لطفاً با پشتیبانی تماس بگیرید.', 'error');
+
             return;
         }
 

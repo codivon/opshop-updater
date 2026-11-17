@@ -273,7 +273,7 @@ class Plans extends Component
         // ---- طرح رایگان/کوپنِ کامل: مستقیم به صفحه نتیجه سفارش (در انتظار تأیید مدیر) ----
         if (($result['payment_url'] ?? null) === null) {
             $this->showCheckout = false;
-            $this->redirect(route('subscription.result', $order), navigate: true);
+            $this->redirect(route('subscription.result', ['order' => $order, 'token' => $order->access_token]), navigate: true);
 
             return;
         }

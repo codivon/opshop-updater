@@ -2,20 +2,26 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPurchaseAccessToken;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductPurchase extends Model
 {
-    public const STATUS_PENDING  = 'pending';
-    public const STATUS_PAID     = 'paid';
-    public const STATUS_FAILED   = 'failed';
+    use HasPurchaseAccessToken;
+
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_PAID = 'paid';
+
+    public const STATUS_FAILED = 'failed';
+
     public const STATUS_REFUNDED = 'refunded';
 
     public const STATUS_LABELS = [
-        self::STATUS_PENDING  => 'در انتظار پرداخت',
-        self::STATUS_PAID     => 'پرداخت شده',
-        self::STATUS_FAILED   => 'ناموفق',
+        self::STATUS_PENDING => 'در انتظار پرداخت',
+        self::STATUS_PAID => 'پرداخت شده',
+        self::STATUS_FAILED => 'ناموفق',
         self::STATUS_REFUNDED => 'بازپرداخت',
     ];
 
@@ -23,12 +29,13 @@ class ProductPurchase extends Model
         'product_id', 'version_id', 'transaction_id', 'discount_code_id',
         'original_amount', 'amount', 'discount_amount', 'gateway',
         'payment_url', 'callback_url', 'status', 'paid_at', 'meta',
+        'access_token',
     ];
 
     protected $casts = [
-        'amount'  => 'integer',
+        'amount' => 'integer',
         'paid_at' => 'datetime',
-        'meta'    => 'array',
+        'meta' => 'array',
     ];
 
     /* ---------------- Relationships ---------------- */
@@ -68,7 +75,7 @@ class ProductPurchase extends Model
         }
 
         $this->update([
-            'status'  => self::STATUS_PAID,
+            'status' => self::STATUS_PAID,
             'paid_at' => now(),
             'gateway' => $gateway ?? $this->gateway,
         ]);
@@ -83,9 +90,14 @@ class ProductPurchase extends Model
 
     public function markAsFailed(?string $reason = null): void
     {
+        // Task 85 — امنیت: خریدِ پرداخت‌شده هرگز نباید با کال‌بک هم‌زمان به «ناموفق» برگردد
+        if ($this->isPaid()) {
+            return;
+        }
+
         $this->update([
             'status' => self::STATUS_FAILED,
-            'meta'   => array_merge($this->meta ?? [], ['fail_reason' => $reason]),
+            'meta' => array_merge($this->meta ?? [], ['fail_reason' => $reason]),
         ]);
     }
 
@@ -96,16 +108,16 @@ class ProductPurchase extends Model
             ? ProductVersion::find($this->version_id)
             : $this->product->latestVersion()->first();
 
-        if (!$version || !$version->isActive() || !$version->hasFile()) {
+        if (! $version || ! $version->isActive() || ! $version->hasFile()) {
             return null;
         }
 
         return ProductDownloadToken::create([
-            'token'             => 'pdt_' . bin2hex(random_bytes(20)),
-            'product_id'        => $this->product_id,
+            'token' => 'pdt_'.bin2hex(random_bytes(20)),
+            'product_id' => $this->product_id,
             'product_version_id' => $version->id,
-            'purchase_id'       => $this->id,
-            'expires_at'        => now()->addMinutes(15),
+            'purchase_id' => $this->id,
+            'expires_at' => now()->addMinutes(15),
         ]);
     }
 }

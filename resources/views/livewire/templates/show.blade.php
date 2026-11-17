@@ -644,6 +644,22 @@
                 <x-textarea id="eform.short_description" wire:model="form.short_description" rows="3" />
             </x-field>
 
+            {{-- سئوی اختصاصی قالب (Task 84) --}}
+            <div class="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-700/60">
+                <p class="mb-3 flex items-center gap-1.5 text-sm font-black text-zinc-800 dark:text-zinc-100">
+                    <x-icon name="search" class="size-4 text-brand-600" />
+                    سئوی اختصاصی (گوگل)
+                </p>
+                <div class="space-y-3">
+                    <x-field label="عنوان متا (Title)" for="eform.meta_title" hint="حداکثر ۲۰۰ کاراکتر — عنوانی که در گوگل نمایش داده می‌شود.">
+                        <x-input id="eform.meta_title" wire:model="form.meta_title" dir="ltr" placeholder="{{ $template->name }}" />
+                    </x-field>
+                    <x-field label="توضیح متا (Description)" for="eform.meta_description" hint="۱۵۰ تا ۱۶۰ کاراکتر گویا با کلمات کلیدی هدف.">
+                        <x-textarea id="eform.meta_description" wire:model="form.meta_description" rows="3" placeholder="{{ \Illuminate\Support\Str::limit($template->short_description ?: '', 155) }}" />
+                    </x-field>
+                </div>
+            </div>
+
             <x-field label="توضیحات کامل (HTML)" for="eform.description">
                 <x-ckeditor model="form.description" :value="$form['description'] ?? ''" />
             </x-field>

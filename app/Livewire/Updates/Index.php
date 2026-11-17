@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Updates;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Project;
@@ -12,6 +13,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
@@ -19,7 +21,8 @@ use Livewire\WithPagination;
 #[Title('آپدیت‌ها')]
 class Index extends Component
 {
-    use WithPagination, WithFileUploads, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithFileUploads, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -41,7 +44,9 @@ class Index extends Component
     public array $form = [];
 
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public ?int $deleteId = null;
 
     public function updatedSearch(): void
@@ -100,7 +105,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     public function bulkPageIds(): array
@@ -123,11 +128,11 @@ class Index extends Component
 
         $count = Update::query()->whereIn('id', $ids)->delete();
 
-        $this->toast(fa_num($count) . ' آپدیت حذف شد.');
+        $this->toast(fa_num($count).' آپدیت حذف شد.');
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD (ported from Back/UpdateController)                         */
+    /*  CRUD (ported from Back/UpdateController) */
     /* ---------------------------------------------------------------- */
 
     public function openCreate(): void
@@ -177,7 +182,7 @@ class Index extends Component
         $validated = $this->validate();
         $data = $validated['form'];
 
-        /** @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null $file */
+        /** @var TemporaryUploadedFile|null $file */
         $file = $data['file'] ?? null;
         unset($data['file'], $data['download_link'], $data['file_size']);
 
@@ -193,7 +198,7 @@ class Index extends Component
                 Storage::disk('local')->delete($previous->download_link);
             }
 
-            $filename = 'update_' . time() . '_' . $file->getClientOriginalName();
+            $filename = 'update_'.time().'_'.$file->getClientOriginalName();
             $path = $file->storeAs('updates', $filename, 'local');
 
             if (! $path || ! Storage::disk('local')->exists($path)) {
@@ -295,7 +300,7 @@ class Index extends Component
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
         $factor = floor((strlen($bytes) - 1) / 3);
 
-        return sprintf("%.{$decimals}f", $bytes / pow(1024, $factor)) . ' ' . $units[$factor];
+        return sprintf("%.{$decimals}f", $bytes / pow(1024, $factor)).' '.$units[$factor];
     }
 
     public function render()

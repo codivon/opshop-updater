@@ -50,7 +50,7 @@ class WebPaymentController extends Controller
             ?? $request->input('tracking_code')
             ?? $request->input('token');
 
-        if (!$transactionId) {
+        if (! $transactionId) {
             return redirect()
                 ->route('shop.home')
                 ->with('error', 'اطلاعات تراکنش ناقص است.');
@@ -69,8 +69,8 @@ class WebPaymentController extends Controller
 
                 $vars = [
                     'customer_name' => $customer?->name ?? 'مشتری',
-                    'plan_name'     => $subscriptionOrder->plan_name,
-                    'amount'        => number_format((int) $subscriptionOrder->final_amount),
+                    'plan_name' => $subscriptionOrder->plan_name,
+                    'amount' => number_format((int) $subscriptionOrder->final_amount),
                 ];
 
                 $this->smsManager->send('subscription_paid', $customer?->phone, $vars, $subscriptionOrder, once: true);
@@ -78,14 +78,15 @@ class WebPaymentController extends Controller
             }
 
             // سفارش API (callback_url بیرونی) → صفحه نتیجه + شمارش معکوس، سپس فروشگاه
-            if ($subscriptionOrder->callback_url && !$this->isInternalCallback($subscriptionOrder->callback_url)) {
+            if ($subscriptionOrder->callback_url && ! $this->isInternalCallback($subscriptionOrder->callback_url)) {
                 return redirect()->route('payment.return.subscription', array_merge($request->query(), [
                     'order' => $subscriptionOrder->id,
+                    'token' => $subscriptionOrder->access_token,
                 ]));
             }
 
             return redirect()
-                ->route('subscription.result', $subscriptionOrder)
+                ->route('subscription.result', ['order' => $subscriptionOrder, 'token' => $subscriptionOrder->access_token])
                 ->with(
                     ($result['paid'] ?? false) ? 'success' : 'error',
                     $result['message'] ?? (($result['paid'] ?? false) ? 'پرداخت با موفقیت تأیید شد.' : 'پرداخت ناموفق بود.')
@@ -103,15 +104,15 @@ class WebPaymentController extends Controller
             if (($result['paid'] ?? false) && $productPurchase->isPaid()) {
                 $vars = [
                     'product_name' => $productPurchase->product?->name ?? 'محصول',
-                    'amount'       => number_format((int) $productPurchase->amount),
-                    'gateway'      => $productPurchase->gateway ?? '-',
+                    'amount' => number_format((int) $productPurchase->amount),
+                    'gateway' => $productPurchase->gateway ?? '-',
                 ];
 
                 $this->smsManager->notifyAdminSale('product', 'admin_product_paid', $vars, $productPurchase);
             }
 
             return redirect()
-                ->route('payment.result.product', $productPurchase)
+                ->route('payment.result.product', ['purchase' => $productPurchase, 'token' => $productPurchase->access_token])
                 ->with(
                     ($result['paid'] ?? false) ? 'success' : 'error',
                     $result['message'] ?? (($result['paid'] ?? false) ? 'پرداخت با موفقیت تأیید شد.' : 'پرداخت ناموفق بود.')
@@ -129,15 +130,15 @@ class WebPaymentController extends Controller
             if (($result['paid'] ?? false) && $templatePurchase->isPaid()) {
                 $vars = [
                     'template_name' => $templatePurchase->template?->name ?? 'قالب',
-                    'amount'        => number_format((int) $templatePurchase->amount),
-                    'gateway'       => $templatePurchase->gateway ?? '-',
+                    'amount' => number_format((int) $templatePurchase->amount),
+                    'gateway' => $templatePurchase->gateway ?? '-',
                 ];
 
                 $this->smsManager->notifyAdminSale('template', 'admin_template_paid', $vars, $templatePurchase);
             }
 
             return redirect()
-                ->route('payment.result.template', $templatePurchase)
+                ->route('payment.result.template', ['purchase' => $templatePurchase, 'token' => $templatePurchase->access_token])
                 ->with(
                     ($result['paid'] ?? false) ? 'success' : 'error',
                     $result['message'] ?? (($result['paid'] ?? false) ? 'پرداخت با موفقیت تأیید شد.' : 'پرداخت ناموفق بود.')
@@ -147,7 +148,7 @@ class WebPaymentController extends Controller
         // ---------- ۳) خرید پکیج (مانند قبل) ----------
         $purchase = PackagePurchase::where('transaction_id', $transactionId)->first();
 
-        if (!$purchase) {
+        if (! $purchase) {
             return redirect()
                 ->route('shop.home')
                 ->with('error', 'رکورد خرید یافت نشد.');
@@ -162,9 +163,9 @@ class WebPaymentController extends Controller
         if (($result['paid'] ?? false) && $purchase->isPaid()) {
             $vars = [
                 'customer_name' => $purchase->customer?->name ?? 'مشتری',
-                'package_name'  => $purchase->package?->name ?? 'پکیج',
-                'amount'        => number_format((int) $purchase->amount),
-                'license_key'   => (string) ($result['license_key'] ?? $purchase->license?->license_key ?? ''),
+                'package_name' => $purchase->package?->name ?? 'پکیج',
+                'amount' => number_format((int) $purchase->amount),
+                'license_key' => (string) ($result['license_key'] ?? $purchase->license?->license_key ?? ''),
             ];
 
             $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
@@ -172,14 +173,15 @@ class WebPaymentController extends Controller
         }
 
         // خرید فروشگاه (API): ابتدا صفحه‌ی نتیجه + شمارش معکوس، سپس بازگشت به فروشگاه
-        if ($purchase->callback_url && !$this->isInternalCallback($purchase->callback_url)) {
+        if ($purchase->callback_url && ! $this->isInternalCallback($purchase->callback_url)) {
             return redirect()->route('payment.return', array_merge($request->query(), [
                 'purchase' => $purchase->id,
+                'token' => $purchase->access_token,
             ]));
         }
 
         return redirect()
-            ->route('payment.result', $purchase)
+            ->route('payment.result', ['purchase' => $purchase, 'token' => $purchase->access_token])
             ->with(
                 ($result['paid'] ?? false) ? 'success' : 'error',
                 $result['message'] ?? (($result['paid'] ?? false) ? 'پرداخت با موفقیت تأیید شد.' : 'پرداخت ناموفق بود.')
@@ -211,6 +213,6 @@ class WebPaymentController extends Controller
         $host = (string) parse_url($url, PHP_URL_HOST);
         $port = parse_url($url, PHP_URL_PORT);
 
-        return $port ? $host . ':' . $port : $host;
+        return $port ? $host.':'.$port : $host;
     }
 }

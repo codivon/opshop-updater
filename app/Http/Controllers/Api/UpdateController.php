@@ -4,76 +4,48 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\Subscription;
 use App\Models\Update as UpdateModel;
+use App\Services\PackageApiAuthService;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Carbon\Carbon;
+use RuntimeException;
 
+/**
+ * Task 85 — امنیت (H1/M2): بازنویسی کامل کنترلر آپدیت با احراز هویت مشترکِ fail-closed:
+ *  - توکن مشتری + اشتراک فعالِ پرداخت‌شده
+ *  - دامنهٔ پروژه از هدر X-Project-Url (همان قرارداد بقیهٔ API) — بدون هدر یا با دامنهٔ خالی، دسترسی 403 است
+ *  - دانلود آپدیت فقط از بین پروژه‌های خودِ مشتری (قبلاً هر آپدیتی با شمردن شناسه قابل دانلود بود)
+ */
 class UpdateController extends Controller
 {
-    // 1. بررسی نسخه (Check for Updates)
+    /**
+     * 1. بررسی نسخه (Check for Updates)
+     */
     public function check(Request $request)
     {
-        $token = $request->input('token');
-        $currentVersion = $request->input('version'); // مثلا 1.0.0
+        $customer = $this->authorizeCustomer($request);
+        $currentVersion = (string) $request->input('version'); // مثلا 1.0.0
 
-        // اعتبارسنجی مشتری و اشتراک
-        $customer = Customer::where('update_code', $token)->first();
-
-        if (!$customer || $customer->status !== 'active') {
-            return response()->json(['error' => 'شماره سفارش نامعتبر است'], 403);
-        }
-
-        // ===== فیلتر دامنه =====
-        $allowedDomain = $customer->website_url;
-        $requestDomain = $request->getHost(); // دامنه درخواست فعلی
-
-// اگر درخواست از localhost یا IP باشد، ممکن است پورت هم داشته باشد
-        $requestFullDomain = $request->getHttpHost(); // شامل پورت: example.com:8080
-
-        if (!$this->isDomainAllowed($allowedDomain, $requestFullDomain, $requestDomain)) {
-            return response()->json([
-                'error' => 'دسترسی از این دامنه مجاز نیست',
-                'allowed' => $allowedDomain,
-                'current' => $requestFullDomain
-            ], 403);
-        }
-
-
-        $hasActiveSubscription = $customer->subscriptions()
+        // آخرین آپدیت منتشرشده برای پروژه‌های همین مشتری
+        $latestUpdate = UpdateModel::query()
+            ->whereIn('project_id', $customer->subscriptions()->pluck('project_id'))
             ->where('status', 'active')
-            ->where('payment_status', 'paid')
-            ->where(function($q) {
-                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })->exists();
-
-        if (!$hasActiveSubscription) {
-            return response()->json(['error' => 'اشتراک فعالی وجود ندارد'], 403);
-        }
-
-        // پیدا کردن آخرین آپدیت منتشر شده برای پروژه‌های این مشتری
-        $projectIds = $customer->subscriptions()->pluck('project_id');
-
-        $latestUpdate = UpdateModel::whereIn('project_id', $projectIds)
-            ->where(['status'=>'active'])
-            ->orderByDesc('version') // فرض بر این است که ورژن به صورت صحیح یا رشته قابل مقایسه ذخیره شده
+            ->orderByDesc('version')
             ->first();
 
-        if (!$latestUpdate) {
+        if (! $latestUpdate) {
             return response()->json(['update_available' => false]);
         }
 
-        // مقایسه نسخه‌ها (نیاز به کتابخانه version_compare دارد)
-       if (version_compare($latestUpdate->version, $currentVersion, '<=')) {
+        if (version_compare($latestUpdate->version, $currentVersion, '<=')) {
             return response()->json(['update_available' => false]);
         }
 
-        // ساخت لینک دانلود امن (امضا دار یا موقت)
-        // ما از روت download استفاده می‌کنیم که توکن را چک میکند
+        // ساخت لینک دانلود امن (توکن مشتری داخل لینک + اعتبارسنجی کامل در download)
         $downloadUrl = route('api.update.download', [
-            'token' => $token,
-            'updateId' => $latestUpdate->id
+            'token' => $customer->update_code,
+            'updateId' => $latestUpdate->id,
         ]);
 
         return response()->json([
@@ -81,132 +53,63 @@ class UpdateController extends Controller
             'version' => $latestUpdate->version,
             'description' => $latestUpdate->description,
             'download_url' => $downloadUrl,
-            'file_size' => $latestUpdate->file_size ?? null
+            'file_size' => $latestUpdate->file_size ?? null,
         ]);
     }
 
-    // 2. دانلود امن فایل (Secure Download)
+    /**
+     * 2. دانلود امن فایل (Secure Download)
+     */
     public function download(Request $request, $updateId)
     {
-        $token = $request->input('token');
-        $currentVersion = $request->input('version'); // مثلا 1.0.0
+        $customer = $this->authorizeCustomer($request);
 
-        // اعتبارسنجی مشتری و اشتراک
-        $customer = Customer::where('update_code', $token)->first();
-
-        if (!$customer || $customer->status !== 'active') {
-            return response()->json(['error' => 'شماره سفارش نامعتبر است'], 403);
-        }
-
-        // ===== فیلتر دامنه =====
-        $allowedDomain = $customer->website_url;
-        $requestDomain = $request->getHost(); // دامنه درخواست فعلی
-
-// اگر درخواست از localhost یا IP باشد، ممکن است پورت هم داشته باشد
-        $requestFullDomain = $request->getHttpHost(); // شامل پورت: example.com:8080
-
-        if (!$this->isDomainAllowed($allowedDomain, $requestFullDomain, $requestDomain)) {
-            return response()->json([
-                'error' => 'دسترسی از این دامنه مجاز نیست',
-                'allowed' => $allowedDomain,
-                'current' => $requestFullDomain
-            ], 403);
-        }
-
-
-        $hasActiveSubscription = $customer->subscriptions()
+        // Task 85 (H1): آپدیت فقط باید از پروژه‌های خودِ مشتری باشد — نه هر آپدیتی با شناسهٔ دلخواه
+        $update = UpdateModel::query()
+            ->whereIn('project_id', $customer->subscriptions()->pluck('project_id'))
             ->where('status', 'active')
-            ->where('payment_status', 'paid')
-            ->where(function($q) {
-                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })->exists();
+            ->find($updateId);
 
-        if (!$hasActiveSubscription) {
-            return response()->json(['error' => 'اشتراک فعالی وجود ندارد'], 403);
+        if (! $update) {
+            return response()->json(['error' => 'آپدیت موردنظر برای پروژه‌های شما یافت نشد'], 404);
         }
 
-
-        // ===== فیلتر دامنه =====
-        $allowedDomain = $customer->website_url;
-        $requestDomain = $request->getHost(); // دامنه درخواست فعلی
-
-// اگر درخواست از localhost یا IP باشد، ممکن است پورت هم داشته باشد
-        $requestFullDomain = $request->getHttpHost(); // شامل پورت: example.com:8080
-
-        if (!$this->isDomainAllowed($allowedDomain, $requestFullDomain, $requestDomain)) {
-            return response()->json([
-                'error' => 'دسترسی از این دامنه مجاز نیست',
-                'allowed' => $allowedDomain,
-                'current' => $requestFullDomain
-            ], 403);
+        // از دیسک local استفاده کن (مسیر storage/app/private)
+        if (! Storage::disk('local')->exists($update->download_link)) {
+            return response()->json(['error' => 'فایل یافت نشد'], 404);
         }
 
-
-        $update = UpdateModel::findOrFail($updateId);
-
-        // ✅ از دیسک local استفاده کن (مسیر storage/app/private)
-        if (!Storage::disk('local')->exists($update->download_link)) {
-            abort(404, 'فایل یافت نشد');
-        }
-
-        // ✅ همان دیسک local برای دانلود
         return Storage::disk('local')->download($update->download_link, $update->file_name);
     }
 
     /**
-     * بررسی اینکه آیا دامنه درخواست با دامنه مجاز مطابقت دارد
+     * احراز هویت مشترک: توکن مشتری + اشتراک فعال + دامنهٔ پروژه (هدر X-Project-Url).
+     * منطق دقیقاً مشترک با بقیهٔ API (PackageApiAuthService) — fail-closed.
      */
-    private function isDomainAllowed($allowedDomain, $requestFullDomain, $requestDomain)
+    private function authorizeCustomer(Request $request): Customer
     {
-        // اگر دامنه مجاز خالی باشد، اجازه دسترسی داده می‌شود (اختیاری)
-        if (empty($allowedDomain)) {
-            return true;
+        try {
+            $customer = app(PackageApiAuthService::class)->authenticate($request);
+        } catch (RuntimeException $e) {
+            throw new HttpResponseException(
+                response()->json(['error' => $e->getMessage()], $e->getCode() ?: 403)
+            );
         }
 
-        // نرمال‌سازی دامنه مجاز
-        $allowed = $this->normalizeDomain($allowedDomain);
-        $request = $this->normalizeDomain($requestFullDomain);
-        $requestHost = $this->normalizeDomain($requestDomain);
+        $hasActiveSubscription = $customer->subscriptions()
+            ->where('status', 'active')
+            ->where('payment_status', 'paid')
+            ->where(function ($q) {
+                $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->exists();
 
-        // بررسی مطابقت کامل
-        if ($allowed === $request || $allowed === $requestHost) {
-            return true;
+        if (! $hasActiveSubscription) {
+            throw new HttpResponseException(
+                response()->json(['error' => 'اشتراک فعالی وجود ندارد'], 403)
+            );
         }
 
-        // بررسی تطابق با Subdomain (اختیاری)
-        // اگر دامنه مجاز example.com باشد، sub.example.com نیز مجاز باشد
-        if (str_ends_with($requestHost, '.' . $allowed)) {
-            return true;
-        }
-
-        // بررسی تطابق با IP (اگر دامنه مجاز IP باشد)
-        if (filter_var($allowed, FILTER_VALIDATE_IP)) {
-            $requestIp = $request->ip();
-            if ($allowed === $requestIp) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * نرمال‌سازی دامنه: حذف پروتکل، www، اسلش انتهایی و پورت
-     */
-    private function normalizeDomain($domain)
-    {
-        // حذف پروتکل (http://, https://)
-        $domain = preg_replace('#^https?://#', '', $domain);
-
-        // حذف www. از ابتدا
-        $domain = preg_replace('/^www\./', '', $domain);
-
-        // حذف اسلش انتهایی
-        $domain = rtrim($domain, '/');
-
-        // حذف پورت (اگر وجود داشته باشد)
-        $domain = preg_replace('/:\d+$/', '', $domain);
-
-        return strtolower(trim($domain));
+        return $customer;
     }
 }

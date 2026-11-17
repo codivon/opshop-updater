@@ -17,8 +17,11 @@ class PaymentResult extends Component
 
     public PackagePurchase $purchase;
 
-    public function mount(PackagePurchase $purchase): void
+    public function mount(PackagePurchase $purchase, string $token): void
     {
+        // Task 85 — امنیت: صفحهٔ نتیجهٔ پرداخت (با نمایش لایسنس) فقط با توکن محرمانهٔ خرید باز می‌شود
+        abort_unless($purchase->hasValidAccessToken($token), 404);
+
         $purchase->load([
             'package:id,name,slug,thumbnail,is_free',
             'customer:id,name,email',
@@ -38,11 +41,13 @@ class PaymentResult extends Component
     {
         if ($this->purchase->status !== PackagePurchase::STATUS_PENDING) {
             $this->toast('این خرید در انتظار تأیید نیست.');
+
             return;
         }
 
-        if (!$this->purchase->transaction_id) {
+        if (! $this->purchase->transaction_id) {
             $this->toast('شناسه تراکنش برای این خرید ثبت نشده است.', 'error');
+
             return;
         }
 

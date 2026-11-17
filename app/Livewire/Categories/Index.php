@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Categories;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Category;
+use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -14,34 +16,38 @@ use Livewire\WithPagination;
 #[Title('دسته‌بندی‌ها')]
 class Index extends Component
 {
-    use WithToasts, WithPagination;
+    use AuthorizesAdmin;
+    use WithPagination, WithToasts;
 
     public string $search = '';
+
     public string $typeFilter = '';
 
     /** فرم مودال ایجاد/ویرایش */
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public array $form = [
-        'name'        => '',
-        'slug'        => '',
-        'type'        => Category::TYPE_PRODUCT,
-        'parent_id'   => '',
+        'name' => '',
+        'slug' => '',
+        'type' => Category::TYPE_PRODUCT,
+        'parent_id' => '',
         'description' => '',
-        'is_active'   => true,
-        'sort_order'  => 0,
+        'is_active' => true,
+        'sort_order' => 0,
     ];
 
     protected function rules(): array
     {
         return [
-            'form.name'        => ['required', 'string', 'max:120'],
-            'form.slug'        => ['nullable', 'string', 'max:120', 'alpha_dash:ascii'],
-            'form.type'        => ['required', 'in:product,package,template'],
-            'form.parent_id'   => ['nullable', 'integer', 'exists:categories,id'],
+            'form.name' => ['required', 'string', 'max:120'],
+            'form.slug' => ['nullable', 'string', 'max:120', 'alpha_dash:ascii'],
+            'form.type' => ['required', 'in:product,package,template'],
+            'form.parent_id' => ['nullable', 'integer', 'exists:categories,id'],
             'form.description' => ['nullable', 'string', 'max:500'],
-            'form.is_active'   => ['boolean'],
-            'form.sort_order'  => ['nullable', 'integer', 'min:0', 'max:9999'],
+            'form.is_active' => ['boolean'],
+            'form.sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
         ];
     }
 
@@ -67,7 +73,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD                                                             */
+    /*  CRUD */
     /* ---------------------------------------------------------------- */
 
     public function create(): void
@@ -75,13 +81,13 @@ class Index extends Component
         $this->resetErrorBag();
         $this->editingId = null;
         $this->form = [
-            'name'        => '',
-            'slug'        => '',
-            'type'        => $this->typeFilter !== '' ? $this->typeFilter : Category::TYPE_PRODUCT,
-            'parent_id'   => '',
+            'name' => '',
+            'slug' => '',
+            'type' => $this->typeFilter !== '' ? $this->typeFilter : Category::TYPE_PRODUCT,
+            'parent_id' => '',
             'description' => '',
-            'is_active'   => true,
-            'sort_order'  => 0,
+            'is_active' => true,
+            'sort_order' => 0,
         ];
         $this->showModal = true;
     }
@@ -93,13 +99,13 @@ class Index extends Component
 
         $this->editingId = $category->id;
         $this->form = [
-            'name'        => $category->name,
-            'slug'        => $category->slug,
-            'type'        => $category->type,
-            'parent_id'   => $category->parent_id ?? '',
+            'name' => $category->name,
+            'slug' => $category->slug,
+            'type' => $category->type,
+            'parent_id' => $category->parent_id ?? '',
             'description' => (string) $category->description,
-            'is_active'   => $category->is_active,
-            'sort_order'  => $category->sort_order,
+            'is_active' => $category->is_active,
+            'sort_order' => $category->sort_order,
         ];
         $this->showModal = true;
     }
@@ -121,6 +127,7 @@ class Index extends Component
 
             if ($exists) {
                 $this->addError('form.slug', 'این نامک قبلاً استفاده شده است.');
+
                 return;
             }
         }
@@ -131,13 +138,15 @@ class Index extends Component
         if ($parentId !== null) {
             $parent = Category::find($parentId);
 
-            if (!$parent || $parent->type !== $data['form']['type']) {
+            if (! $parent || $parent->type !== $data['form']['type']) {
                 $this->addError('form.parent_id', 'دسته والد باید از همان نوع این دسته باشد.');
+
                 return;
             }
 
             if ($this->editingId && Category::inSubtree($this->editingId, $parentId)) {
                 $this->addError('form.parent_id', 'نمی‌توان خود دسته یا زیردسته‌هایش را به‌عنوان والد انتخاب کرد.');
+
                 return;
             }
         }
@@ -147,13 +156,13 @@ class Index extends Component
         Category::updateOrCreate(
             ['id' => $id],
             [
-                'name'        => $name,
-                'slug'        => $slug,
-                'type'        => $data['form']['type'],
-                'parent_id'   => $parentId,
+                'name' => $name,
+                'slug' => $slug,
+                'type' => $data['form']['type'],
+                'parent_id' => $parentId,
                 'description' => $data['form']['description'] ?: null,
-                'is_active'   => (bool) $data['form']['is_active'],
-                'sort_order'  => (int) ($data['form']['sort_order'] ?? 0),
+                'is_active' => (bool) $data['form']['is_active'],
+                'sort_order' => (int) ($data['form']['sort_order'] ?? 0),
             ]
         );
 
@@ -164,7 +173,7 @@ class Index extends Component
     public function toggleActive(int $id): void
     {
         $category = Category::findOrFail($id);
-        $category->update(['is_active' => !$category->is_active]);
+        $category->update(['is_active' => ! $category->is_active]);
 
         $this->toast($category->is_active ? 'دسته‌بندی فعال شد.' : 'دسته‌بندی غیرفعال شد.');
     }
@@ -177,14 +186,16 @@ class Index extends Component
         $childrenCount = $category->children()->count();
 
         if ($childrenCount > 0) {
-            $this->toast('این دسته‌بندی دارای ' . fa_num($childrenCount) . ' زیردسته است؛ ابتدا زیردسته‌ها را حذف یا جابه‌جا کنید.', 'error');
+            $this->toast('این دسته‌بندی دارای '.fa_num($childrenCount).' زیردسته است؛ ابتدا زیردسته‌ها را حذف یا جابه‌جا کنید.', 'error');
+
             return;
         }
 
         $usage = $category->usageCount();
 
         if ($usage > 0) {
-            $this->toast("این دسته‌بندی در " . fa_num($usage) . " مورد استفاده شده و قابل حذف نیست. ابتدا آن‌ها را جابه‌جا کنید.", 'error');
+            $this->toast('این دسته‌بندی در '.fa_num($usage).' مورد استفاده شده و قابل حذف نیست. ابتدا آن‌ها را جابه‌جا کنید.', 'error');
+
             return;
         }
 
@@ -194,31 +205,31 @@ class Index extends Component
 
     private function uniqueSlug(string $name, ?int $ignoreId): string
     {
-        $base = \Illuminate\Support\Str::slug($name);
+        $base = Str::slug($name);
 
         if ($base === '') {
-            $base = 'cat-' . \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(6));
+            $base = 'cat-'.Str::lower(Str::random(6));
         }
 
         $slug = $base;
         $i = 2;
 
         while (Category::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
-            $slug = $base . '-' . $i++;
+            $slug = $base.'-'.$i++;
         }
 
         return $slug;
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Computed                                                         */
+    /*  Computed */
     /* ---------------------------------------------------------------- */
 
     public function getTypesProperty(): array
     {
         return [
-            Category::TYPE_PRODUCT  => 'محصولات (پروژه‌ها)',
-            Category::TYPE_PACKAGE  => 'پکیج‌ها',
+            Category::TYPE_PRODUCT => 'محصولات (پروژه‌ها)',
+            Category::TYPE_PACKAGE => 'پکیج‌ها',
             Category::TYPE_TEMPLATE => 'قالب‌ها',
         ];
     }

@@ -2,22 +2,24 @@
 
 namespace App\Livewire\Projects;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Project;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Illuminate\Support\Str;
 
 #[Layout('components.layouts.app')]
 #[Title('پروژه‌ها')]
 class Index extends Component
 {
-    use WithPagination, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -33,7 +35,9 @@ class Index extends Component
     public array $form = [];
 
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public ?int $deleteId = null;
 
     public function updatedSearch(): void
@@ -70,7 +74,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     public function bulkPageIds(): array
@@ -112,10 +116,10 @@ class Index extends Component
             return;
         }
 
-        $message = fa_num($deleted) . ' پروژه حذف شد.';
+        $message = fa_num($deleted).' پروژه حذف شد.';
 
         if ($skipped > 0) {
-            $message .= ' ' . fa_num($skipped) . ' پروژه به دلیل داشتن آپدیت یا پکیج حذف نشد.';
+            $message .= ' '.fa_num($skipped).' پروژه به دلیل داشتن آپدیت یا پکیج حذف نشد.';
             $this->toast($message, 'warning');
         } else {
             $this->toast($message);
@@ -123,7 +127,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD                                                             */
+    /*  CRUD */
     /* ---------------------------------------------------------------- */
 
     public function openCreate(): void
@@ -183,7 +187,7 @@ class Index extends Component
     protected function rules(): array
     {
         $slugUnique = $this->editingId
-            ? 'unique:projects,slug,' . $this->editingId
+            ? 'unique:projects,slug,'.$this->editingId
             : 'unique:projects,slug';
 
         return [

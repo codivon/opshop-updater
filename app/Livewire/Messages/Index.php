@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Messages;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\ContactMessage;
 use Livewire\Attributes\Computed;
@@ -19,14 +20,18 @@ use Livewire\WithPagination;
 #[Title('پیام‌های تماس')]
 class Index extends Component
 {
-    use WithToasts, WithPagination;
+    use AuthorizesAdmin;
+    use WithPagination, WithToasts;
 
     public string $search = '';
+
     public string $statusFilter = '';
+
     public string $typeFilter = '';
 
     /** مودال مشاهدهٔ پیام */
     public bool $showViewModal = false;
+
     public ?int $viewingId = null;
 
     public function updatingSearch(): void

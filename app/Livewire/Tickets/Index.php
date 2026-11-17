@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Tickets;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Ticket;
 use App\Models\TicketReply;
@@ -22,7 +23,8 @@ use Livewire\WithPagination;
 #[Title('تیکت‌های پشتیبانی')]
 class Index extends Component
 {
-    use WithToasts, WithPagination;
+    use AuthorizesAdmin;
+    use WithPagination, WithToasts;
 
     public string $search = '';
 
@@ -47,7 +49,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  مودال گفتگو                                                      */
+    /*  مودال گفتگو */
     /* ---------------------------------------------------------------- */
 
     public function view(int $id): void
@@ -62,7 +64,7 @@ class Index extends Component
     {
         $ticket = Ticket::find($this->viewingId ?? 0);
 
-        if (!$ticket) {
+        if (! $ticket) {
             $this->toast('تیکت یافت نشد.', 'error');
 
             return;
@@ -72,14 +74,14 @@ class Index extends Component
             'replyText' => ['required', 'string', 'min:2', 'max:5000'],
         ], [
             'replyText.required' => 'متن پاسخ الزامی است.',
-            'replyText.min'      => 'متن پاسخ حداقل ۲ حرف است.',
-            'replyText.max'      => 'متن پاسخ حداکثر ۵۰۰۰ حرف است.',
+            'replyText.min' => 'متن پاسخ حداقل ۲ حرف است.',
+            'replyText.max' => 'متن پاسخ حداکثر ۵۰۰۰ حرف است.',
         ]);
 
         TicketReply::create([
-            'ticket_id'   => $ticket->id,
+            'ticket_id' => $ticket->id,
             'author_type' => TicketReply::AUTHOR_ADMIN,
-            'body'        => trim($data['replyText']),
+            'body' => trim($data['replyText']),
         ]);
 
         $ticket->update(['status' => Ticket::STATUS_ANSWERED, 'last_reply_at' => now()]);
@@ -93,13 +95,13 @@ class Index extends Component
     /** تغییر وضعیت دستی: بستن / بازکردن / برگرداندن به انتظار */
     public function setStatus(int $id, string $status): void
     {
-        if (!in_array($status, [Ticket::STATUS_OPEN, Ticket::STATUS_ANSWERED, Ticket::STATUS_CLOSED], true)) {
+        if (! in_array($status, [Ticket::STATUS_OPEN, Ticket::STATUS_ANSWERED, Ticket::STATUS_CLOSED], true)) {
             return;
         }
 
         $ticket = Ticket::find($id);
 
-        if (!$ticket) {
+        if (! $ticket) {
             $this->toast('تیکت یافت نشد.', 'error');
 
             return;
@@ -109,7 +111,7 @@ class Index extends Component
 
         unset($this->records, $this->stats);
 
-        $this->toast('وضعیت تیکت به «' . $ticket->statusLabel() . '» تغییر کرد.');
+        $this->toast('وضعیت تیکت به «'.$ticket->statusLabel().'» تغییر کرد.');
     }
 
     public function delete(int $id): void
@@ -127,7 +129,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Computed                                                         */
+    /*  Computed */
     /* ---------------------------------------------------------------- */
 
     #[Computed]
@@ -155,10 +157,10 @@ class Index extends Component
     public function stats(): array
     {
         return [
-            'total'    => Ticket::count(),
-            'open'     => Ticket::where('status', Ticket::STATUS_OPEN)->count(),
+            'total' => Ticket::count(),
+            'open' => Ticket::where('status', Ticket::STATUS_OPEN)->count(),
             'answered' => Ticket::where('status', Ticket::STATUS_ANSWERED)->count(),
-            'closed'   => Ticket::where('status', Ticket::STATUS_CLOSED)->count(),
+            'closed' => Ticket::where('status', Ticket::STATUS_CLOSED)->count(),
         ];
     }
 
@@ -166,7 +168,7 @@ class Index extends Component
     #[Computed]
     public function viewing()
     {
-        if (!$this->viewingId) {
+        if (! $this->viewingId) {
             return null;
         }
 

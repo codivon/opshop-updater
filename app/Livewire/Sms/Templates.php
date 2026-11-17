@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Sms;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\SmsLog;
 use App\Models\SmsTemplate;
@@ -18,6 +19,7 @@ use Livewire\WithPagination;
 #[Title('قالب‌های پیامک')]
 class Templates extends Component
 {
+    use AuthorizesAdmin;
     use WithPagination, WithToasts;
 
     #[Url]
@@ -29,18 +31,21 @@ class Templates extends Component
     #[Url]
     public string $sort = 'newest';
 
-    public bool $showModal   = false;
-    public bool $testModal   = false;
-    public ?int $deleteId    = null;
-    public ?int $editingId   = null;
+    public bool $showModal = false;
+
+    public bool $testModal = false;
+
+    public ?int $deleteId = null;
+
+    public ?int $editingId = null;
 
     public string $testMobile = '';
 
     /** فرم اصلی قالب */
     public array $form = [
-        'key'    => '',
-        'title'  => '',
-        'body'   => '',
+        'key' => '',
+        'title' => '',
+        'body' => '',
         'is_active' => true,
     ];
 
@@ -83,13 +88,13 @@ class Templates extends Component
         $this->resetValidation();
         $this->editingId = null;
         $this->form = [
-            'key'       => '',
-            'title'     => '',
-            'body'      => '',
+            'key' => '',
+            'title' => '',
+            'body' => '',
             'is_active' => true,
         ];
         $this->formVariables = [];
-        $this->formPatterns  = array_fill_keys(array_keys(SmsTemplate::DRIVERS), '');
+        $this->formPatterns = array_fill_keys(array_keys(SmsTemplate::DRIVERS), '');
         $this->showModal = true;
     }
 
@@ -100,9 +105,9 @@ class Templates extends Component
         $this->editingId = $template->id;
 
         $this->form = [
-            'key'       => $template->key,
-            'title'     => $template->title,
-            'body'      => (string) $template->body,
+            'key' => $template->key,
+            'title' => $template->title,
+            'body' => (string) $template->body,
             'is_active' => (bool) $template->is_active,
         ];
         $this->formVariables = array_values((array) $template->variables);
@@ -131,18 +136,18 @@ class Templates extends Component
         $isEdit = $this->editingId !== null;
 
         $this->validate([
-            'form.key'    => ['required', 'string', 'max:64', 'regex:/^[a-z0-9_]+$/', Rule::unique('sms_templates', 'key')->ignore($this->editingId)],
-            'form.title'  => ['required', 'string', 'max:191'],
-            'form.body'   => ['required', 'string', 'max:2000'],
-            'formVariables'   => ['nullable', 'array', 'max:20'],
+            'form.key' => ['required', 'string', 'max:64', 'regex:/^[a-z0-9_]+$/', Rule::unique('sms_templates', 'key')->ignore($this->editingId)],
+            'form.title' => ['required', 'string', 'max:191'],
+            'form.body' => ['required', 'string', 'max:2000'],
+            'formVariables' => ['nullable', 'array', 'max:20'],
             'formVariables.*' => ['nullable', 'string', 'max:64', 'regex:/^[a-z0-9_]+$/'],
-            'formPatterns'    => ['nullable', 'array'],
+            'formPatterns' => ['nullable', 'array'],
         ], [
             'form.key.required' => 'کلید قالب الزامی است.',
-            'form.key.regex'    => 'کلید فقط حروف کوچک لاتین، عدد و ٍunderline باشد.',
-            'form.key.unique'   => 'این کلید قبلاً ثبت شده است.',
+            'form.key.regex' => 'کلید فقط حروف کوچک لاتین، عدد و ٍunderline باشد.',
+            'form.key.unique' => 'این کلید قبلاً ثبت شده است.',
             'form.title.required' => 'عنوان قالب الزامی است.',
-            'form.body.required'  => 'متن قالب الزامی است.',
+            'form.body.required' => 'متن قالب الزامی است.',
             'formVariables.*.regex' => 'نام متغیر فقط حروف کوچک لاتین، عدد و underline باشد.',
         ]);
 
@@ -150,7 +155,7 @@ class Templates extends Component
         if ($isEdit) {
             $template = SmsTemplate::findOrFail($this->editingId);
         } else {
-            $template = new SmsTemplate();
+            $template = new SmsTemplate;
             $template->key = $this->form['key'];
         }
 
@@ -178,7 +183,7 @@ class Templates extends Component
     public function toggle(int $id): void
     {
         $template = SmsTemplate::findOrFail($id);
-        $template->update(['is_active' => !$template->is_active]);
+        $template->update(['is_active' => ! $template->is_active]);
 
         $this->toast($template->is_active ? 'قالب فعال شد.' : 'قالب غیرفعال شد.');
     }
@@ -189,6 +194,7 @@ class Templates extends Component
 
         if ($template && in_array($template->key, SmsTemplate::SYSTEM_KEYS, true)) {
             $this->toast('قالب‌های سیستمی قابل حذف نیستند؛ فقط می‌توانید غیرفعالشان کنید.', 'warning');
+
             return;
         }
 
@@ -224,7 +230,7 @@ class Templates extends Component
             'testMobile' => ['required', 'regex:/^09\d{9}$/'],
         ], [
             'testMobile.required' => 'شماره موبایل را وارد کنید.',
-            'testMobile.regex'     => 'شماره موبایل معتبر نیست (۰۹xxxxxxxxx).',
+            'testMobile.regex' => 'شماره موبایل معتبر نیست (۰۹xxxxxxxxx).',
         ]);
 
         $template = SmsTemplate::findOrFail($this->editingId);
@@ -237,10 +243,10 @@ class Templates extends Component
         } else {
             $reason = $log?->error
                 ?? match (true) {
-                    !filter_var(setting('sms_enabled', '0'), FILTER_VALIDATE_BOOLEAN) => 'سیستم پیامک در تنظیمات غیرفعال است.',
+                    ! filter_var(setting('sms_enabled', '0'), FILTER_VALIDATE_BOOLEAN) => 'سیستم پیامک در تنظیمات غیرفعال است.',
                     default => 'ارسال ناموفق بود؛ پاسخ سرویس را در «لاگ پیامک‌ها» ببینید.',
                 };
-            $this->toast('ارسال ناموفق: ' . $reason, 'error');
+            $this->toast('ارسال ناموفق: '.$reason, 'error');
         }
     }
 

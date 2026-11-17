@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Customers;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
@@ -16,7 +17,8 @@ use Livewire\WithPagination;
 #[Title('مشتریان')]
 class Index extends Component
 {
-    use WithPagination, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -32,7 +34,9 @@ class Index extends Component
     public array $form = [];
 
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public ?int $deleteId = null;
 
     /** نمایش کد آپدیت در مودال ویرایش (فقط‌خواندنی) */
@@ -76,7 +80,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD                                                             */
+    /*  CRUD */
     /* ---------------------------------------------------------------- */
 
     public function openCreate(): void
@@ -115,7 +119,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     public function bulkPageIds(): array
@@ -130,7 +134,7 @@ class Index extends Component
         // اشتراک‌ها/لایسنس‌ها/خریدهای مرتبط با FK cascade حذف می‌شوند
         $count = Customer::query()->whereIn('id', $ids)->delete();
 
-        $this->toast(fa_num($count) . ' مشتری حذف شد.');
+        $this->toast(fa_num($count).' مشتری حذف شد.');
     }
 
     public function delete(): void
@@ -147,7 +151,7 @@ class Index extends Component
     protected function rules(): array
     {
         $emailUnique = $this->editingId
-            ? 'unique:customers,email,' . $this->editingId
+            ? 'unique:customers,email,'.$this->editingId
             : 'unique:customers,email';
 
         return [

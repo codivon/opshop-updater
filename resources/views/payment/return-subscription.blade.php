@@ -459,7 +459,7 @@
 
 <script>
     (function () {
-        var RETURN_URL = @json($returnUrl);
+        var RETURN_URL = @json($returnUrl, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
         var TOTAL = {{ (int) $seconds }};
         var left = TOTAL;
         var stopped = false;

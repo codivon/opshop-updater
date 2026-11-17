@@ -269,7 +269,7 @@ class PackageCheckout extends Component
 
             $this->toast('کد تخفیف کل مبلغ را پوشش داد — لایسنس شما صادر شد.');
 
-            return $this->redirect(route('payment.result', $this->purchase), navigate: false);
+            return $this->redirect(route('payment.result', ['purchase' => $this->purchase, 'token' => $this->purchase->access_token]), navigate: false);
         }
 
         // ---------- گارد IP ایران: پرداخت فقط از IP ایران (ضد فیلترشکن/VPN) ----------

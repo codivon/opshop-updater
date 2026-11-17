@@ -8,7 +8,6 @@ use App\Services\LicenseService;
 use App\Services\PaymentService;
 use App\Services\Sms\SmsManager;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class ApiPaymentCallbackController extends Controller
 {
@@ -35,14 +34,14 @@ class ApiPaymentCallbackController extends Controller
             ?? $request->input('tracking_code')
             ?? $request->input('token');
 
-        if (!$transactionId) {
+        if (! $transactionId) {
             return redirect()->route('shop.home')
                 ->with('error', 'اطلاعات تراکنش ناقص است.');
         }
 
         $purchase = PackagePurchase::where('transaction_id', $transactionId)->first();
 
-        if (!$purchase) {
+        if (! $purchase) {
             return redirect()->route('shop.home')
                 ->with('error', 'رکورد خرید یافت نشد.');
         }
@@ -56,9 +55,9 @@ class ApiPaymentCallbackController extends Controller
         if (($result['paid'] ?? false) && $purchase->isPaid()) {
             $vars = [
                 'customer_name' => $purchase->customer?->name ?? 'مشتری',
-                'package_name'  => $purchase->package?->name ?? 'پکیج',
-                'amount'        => number_format((int) $purchase->amount),
-                'license_key'   => (string) ($result['license_key'] ?? $purchase->license?->license_key ?? ''),
+                'package_name' => $purchase->package?->name ?? 'پکیج',
+                'amount' => number_format((int) $purchase->amount),
+                'license_key' => (string) ($result['license_key'] ?? $purchase->license?->license_key ?? ''),
             ];
 
             $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
@@ -66,14 +65,15 @@ class ApiPaymentCallbackController extends Controller
         }
 
         // صفحه‌ی نتیجه + شمارش معکوس برای بازگشت به فروشگاه
-        if ($purchase->callback_url && !$this->isInternalCallback($purchase->callback_url)) {
+        if ($purchase->callback_url && ! $this->isInternalCallback($purchase->callback_url)) {
             return redirect()->route('payment.return', array_merge($request->query(), [
                 'purchase' => $purchase->id,
+                'token' => $purchase->access_token,
             ]));
         }
 
         // callback داخلی/ویترین پنل → صفحه‌ی نتیجه‌ی خود پنل
-        return redirect()->route('payment.result', $purchase)
+        return redirect()->route('payment.result', ['purchase' => $purchase, 'token' => $purchase->access_token])
             ->with(($result['paid'] ?? false) ? 'success' : 'error',
                 $result['message'] ?? (($result['paid'] ?? false) ? 'پرداخت با موفقیت تأیید شد.' : 'پرداخت ناموفق بود.'));
     }
@@ -103,6 +103,6 @@ class ApiPaymentCallbackController extends Controller
         $host = (string) parse_url($url, PHP_URL_HOST);
         $port = parse_url($url, PHP_URL_PORT);
 
-        return $port ? $host . ':' . $port : $host;
+        return $port ? $host.':'.$port : $host;
     }
 }

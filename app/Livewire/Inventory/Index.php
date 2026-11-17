@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Inventory;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Models\Package;
 use App\Models\PackageLicense;
 use App\Models\PackagePurchase;
@@ -32,6 +33,7 @@ use Livewire\WithPagination;
 #[Title('نمای کامل فروشگاه')]
 class Index extends Component
 {
+    use AuthorizesAdmin;
     use WithPagination;
 
     /** تب فعال: packages | products | licenses */

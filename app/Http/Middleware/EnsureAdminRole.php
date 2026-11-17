@@ -2,36 +2,45 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\Features;
+use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * اجبار نقش مدیر (وقتی «نقش‌های مدیر» در پنل امنیت و امکانات روشن باشد):
- * فقط کاربران با role=admin به صفحات /admin/* وارد می‌شوند؛ کاربر operator
- * با صفحهٔ 403 مواجه می‌شود.
+ * Task 85 — گارد نقش مدیر: فقط کاربران با role=admin به صفحات /admin/* وارد می‌شوند؛
+ * کاربر operator با صفحهٔ 403 مواجه می‌شود.
  *
- * ⚠️ پیش‌فرض خاموش است — قبل از روشن‌کردن، نقش کاربر خودتان را در صفحهٔ
- * «کاربران» روی admin بگذارید (وگرنه پنل را از دست می‌دهید).
+ * تغییر مهم نسبت به نسخهٔ قبلی: این میدلور دیگر «fail-open» نیست —
+ * قبل از آن، وقتی قابلیت نقش‌ها خاموش بود، هر کاربر احراز هویت‌شده‌ای
+ * به کل پنل (بکاپ‌ها، لایسنس‌ها، لاگ‌ها، مالی) دسترسی داشت.
+ *
+ * تنها استثنا (ضد قفل‌شدگی): اگر در کل سیستم هیچ کاربر admin وجود نداشته باشد،
+ * قدیمی‌ترین حساب (اولین کاربر = مالک سایت) به‌عنوان مدیر شناسایی می‌شود.
  */
 class EnsureAdminRole
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! Features::roles()) {
-            return $next($request);
-        }
-
-        // ایمنی: اگر هیچ کاربر admin در سیستم نبود، بلاک نکن
-        // (وگرنه با یک پیکربندی اشتباه، کل پنل برای همیشه قفل می‌شد)
-        if (! \App\Models\User::query()->where('role', 'admin')->exists()) {
-            return $next($request);
-        }
-
         $user = $request->user();
 
-        if (! $user || $user->role !== 'admin') {
+        if (! $user) {
+            abort(403, 'برای دسترسی به پنل مدیریت باید وارد شوید.');
+        }
+
+        // ایمنی ضد قفل‌شدگی: اگر هیچ admin واقعی وجود نداشته باشد،
+        // اولین حسابِ ساخته‌شده (مالک) مدیر در نظر گرفته می‌شود — نه هر کاربر دلخواه.
+        $isAdmin = $user->role === 'admin';
+
+        if (! $isAdmin) {
+            $firstUser = User::query()->orderBy('id')->first();
+
+            $isAdmin = $firstUser !== null
+                && $firstUser->id === $user->id
+                && ! User::query()->where('role', 'admin')->exists();
+        }
+
+        if (! $isAdmin) {
             abort(403, 'دسترسی به پنل مدیریت فقط برای نقش «مدیر» مجاز است.');
         }
 

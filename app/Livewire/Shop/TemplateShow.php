@@ -274,7 +274,7 @@ class TemplateShow extends Component
             $this->toast($couponDiscount > 0
                 ? 'قالب با کد تخفیف به‌صورت رایگان دریافت شد؛ می‌توانید همین حالا دانلود کنید.'
                 : 'قالب رایگان دریافت شد؛ می‌توانید همین حالا دانلود کنید.');
-            $this->redirect(route('payment.result.template', $purchase), navigate: true);
+            $this->redirect(route('payment.result.template', ['purchase' => $purchase, 'token' => $purchase->access_token]), navigate: true);
 
             return;
         }

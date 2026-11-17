@@ -56,14 +56,17 @@ class PaymentReturnController extends Controller
         }
 
         return [
-            'env_line'    => (string) $status['shop_env_value'],
-            'public_key'  => (string) ($status['public_key'] ?? ''),
+            'env_line' => (string) $status['shop_env_value'],
+            'public_key' => (string) ($status['public_key'] ?? ''),
             'fingerprint' => (string) ($status['fingerprint'] ?? ''),
         ];
     }
 
-    public function show(Request $request, PackagePurchase $purchase)
+    public function show(Request $request, PackagePurchase $purchase, string $token)
     {
+        // Task 85 — امنیت: صفحهٔ بازگشت پرداخت فقط با توکن محرمانهٔ خرید باز می‌شود
+        abort_unless($purchase->hasValidAccessToken($token), 404);
+
         $purchase->load([
             'package:id,name,slug',
             'pricingPlan:id,name',
@@ -81,15 +84,15 @@ class PaymentReturnController extends Controller
         [$returnUrl, $returnHost, $isInternal] = $this->resolveReturnTarget($request, $purchase);
 
         return view('payment.return', [
-            'purchase'       => $purchase,
-            'status'         => $purchase->status, // paid | failed | pending
-            'message'        => $this->statusMessage($purchase),
-            'gatewayName'    => config("general.supported_gateways.{$purchase->gateway}") ?? $purchase->gateway,
-            'licenseKeyBox'  => $purchase->isPaid() ? $this->licenseKeyBox() : null,
-            'returnUrl'      => $returnUrl,
-            'returnHost'     => $returnHost,
-            'isInternal'     => $isInternal,
-            'seconds'        => 10,
+            'purchase' => $purchase,
+            'status' => $purchase->status, // paid | failed | pending
+            'message' => $this->statusMessage($purchase),
+            'gatewayName' => config("general.supported_gateways.{$purchase->gateway}") ?? $purchase->gateway,
+            'licenseKeyBox' => $purchase->isPaid() ? $this->licenseKeyBox() : null,
+            'returnUrl' => $returnUrl,
+            'returnHost' => $returnHost,
+            'isInternal' => $isInternal,
+            'seconds' => 10,
         ]);
     }
 
@@ -104,21 +107,21 @@ class PaymentReturnController extends Controller
     {
         $callback = $purchase->callback_url;
 
-        if (!$callback || $this->isInternalCallback($callback)) {
-            $url = route('payment.result', $purchase);
+        if (! $callback || $this->isInternalCallback($callback)) {
+            $url = route('payment.result', ['purchase' => $purchase, 'token' => $purchase->access_token]);
 
             return [$url, null, true];
         }
 
         $status = match ($purchase->status) {
-            PackagePurchase::STATUS_PAID   => 'success',
+            PackagePurchase::STATUS_PAID => 'success',
             PackagePurchase::STATUS_FAILED => 'failed',
-            default                        => 'pending',
+            default => 'pending',
         };
 
         $params = [
             'transaction_id' => $purchase->transaction_id,
-            'status'         => $status,
+            'status' => $status,
         ];
 
         if ($purchase->isPaid()) {
@@ -129,7 +132,7 @@ class PaymentReturnController extends Controller
 
         // پارامترهای اصلی درگاه (مثل transactionId یا cancel) به فروشگاه هم forward می‌شود
         foreach (self::FORWARD_KEYS as $key) {
-            if ($request->filled($key) && !array_key_exists($key, $params)) {
+            if ($request->filled($key) && ! array_key_exists($key, $params)) {
                 $params[$key] = $request->input($key);
             }
         }
@@ -137,7 +140,7 @@ class PaymentReturnController extends Controller
         $separator = str_contains($callback, '?') ? '&' : '?';
 
         return [
-            $callback . $separator . http_build_query($params),
+            $callback.$separator.http_build_query($params),
             parse_url($callback, PHP_URL_HOST) ?: $callback,
             false,
         ];
@@ -147,8 +150,11 @@ class PaymentReturnController extends Controller
      * نسخه‌ی اشتراک: صفحه نتیجه پرداختِ سفارش اشتراک (payment/return/subscription/{order}).
      * برای سفارش‌های API (callback_url بیرونی): وضعیت + شمارش معکوس + بازگشت به فروشگاه.
      */
-    public function showSubscription(Request $request, SubscriptionOrder $order)
+    public function showSubscription(Request $request, SubscriptionOrder $order, string $token)
     {
+        // Task 85 — امنیت: صفحهٔ بازگشت پرداخت اشتراک فقط با توکن محرمانهٔ سفارش باز می‌شود
+        abort_unless($order->hasValidAccessToken($token), 404);
+
         $order->load([
             'plan:id,name,slug,duration_months',
             'customer:id,name',
@@ -164,20 +170,20 @@ class PaymentReturnController extends Controller
         [$returnUrl, $returnHost, $isInternal] = $this->resolveSubscriptionReturnTarget($request, $order);
 
         $months = (int) ($order->plan?->duration_months ?? $order->meta['plan']['duration_months'] ?? null);
-        $planDuration = $months === null ? null : ($months === 0 ? 'نامحدود' : fa_num($months) . ' ماه');
+        $planDuration = $months === null ? null : ($months === 0 ? 'نامحدود' : fa_num($months).' ماه');
 
         return view('payment.return-subscription', [
-            'order'          => $order,
-            'status'         => $order->status, // paid | failed | pending
-            'message'        => $this->subscriptionStatusMessage($order),
-            'gatewayName'    => config("general.supported_gateways.{$order->gateway}") ?? $order->gateway,
-            'planDuration'   => $planDuration,
-            'packagesCount'  => count($order->meta['plan']['packages'] ?? []),
-            'licenseKeyBox'  => $order->isPaid() ? $this->licenseKeyBox() : null,
-            'returnUrl'      => $returnUrl,
-            'returnHost'     => $returnHost,
-            'isInternal'     => $isInternal,
-            'seconds'        => 10,
+            'order' => $order,
+            'status' => $order->status, // paid | failed | pending
+            'message' => $this->subscriptionStatusMessage($order),
+            'gatewayName' => config("general.supported_gateways.{$order->gateway}") ?? $order->gateway,
+            'planDuration' => $planDuration,
+            'packagesCount' => count($order->meta['plan']['packages'] ?? []),
+            'licenseKeyBox' => $order->isPaid() ? $this->licenseKeyBox() : null,
+            'returnUrl' => $returnUrl,
+            'returnHost' => $returnHost,
+            'isInternal' => $isInternal,
+            'seconds' => 10,
         ]);
     }
 
@@ -192,33 +198,33 @@ class PaymentReturnController extends Controller
     {
         $callback = $order->callback_url;
 
-        if (!$callback || $this->isInternalCallback($callback)) {
-            $url = route('subscription.result', $order);
+        if (! $callback || $this->isInternalCallback($callback)) {
+            $url = route('subscription.result', ['order' => $order, 'token' => $order->access_token]);
 
             return [$url, null, true];
         }
 
         $status = match ($order->status) {
-            SubscriptionOrder::STATUS_PAID   => 'success',
+            SubscriptionOrder::STATUS_PAID => 'success',
             SubscriptionOrder::STATUS_FAILED => 'failed',
-            default                          => 'pending',
+            default => 'pending',
         };
 
         $params = [
             'transaction_id' => $order->transaction_id,
-            'status'         => $status,
+            'status' => $status,
         ];
 
         if ($order->isPaid()) {
-            $params['order_id']       = $order->id;
-            $params['admin_status']   = $order->admin_status;
+            $params['order_id'] = $order->id;
+            $params['admin_status'] = $order->admin_status;
             $params['subscription_id'] = $order->subscription_id;
         } else {
             $params['error'] = $order->meta['fail_reason'] ?? 'پرداخت ناموفق بود.';
         }
 
         foreach (self::FORWARD_KEYS as $key) {
-            if ($request->filled($key) && !array_key_exists($key, $params)) {
+            if ($request->filled($key) && ! array_key_exists($key, $params)) {
                 $params[$key] = $request->input($key);
             }
         }
@@ -226,7 +232,7 @@ class PaymentReturnController extends Controller
         $separator = str_contains($callback, '?') ? '&' : '?';
 
         return [
-            $callback . $separator . http_build_query($params),
+            $callback.$separator.http_build_query($params),
             parse_url($callback, PHP_URL_HOST) ?: $callback,
             false,
         ];
@@ -235,9 +241,9 @@ class PaymentReturnController extends Controller
     private function subscriptionStatusMessage(SubscriptionOrder $order): string
     {
         return match ($order->status) {
-            SubscriptionOrder::STATUS_PAID   => 'پرداخت شما تأیید شد؛ درخواست اشتراک ثبت شد و پس از تأیید مدیر، اشتراک و دسترسی‌های پکیج‌ها فعال می‌شود.',
+            SubscriptionOrder::STATUS_PAID => 'پرداخت شما تأیید شد؛ درخواست اشتراک ثبت شد و پس از تأیید مدیر، اشتراک و دسترسی‌های پکیج‌ها فعال می‌شود.',
             SubscriptionOrder::STATUS_FAILED => $order->meta['fail_reason'] ?? 'متأسفانه پرداخت شما تأیید نشد؛ مبلغی از حساب شما کسر نشده است.',
-            default                          => 'پرداخت هنوز توسط درگاه تأیید نشده است. پس از بازگشت به فروشگاه، وضعیت تراکنش بررسی می‌شود.',
+            default => 'پرداخت هنوز توسط درگاه تأیید نشده است. پس از بازگشت به فروشگاه، وضعیت تراکنش بررسی می‌شود.',
         };
     }
 
@@ -264,9 +270,9 @@ class PaymentReturnController extends Controller
     private function statusMessage(PackagePurchase $purchase): string
     {
         return match ($purchase->status) {
-            PackagePurchase::STATUS_PAID   => 'پرداخت شما با موفقیت تأیید شد و لایسنس پکیج صادر گردید.',
+            PackagePurchase::STATUS_PAID => 'پرداخت شما با موفقیت تأیید شد و لایسنس پکیج صادر گردید.',
             PackagePurchase::STATUS_FAILED => $purchase->meta['fail_reason'] ?? 'متأسفانه پرداخت شما تأیید نشد؛ مبلغی از حساب شما کسر نشده است.',
-            default                        => 'پرداخت هنوز توسط درگاه تأیید نشده است. پس از بازگشت به فروشگاه، وضعیت تراکنش بررسی می‌شود.',
+            default => 'پرداخت هنوز توسط درگاه تأیید نشده است. پس از بازگشت به فروشگاه، وضعیت تراکنش بررسی می‌شود.',
         };
     }
 
@@ -276,6 +282,6 @@ class PaymentReturnController extends Controller
         $host = (string) parse_url($url, PHP_URL_HOST);
         $port = parse_url($url, PHP_URL_PORT);
 
-        return $port ? $host . ':' . $port : $host;
+        return $port ? $host.':'.$port : $host;
     }
 }

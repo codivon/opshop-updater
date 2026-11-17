@@ -21,7 +21,7 @@
                     <p class="mt-2 text-sm leading-7 text-emerald-50/85">لایسنس پکیج «{{ $purchase->package?->name }}» صادر شد و می‌توانید جزئیات آن را مشاهده کنید.</p>
                 </div>
                 <div class="flex flex-col gap-3 p-5 sm:flex-row sm:justify-center sm:p-6">
-                    <a href="{{ route('payment.result', $purchase) }}">
+                    <a href="{{ route('payment.result', ['purchase' => $purchase, 'token' => $purchase->access_token]) }}">
                         <x-btn variant="primary" icon="receipt">مشاهده لایسنس و جزئیات</x-btn>
                     </a>
                     @if($purchase->callback_url)

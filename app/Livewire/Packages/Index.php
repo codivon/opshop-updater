@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Packages;
 
+use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithBulkActions;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Category;
@@ -21,7 +22,8 @@ use Livewire\WithPagination;
 #[Title('پکیج‌ها')]
 class Index extends Component
 {
-    use WithPagination, WithToasts, WithBulkActions;
+    use AuthorizesAdmin;
+    use WithBulkActions, WithPagination, WithToasts;
 
     #[Url]
     public string $search = '';
@@ -49,14 +51,14 @@ class Index extends Component
     public array $form = [];
 
     public const CATEGORIES = [
-        'shop'         => 'فروشگاه',
-        'payment'      => 'پرداخت',
+        'shop' => 'فروشگاه',
+        'payment' => 'پرداخت',
         'notification' => 'اعلان',
-        'seo'          => 'سئو',
-        'blog'         => 'بلاگ',
-        'utility'      => 'ابزار',
-        'theme'        => 'قالب',
-        'other'        => 'سایر',
+        'seo' => 'سئو',
+        'blog' => 'بلاگ',
+        'utility' => 'ابزار',
+        'theme' => 'قالب',
+        'other' => 'سایر',
     ];
 
     public function updatedSearch(): void
@@ -128,7 +130,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Bulk selection (WithBulkActions)                                 */
+    /*  Bulk selection (WithBulkActions) */
     /* ---------------------------------------------------------------- */
 
     public function bulkPageIds(): array
@@ -151,19 +153,19 @@ class Index extends Component
 
             // حذف فایل‌های ZIP نسخه‌ها
             foreach ($package->versions as $version) {
-                if ($version->file_path && file_exists(storage_path('app/' . $version->file_path))) {
-                    @unlink(storage_path('app/' . $version->file_path));
+                if ($version->file_path && file_exists(storage_path('app/'.$version->file_path))) {
+                    @unlink(storage_path('app/'.$version->file_path));
                 }
             }
 
             $package->delete();
         }
 
-        $this->toast(fa_num(count($packages)) . ' پکیج و تمام نسخه‌های آن حذف شد.');
+        $this->toast(fa_num(count($packages)).' پکیج و تمام نسخه‌های آن حذف شد.');
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD                                                             */
+    /*  CRUD */
     /* ---------------------------------------------------------------- */
 
     public function openCreate(): void
@@ -171,18 +173,18 @@ class Index extends Component
         $this->resetValidation();
         $this->editingId = null;
         $this->form = [
-            'project_id'        => '',
-            'name'              => '',
-            'slug'              => '',
+            'project_id' => '',
+            'name' => '',
+            'slug' => '',
             'short_description' => '',
-            'description'       => '',
-            'author'            => '',
-            'category_id'       => '',
-            'is_free'           => false,
-            'default_price'     => 0,
-            'status'            => 'draft',
-            'module_name'       => '',
-            'sort_order'        => 0,
+            'description' => '',
+            'author' => '',
+            'category_id' => '',
+            'is_free' => false,
+            'default_price' => 0,
+            'status' => 'draft',
+            'module_name' => '',
+            'sort_order' => 0,
         ];
         $this->showModal = true;
     }
@@ -254,8 +256,8 @@ class Index extends Component
 
         // حذف فایل‌های ZIP نسخه‌ها
         foreach ($package->versions as $version) {
-            if ($version->file_path && file_exists(storage_path('app/' . $version->file_path))) {
-                @unlink(storage_path('app/' . $version->file_path));
+            if ($version->file_path && file_exists(storage_path('app/'.$version->file_path))) {
+                @unlink(storage_path('app/'.$version->file_path));
             }
         }
 
@@ -277,22 +279,22 @@ class Index extends Component
     protected function rules(): array
     {
         $slugUnique = $this->editingId
-            ? 'unique:packages,slug,' . $this->editingId
+            ? 'unique:packages,slug,'.$this->editingId
             : 'unique:packages,slug';
 
         return [
-            'form.project_id'        => ['required', 'exists:projects,id'],
-            'form.name'              => ['required', 'string', 'max:255'],
-            'form.slug'              => ['nullable', 'string', 'max:100', $slugUnique],
+            'form.project_id' => ['required', 'exists:projects,id'],
+            'form.name' => ['required', 'string', 'max:255'],
+            'form.slug' => ['nullable', 'string', 'max:100', $slugUnique],
             'form.short_description' => ['nullable', 'string', 'max:10000'],
-            'form.description'       => ['nullable', 'string'],
-            'form.author'            => ['nullable', 'string', 'max:100'],
-            'form.category_id'       => ['nullable', 'exists:categories,id'],
-            'form.is_free'           => ['nullable', 'boolean'],
-            'form.default_price'     => ['nullable', 'integer', 'min:0'],
-            'form.status'            => ['required', 'in:draft,active,archived'],
-            'form.module_name'       => ['nullable', 'string', 'max:100'],
-            'form.sort_order'        => ['nullable', 'integer', 'min:0'],
+            'form.description' => ['nullable', 'string'],
+            'form.author' => ['nullable', 'string', 'max:100'],
+            'form.category_id' => ['nullable', 'exists:categories,id'],
+            'form.is_free' => ['nullable', 'boolean'],
+            'form.default_price' => ['nullable', 'integer', 'min:0'],
+            'form.status' => ['required', 'in:draft,active,archived'],
+            'form.module_name' => ['nullable', 'string', 'max:100'],
+            'form.sort_order' => ['nullable', 'integer', 'min:0'],
         ];
     }
 
@@ -300,10 +302,10 @@ class Index extends Component
     {
         return [
             'form.project_id.required' => 'انتخاب پروژه الزامی است.',
-            'form.name.required'        => 'نام پکیج الزامی است.',
-            'form.slug.unique'          => 'این نامک قبلاً استفاده شده است.',
+            'form.name.required' => 'نام پکیج الزامی است.',
+            'form.slug.unique' => 'این نامک قبلاً استفاده شده است.',
             'form.default_price.integer' => 'قیمت باید عدد باشد.',
-            'form.status.required'      => 'وضعیت را انتخاب کنید.',
+            'form.status.required' => 'وضعیت را انتخاب کنید.',
         ];
     }
 
