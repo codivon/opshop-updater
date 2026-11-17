@@ -190,6 +190,22 @@
                 </div>
             @endif
 
+            {{-- سئوی اختصاصی محصول (Task 82) --}}
+            <div class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                <p class="mb-3 flex items-center gap-2 text-sm font-black text-zinc-700 dark:text-zinc-200">
+                    <x-icon name="trending-up" class="size-4 text-brand-600" />
+                    سئو (خالی = خود محصول استفاده می‌شود)
+                </p>
+                <div class="space-y-4">
+                    <x-field label="عنوان متا (Title)" for="form.meta_title" hint="حداکثر ۲۰۰ کاراکتر — عنوانی که در گوگل نمایش داده می‌شود.">
+                        <x-input id="form.meta_title" wire:model="form.meta_title" dir="ltr" />
+                    </x-field>
+                    <x-field label="توضیح متا (Description)" for="form.meta_description" hint="۱۵۰ تا ۱۶۰ کاراکتر گویا با کلمات کلیدی هدف.">
+                        <x-textarea id="form.meta_description" wire:model="form.meta_description" rows="3" />
+                    </x-field>
+                </div>
+            </div>
+
             <div class="flex flex-col gap-4">
                 <x-toggle wire:model="form.is_free" label="این محصول رایگان است" />
 

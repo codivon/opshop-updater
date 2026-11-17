@@ -261,6 +261,15 @@ checkout در `Shop\PackageShow::buy()`: کد آپدیت → Customer → گار
 - ⚠️ **گاتچا حیاتی:** پراپرتی محاسبه‌شدهٔ Livewire درون‌درخواستی کش می‌شود (`requestCachedValue ??=`) — چون `runMigrations()` قبل از اجرا `$this->pendingMigrations` را می‌خواند، رندر بعدی مقدار کهنه برمی‌گرداند و بخش مخفی نمی‌شد؛ راه‌حل: `unset($this->pendingMigrations);` بعد از اجرا (handleMagicUnset کش را می‌ریزد).
 - **کش‌ها:** `clearCache('app'|'config'|'route'|'view'|'all')` — یک اکشن با پارامتر (map ثابت CACHE_TARGETS). بهینه‌سازی: `optimize()` = config/route/view:cache (در testing فقط view:cache). دکمه‌های کش = دکمه‌های سفارشی با `wire:target` دقیق هر پارامتر.
 
+## ۶.۹ سئوی مرکزی + مجوزهای فوتر (Task 82)
+
+- **هسته**: `App\Support\Seo` — متاهای هر درخواست (title/description/canonical/robots/OG/Twitter/JSON-LD) + robotsTxt()/llmsTxt()/llmsFullTxt() + schema سازنده‌ها؛ تنظیمات گروه `seo` (کلیدها در `Seo::DEFAULTS`) از پنل `/admin/settings/seo` (Livewire `Settings\SeoSettings`) مدیریت می‌شود.
+- **لایوت**: `components/seo-head.blade.php` همهٔ تگ‌ها را می‌چاپد؛ title لایوت فروشگاه از Seo می‌آید؛ فایل فیزیکی robots.txt حذف شد؛ روت‌ها: `sitemap.xml`, `robots.txt`, `llms.txt`, `llms-full.txt` (SeoController؛ sitemap کش ۳۰دقیقه).
+- **سئوی هر رکورد**: فیلدهای `meta_title/meta_description` روی packages/products/templates (مایگریشن 2026_11_17) + فرم ویرایش هر سه بخش پنل؛ خالی = خود رکورد.
+- **noindex خودکار**: همهٔ روت‌های غیرفروشگاهی (پرداخت/ورود/پنل/دانلود) با `Seo::isIndexableRoute`؛ لایوت guest هم متای noindex ثابت دارد.
+- **مجوزهای فوتر**: تنظیم `footer_badges` (JSON فهرست: type=image|code, title, image, code, link, enabled) در تب فوتر «صفحهٔ اصلی فروشگاه» (کامپوننت `Settings\HomePage` با پراپرتی `$badges` + اکشن‌های addFooterBadge/removeFooterBadge/moveFooterBadge؛ آپلود با `ImageUploadService::uploadFooterBadgeImage` → `uploads/footer-badges/`)؛ رندر در لایوت فروشگاه از `HomePage::badges()`؛ **سازگاری**: تا وقتی فهرست خالی است کد اینماد قدیمی (`footer_enamad_code`) خودکار به‌عنوان یک آیتم کد نمایش/وارد می‌شود.
+- **کلید امضای لایسنس**: صفحهٔ مستقل حذف شد؛ تب دوم «تنظیمات برنامه‌نویس» (`/admin/settings/developer`) — منطق از `LicenseKey` قدیم به `Developer` منتقل شد؛ روت `admin.settings.license-key` فقط redirect است.
+
 ## ۷. گاتچاهای حیاتی (خلاصه تجربه — حتماً رعایت شود)
 
 1. **Blade**: کلاس bare ممنوع (`Route::` → `\Illuminate\Support\Facades\Route::`)؛ `@php(...)` inline را با بلاک `@php @endphp` قاطی نکنید؛ interpolation `{{ }}` **داخل تگ کامپوننت** (`<x-icon ... {{ $x }} />`) تگ را غیرقابل‌کامپایل می‌کند → با `@if` شاخه‌بندی کنید.
@@ -292,6 +301,14 @@ checkout در `Shop\PackageShow::buy()`: کد آپدیت → Customer → گار
 
 19. **دو جدول لایسنس = تداخل شناسه**: `admin.licenses.show` (Livewire `Licenses\Show`) فقط `PackageLicense` می‌بیند — لینک‌دادن `TemplateLicense` به آن یعنی نمایش **لایسنس اشتباه** (id بین `package_licenses` و `template_licenses` مشترک است ولی دو جدول جدا!). لایسنس قالب فقط از طریق صفحهٔ لایسنس‌ها (`admin.licenses.index` با `?type=template&search=KEY`) مدیریت می‌شود — «نمای کامل فروشگاه» (`/admin/inventory`, Livewire `Inventory\Index`) همین قرارداد را رعایت می‌کند.
 20. **کپچای خودمیزبان در E2E**: پاسخ با `en_num` نرمال‌سازی می‌شود (ارقام لاتین هم اوکی)؛ تلهٔ زمان ≥۲ ثانیه بین ساخت سؤال و پاسخ؛ هر `verify()` سؤال را مصرف و نو می‌سازد؛ تصویر سؤال در `/captcha/image` از سشن می‌آید — خواندن با curl باید با کوکی **`laravel-session`** (با خط تیره!) مرورگر انجام شود وگرنه سؤالِ سشن دیگری می‌بینید و پاسخ «نادرست» می‌شود؛ فرم ورود مدیر فیلد honeypot `website` دارد که باید خالی بماند.
+
+21. **کامپوننت x-tabs — id تب بدون خط تیره**: محتوای هر تب با متغیرِ هم‌نامِ id خوانده می‌شود (`{{ ${$tab['id']} ?? '' }}`) → id مثل `license-key` یک متغیر PHP نامعتبر می‌سازد و پنل تب **خالی** رندر می‌شود؛ همیشه id بدون خط تیره بدهید (`license`, `general`, ... — Task 82 در developer.blade.php همین اشتباه بود).
+
+22. **robots.txt پویاست**: فایل فیزیکی `public/robots.txt` حذف شد (فایل ثابت بر روت اولویت دارد) — نسخهٔ پویا از `SeoController::robots` بر اساس تنظیمات پنل سئو ساخته می‌شود؛ **هرگز فایل را دوباره نسازید**؛ sitemap.xml/llms.txt/llms-full.txt هم پویا هستند (کش ۳۰دقیقه‌ای `seo:sitemap`).
+
+23. **سئوی مرکزی**: متاهای فروشگاه فقط از `App\Support\Seo::meta()` در لایوت `components/layouts/shop` می‌آیند — `#[Title]` استاتیک کامپوننت‌های Shop از این پس بی‌اثر است (لایوت نادیده‌اش می‌گیرد). صفحات جزئیات متا را از فیلدهای `meta_title/meta_description` رکورد (یا نام/توضیح خود رکورد) می‌سازند؛ JSON-LD اسکیمای سایت همیشه در head است و SoftwareApplication/Breadcrumb در صفحات جزئیات. به‌روزرسانی متا هنگام wire:navigate با اسکریپت انتهای body (`#seo-page-meta`) انجام می‌شود.
+
+24. **گاتچای `status()` کلید لایسنس**: وقتی کلیدی تنظیم نشده باشد `public_key === null` (نه `''`) — مقایسه `$publicKey !== ''` درست نیست و TypeError می‌دهد (LicenseSigningKeyService::status — Task 82 فیکس شد با `! empty`).
 
 
 ---

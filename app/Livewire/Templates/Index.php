@@ -6,9 +6,10 @@ use App\Livewire\Concerns\WithToasts;
 use App\Models\Category;
 use App\Models\Template;
 use App\Services\ImageUploadService;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -17,54 +18,63 @@ use Livewire\WithPagination;
 #[Title('قالب‌ها')]
 class Index extends Component
 {
-    use WithToasts, WithPagination, WithFileUploads;
+    use WithFileUploads, WithPagination, WithToasts;
 
     public string $search = '';
+
     public string $categoryFilter = '';
+
     public string $statusFilter = '';
 
     /* ---------------- Form (create/edit modal) ---------------- */
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public $thumbnailFile; // UploadedFile (اختیاری — فقط هنگام تغییر)
+
     public bool $removeThumbnail = false;
 
     /** شمارنده برای رندر مجدد اجباری input فایل پس از هر باز/بسته شدن مودال (رفع باگ تصویر) */
     public int $thumbNonce = 0;
 
     public array $form = [
-        'name'               => '',
-        'slug'               => '',
-        'category_id'        => '',
-        'short_description'  => '',
-        'description'        => '',
-        'price'              => 0,
-        'discount'           => 0,
-        'exclusive_price'    => 0,
+        'name' => '',
+        'slug' => '',
+        'category_id' => '',
+        'short_description' => '',
+        'description' => '',
+        'price' => 0,
+        'discount' => 0,
+        'exclusive_price' => 0,
         'exclusive_discount' => 0,
-        'exclusive_note'     => '',
-        'is_free'            => false,
-        'status'             => Template::STATUS_DRAFT,
-        'sort_order'         => 0,
+        'exclusive_note' => '',
+        'is_free' => false,
+        'status' => Template::STATUS_DRAFT,
+        'sort_order' => 0,
     ];
 
     protected function rules(): array
     {
         return [
-            'form.name'               => ['required', 'string', 'max:190'],
-            'form.slug'               => ['nullable', 'string', 'max:190', 'alpha_dash:ascii'],
-            'form.category_id'        => ['nullable', 'exists:categories,id'],
-            'form.short_description'  => ['nullable', 'string', 'max:10000'],
-            'form.description'        => ['nullable', 'string', 'max:100000'],
-            'form.price'              => ['nullable', 'integer', 'min:0'],
-            'form.discount'           => ['nullable', 'integer', 'min:0', 'max:100'],
-            'form.exclusive_price'    => ['nullable', 'integer', 'min:0'],
+            'form.name' => ['required', 'string', 'max:190'],
+            'form.slug' => ['nullable', 'string', 'max:190', 'alpha_dash:ascii'],
+            'form.category_id' => ['nullable', 'exists:categories,id'],
+            'form.short_description' => ['nullable', 'string', 'max:10000'],
+            'form.description' => ['nullable', 'string', 'max:100000'],
+            'form.price' => ['nullable', 'integer', 'min:0'],
+            'form.discount' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'form.exclusive_price' => ['nullable', 'integer', 'min:0'],
             'form.exclusive_discount' => ['nullable', 'integer', 'min:0', 'max:100'],
-            'form.exclusive_note'     => ['nullable', 'string', 'max:2000'],
-            'form.is_free'            => ['boolean'],
-            'form.status'             => ['required', 'in:draft,active,archived'],
-            'form.sort_order'         => ['nullable', 'integer', 'min:0', 'max:9999'],
-            'thumbnailFile'           => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
+            'form.exclusive_note' => ['nullable', 'string', 'max:2000'],
+            'form.is_free' => ['boolean'],
+            'form.status' => ['required', 'in:draft,active,archived'],
+            'form.sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
+
+            // سئوی اختصاصی قالب (Task 82)
+            'form.meta_title' => ['nullable', 'string', 'max:200'],
+            'form.meta_description' => ['nullable', 'string', 'max:500'],
+            'thumbnailFile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
         ];
     }
 
@@ -72,7 +82,7 @@ class Index extends Component
         'form.name.required' => 'نام قالب الزامی است.',
         'form.status.required' => 'وضعیت قالب الزامی است.',
         'thumbnailFile.image' => 'فایل تصویر شاخص معتبر نیست.',
-        'thumbnailFile.max'   => 'حجم تصویر شاخص حداکثر ۳ مگابایت.',
+        'thumbnailFile.max' => 'حجم تصویر شاخص حداکثر ۳ مگابایت.',
     ];
 
     public function updatingSearch(): void
@@ -91,7 +101,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  CRUD                                                             */
+    /*  CRUD */
     /* ---------------------------------------------------------------- */
 
     public function create(): void
@@ -102,19 +112,21 @@ class Index extends Component
         $this->thumbnailFile = null;
         $this->removeThumbnail = false;
         $this->form = [
-            'name'               => '',
-            'slug'               => '',
-            'category_id'        => '',
-            'short_description'  => '',
-            'description'        => '',
-            'price'              => 0,
-            'discount'           => 0,
-            'exclusive_price'    => 0,
+            'name' => '',
+            'slug' => '',
+            'category_id' => '',
+            'short_description' => '',
+            'description' => '',
+            'price' => 0,
+            'discount' => 0,
+            'exclusive_price' => 0,
             'exclusive_discount' => 0,
-            'exclusive_note'     => '',
-            'is_free'            => false,
-            'status'             => Template::STATUS_DRAFT,
-            'sort_order'         => 0,
+            'exclusive_note' => '',
+            'is_free' => false,
+            'status' => Template::STATUS_DRAFT,
+            'sort_order' => 0,
+            'meta_title' => '',
+            'meta_description' => '',
         ];
         $this->thumbNonce++;
         $this->showModal = true;
@@ -130,19 +142,21 @@ class Index extends Component
         $this->thumbnailFile = null;
         $this->removeThumbnail = false;
         $this->form = [
-            'name'               => $template->name,
-            'slug'               => $template->slug,
-            'category_id'        => (string) $template->category_id,
-            'short_description'  => (string) $template->short_description,
-            'description'        => (string) $template->description,
-            'price'              => $template->price,
-            'discount'           => $template->discount,
-            'exclusive_price'    => $template->exclusive_price,
+            'name' => $template->name,
+            'slug' => $template->slug,
+            'category_id' => (string) $template->category_id,
+            'short_description' => (string) $template->short_description,
+            'description' => (string) $template->description,
+            'price' => $template->price,
+            'discount' => $template->discount,
+            'exclusive_price' => $template->exclusive_price,
             'exclusive_discount' => $template->exclusive_discount,
-            'exclusive_note'     => (string) ($template->exclusive_note ?? ''),
-            'is_free'            => $template->is_free,
-            'status'             => $template->status,
-            'sort_order'         => $template->sort_order,
+            'exclusive_note' => (string) ($template->exclusive_note ?? ''),
+            'is_free' => $template->is_free,
+            'status' => $template->status,
+            'sort_order' => $template->sort_order,
+            'meta_title' => (string) $template->meta_title,
+            'meta_description' => (string) $template->meta_description,
         ];
         $this->thumbNonce++;
         $this->showModal = true;
@@ -153,19 +167,21 @@ class Index extends Component
         $data = $this->validate();
 
         $payload = [
-            'name'               => trim($data['form']['name']),
-            'slug'               => trim((string) ($data['form']['slug'] ?? '')),
-            'category_id'        => $data['form']['category_id'] !== '' ? (int) $data['form']['category_id'] : null,
-            'short_description'  => $data['form']['short_description'] ?: null,
-            'description'        => $data['form']['description'] ?: null,
-            'price'              => (int) ($data['form']['price'] ?? 0),
-            'discount'           => (int) ($data['form']['discount'] ?? 0),
-            'exclusive_price'    => (int) ($data['form']['exclusive_price'] ?? 0),
+            'name' => trim($data['form']['name']),
+            'slug' => trim((string) ($data['form']['slug'] ?? '')),
+            'category_id' => $data['form']['category_id'] !== '' ? (int) $data['form']['category_id'] : null,
+            'short_description' => $data['form']['short_description'] ?: null,
+            'description' => $data['form']['description'] ?: null,
+            'price' => (int) ($data['form']['price'] ?? 0),
+            'discount' => (int) ($data['form']['discount'] ?? 0),
+            'exclusive_price' => (int) ($data['form']['exclusive_price'] ?? 0),
             'exclusive_discount' => (int) ($data['form']['exclusive_discount'] ?? 0),
-            'exclusive_note'     => ($data['form']['exclusive_note'] ?? '') ?: null,
-            'is_free'            => (bool) $data['form']['is_free'],
-            'status'             => $data['form']['status'],
-            'sort_order'         => (int) ($data['form']['sort_order'] ?? 0),
+            'exclusive_note' => ($data['form']['exclusive_note'] ?? '') ?: null,
+            'is_free' => (bool) $data['form']['is_free'],
+            'status' => $data['form']['status'],
+            'sort_order' => (int) ($data['form']['sort_order'] ?? 0),
+            'meta_title' => $data['form']['meta_title'] ?: null,
+            'meta_description' => $data['form']['meta_description'] ?: null,
         ];
 
         // قالب رایگان قیمت ندارد
@@ -187,6 +203,7 @@ class Index extends Component
                     $exists = Template::where('slug', $payload['slug'])->where('id', '!=', $template->id)->exists();
                     if ($exists) {
                         $this->addError('form.slug', 'این نامک قبلاً استفاده شده است.');
+
                         return;
                     }
                 }
@@ -212,6 +229,7 @@ class Index extends Component
                     $payload['slug'] = Template::generateSlug($payload['name']);
                 } elseif (Template::where('slug', $payload['slug'])->exists()) {
                     $this->addError('form.slug', 'این نامک قبلاً استفاده شده است.');
+
                     return;
                 }
 
@@ -224,10 +242,12 @@ class Index extends Component
             }
         } catch (\RuntimeException $e) {
             $this->toast($e->getMessage(), 'error');
+
             return;
         } catch (\Throwable $e) {
             report($e);
-            $this->toast('ذخیره قالب ناموفق بود: ' . $e->getMessage(), 'error');
+            $this->toast('ذخیره قالب ناموفق بود: '.$e->getMessage(), 'error');
+
             return;
         }
 
@@ -260,6 +280,7 @@ class Index extends Component
 
         if ($template->purchases()->where('status', 'paid')->exists()) {
             $this->toast('این قالب خرید موفق دارد و قابل حذف نیست؛ آن را آرشیو کنید.', 'error');
+
             return;
         }
 
@@ -271,8 +292,8 @@ class Index extends Component
 
         // حذف فایل ZIP نسخه‌ها
         foreach ($template->versions as $version) {
-            if ($version->file_path && \Illuminate\Support\Facades\Storage::disk('local')->exists($version->file_path)) {
-                \Illuminate\Support\Facades\Storage::disk('local')->delete($version->file_path);
+            if ($version->file_path && Storage::disk('local')->exists($version->file_path)) {
+                Storage::disk('local')->delete($version->file_path);
             }
         }
 
@@ -281,7 +302,7 @@ class Index extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Computed                                                         */
+    /*  Computed */
     /* ---------------------------------------------------------------- */
 
     #[Computed]

@@ -626,18 +626,137 @@
             {{-- ==================== فوتر ==================== --}}
             <x-slot:footer>
                 <div class="space-y-6">
-                    <x-card title="نشان‌های اعتماد فوتر (اینماد)" subtitle="کد HTML اینماد (یا هر نشان اعتماد دیگر) را اینجا بچسبانید؛ در فوتر همهٔ صفحات فروشگاه نمایش داده می‌شود.">
+                    {{-- مجوزها و نشان‌های اعتماد — هر مجوز به‌صورت تصویر (آپلود یا URL) یا کد HTML (Task 82) --}}
+                    <x-card title="مجوزها و نشان‌های اعتماد فوتر" subtitle="هر مجوزی (اینماد، ساماندهی، ای‌نماد، مجوز اتحادیه و...) را به‌صورت تصویر یا کد HTML اضافه کنید؛ در فوتر همهٔ صفحات فروشگاه نمایش داده می‌شود.">
                         <div class="space-y-5">
-                            <div class="rounded-xl bg-amber-50 p-4 text-xs leading-6 text-amber-800 ring-1 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20">
-                                کد را از پنل اینماد کپی کنید (معمولاً یک تگ <a> با تصویر یا یک اسکریپت) و عیناً در کادر زیر قرار دهید. تا وقتی این کادر خالی باشد، هیچ نشان نمایش داده نمی‌شود. این فیلد HTML خام است؛ فقط از کد رسمی اینماد استفاده کنید.
+                            <div class="rounded-xl bg-brand-50 p-4 text-xs leading-6 text-brand-800 ring-1 ring-brand-600/20 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
+                                <span class="font-bold">چطور کار می‌کند؟</span>
+                                برای هر مجوز یک ردیف اضافه کنید و نوعش را انتخاب کنید:
+                                <span class="font-bold">تصویر</span> (فایل را آپلود کنید یا آدرس اینترنتی تصویر را بدهید) یا
+                                <span class="font-bold">کد</span> (کد HTML رسمی مجوز — مثل کد اینماد — را عیناً بچسبانید).
+                                ترتیب نمایش با فلش‌های بالا/پایین، نمایش/مخفی‌کردن هر مجوز با کلیدش کنترل می‌شود.
+                                <span class="font-bold">پس از تکمیل، «ذخیره تنظیمات» را بزنید.</span>
                             </div>
 
-                            <x-field label="کد اینماد (HTML)" for="footer_enamad_code">
-                                <x-textarea id="footer_enamad_code" wire:model="form.footer_enamad_code" rows="6" dir="ltr"
-                                            class="font-mono text-xs" placeholder='<a href="https://trustseal.enamad.ir/?id=…"><img src="…" alt=""/></a>' />
-                            </x-field>
+                            @if(count($badges) === 0)
+                                <div class="flex flex-col items-center gap-3 rounded-xl border border-dashed border-zinc-300 px-4 py-10 text-center dark:border-zinc-700">
+                                    <span class="flex size-12 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500">
+                                        <x-icon name="badge-check" class="size-6" />
+                                    </span>
+                                    <p class="text-sm font-bold text-zinc-600 dark:text-zinc-300">هنوز مجوزی اضافه نشده است</p>
+                                    <p class="max-w-md text-xs leading-6 text-zinc-400 dark:text-zinc-500">
+                                        اگر قبلاً کد اینماد در این تب ثبت کرده بودید، به‌صورت خودکار به فهرست پایین منتقل شده است. برای افزودن مجوز جدید، دکمهٔ زیر را بزنید.
+                                    </p>
+                                </div>
+                            @endif
+
+                            @error('badges')
+                                <div class="rounded-xl bg-rose-50 p-4 text-xs leading-6 text-rose-700 ring-1 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20">{{ $message }}</div>
+                            @enderror
+
+                            <div class="space-y-4">
+                                @foreach($badges as $i => $badge)
+                                    <div wire:key="footer-badge-{{ $i }}"
+                                         class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+                                                <x-icon name="{{ ($badge['type'] ?? 'image') === 'code' ? 'code' : 'image' }}" class="size-4" />
+                                            </span>
+                                            <p class="text-sm font-black text-zinc-700 dark:text-zinc-200">
+                                                مجوز {{ fa_num($i + 1) }}
+                                                @if(($badge['title'] ?? '') !== '')
+                                                    <span class="font-medium text-zinc-400">— {{ $badge['title'] }}</span>
+                                                @endif
+                                            </p>
+
+                                            <div class="flex flex-1 items-center justify-end gap-1">
+                                                <button type="button" wire:click="moveFooterBadge({{ $i }}, 'up')"
+                                                        @disabled($i === 0)
+                                                        class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                                                        title="انتقال به بالا" aria-label="انتقال مجوز به بالا">
+                                                    <x-icon name="chevron-up" class="size-4" />
+                                                </button>
+                                                <button type="button" wire:click="moveFooterBadge({{ $i }}, 'down')"
+                                                        @disabled($i === count($badges) - 1)
+                                                        class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-700 disabled:opacity-30 disabled:hover:bg-transparent dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                                                        title="انتقال به پایین" aria-label="انتقال مجوز به پایین">
+                                                    <x-icon name="chevron-down" class="size-4" />
+                                                </button>
+                                                <x-toggle wire:model="badges.{{ $i }}.enabled" id="badge_enabled_{{ $i }}" label="نمایش" />
+                                                <button type="button" wire:click="removeFooterBadge({{ $i }})"
+                                                        wire:confirm="این مجوز از فهرست حذف شود؟"
+                                                        class="rounded-lg p-2 text-rose-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                                                        title="حذف مجوز" aria-label="حذف مجوز">
+                                                    <x-icon name="trash-2" class="size-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                            <x-field label="عنوان (برای alt تصویر و متن جانشین)" for="badge_title_{{ $i }}">
+                                                <x-input id="badge_title_{{ $i }}" wire:model="badges.{{ $i }}.title" placeholder="مثلاً: نماد اعتماد الکترونیکی" />
+                                            </x-field>
+
+                                            <x-field label="نوع مجوز" for="badge_type_{{ $i }}">
+                                                <x-select id="badge_type_{{ $i }}" wire:model.live="badges.{{ $i }}.type" :options="['image' => 'تصویر (آپلود یا آدرس)', 'code' => 'کد HTML']" />
+                                            </x-field>
+
+                                            @if(($badge['type'] ?? 'image') === 'image')
+                                                <x-field label="آدرس تصویر (URL)" for="badge_image_{{ $i }}" hint="اگر فایل آپلود کنید، بر این آدرس اولویت دارد.">
+                                                    <x-input id="badge_image_{{ $i }}" wire:model="badges.{{ $i }}.image" dir="ltr"
+                                                             placeholder="https://trustseal.enamad.ir/…/logo.png" class="font-mono text-xs" />
+                                                </x-field>
+                                                <x-field label="یا آپلود فایل تصویر" for="badge_file_{{ $i }}" hint="JPG، PNG، WEBP یا GIF — حداکثر ۳ مگابایت.">
+                                                    <input id="badge_file_{{ $i }}" type="file" wire:model="badges.{{ $i }}.file"
+                                                           accept=".jpg,.jpeg,.png,.webp,.gif"
+                                                           class="block w-full rounded-lg border border-zinc-200 bg-white text-xs text-zinc-600 file:me-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-xs file:font-bold file:text-brand-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:file:bg-brand-500/10 dark:file:text-brand-300" />
+                                                    @error('badges.'.$i.'.file')
+                                                        <p class="mt-1 text-xs font-bold text-rose-600">{{ $message }}</p>
+                                                    @enderror
+                                                </x-field>
+
+                                                @if(($badge['image'] ?? '') !== '')
+                                                    <div class="flex items-center gap-3 lg:col-span-2">
+                                                        <img src="{{ \App\Support\HomePage::badgeImageUrl($badge['image']) }}" alt="{{ $badge['title'] ?: 'پیش‌نمایش مجوز' }}"
+                                                             class="h-16 w-auto rounded-lg bg-white object-contain p-1 ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-700"
+                                                             onerror="this.style.display='none'">
+                                                        <p class="text-[11px] text-zinc-400">پیش‌نمایش تصویر فعلی</p>
+                                                    </div>
+                                                @endif
+                                            @else
+                                                <div class="lg:col-span-2">
+                                                    <x-field label="کد HTML مجوز" for="badge_code_{{ $i }}" hint="کد را عیناً از پنل مجوز (مثل اینماد) کپی کنید؛ فقط از کد رسمی استفاده کنید.">
+                                                        <x-textarea id="badge_code_{{ $i }}" wire:model="badges.{{ $i }}.code" rows="5" dir="ltr"
+                                                                    class="font-mono text-xs" placeholder='<a href="https://trustseal.enamad.ir/?id=…"><img src="…" alt=""/></a>' />
+                                                        @error('badges.'.$i.'.code')
+                                                            <p class="mt-1 text-xs font-bold text-rose-600">{{ $message }}</p>
+                                                        @enderror
+                                                    </x-field>
+                                                </div>
+                                            @endif
+
+                                            <x-field label="لینک (اختیاری)" for="badge_link_{{ $i }}" hint="روی تصویر مجوز کلیک شود، به این آدرس برود.">
+                                                <x-input id="badge_link_{{ $i }}" wire:model="badges.{{ $i }}.link" dir="ltr" placeholder="https://trustseal.enamad.ir/?id=…" class="font-mono text-xs" />
+                                            </x-field>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div>
+                                <x-btn variant="secondary" icon="plus" wire:click="addFooterBadge">افزودن مجوز جدید</x-btn>
+                            </div>
                         </div>
                     </x-card>
+
+                    {{-- کد اینماد قدیمی — فقط برای سازگاری؛ محتوای آن به‌صورت خودکار به فهرست بالا منتقل شده --}}
+                    @if(trim($form['footer_enamad_code'] ?? '') !== '')
+                        <x-card title="کد اینماد قدیمی (سازگاری)" subtitle="این کد از قبل ثبت شده و به‌صورت خودکار به فهرست مجوزهای بالا منتقل شده است.">
+                            <div class="rounded-xl bg-amber-50 p-4 text-xs leading-6 text-amber-800 ring-1 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20">
+                                برای مدیریت از فهرست «مجوزها و نشان‌های اعتماد فوتر» استفاده کنید. این کد پس از اولین «ذخیره تنظیمات» دیگر مستقیماً استفاده نمی‌شود.
+                            </div>
+                        </x-card>
+                    @endif
                 </div>
             </x-slot:footer>
         </x-tabs>

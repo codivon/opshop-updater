@@ -9,6 +9,7 @@ use App\Http\Controllers\Front\TemplateDownloadController;
 use App\Http\Controllers\Front\UpdateDownloadController;
 use App\Http\Controllers\Front\UploadsServeController;
 use App\Http\Controllers\Front\WebPaymentController;
+use App\Http\Controllers\SeoController;
 use App\Http\Middleware\EnsureAdminRole;
 use App\Livewire\ApiDocs;
 use App\Livewire\Dashboard;
@@ -17,9 +18,9 @@ use App\Livewire\Messages\Index;
 use App\Livewire\Packages\Show;
 use App\Livewire\Settings\Developer;
 use App\Livewire\Settings\HomePage;
-use App\Livewire\Settings\LicenseKey;
 use App\Livewire\Settings\Profile;
 use App\Livewire\Settings\Security;
+use App\Livewire\Settings\SeoSettings;
 use App\Livewire\Shop\Changelog;
 use App\Livewire\Shop\CustomerLogin;
 use App\Livewire\Shop\CustomerProfile;
@@ -52,6 +53,13 @@ use Illuminate\Support\Facades\Route;
 Route::get('uploads/{path}', UploadsServeController::class)
     ->where('path', '(.*)')
     ->name('uploads.serve');
+
+// سئو — sitemap.xml / robots.txt / llms.txt (پویا از پنل سئو — Task 82)
+// ⚠️ فایل فیزیکی public/robots.txt حذف شد؛ نسخهٔ پویا بر اساس تنظیمات سئو سرو می‌شود
+Route::get('sitemap.xml', [SeoController::class, 'sitemap']);
+Route::get('robots.txt', [SeoController::class, 'robots']);
+Route::get('llms.txt', [SeoController::class, 'llms']);
+Route::get('llms-full.txt', [SeoController::class, 'llmsFull']);
 
 /*
 |--------------------------------------------------------------------------
@@ -253,8 +261,12 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', EnsureAdminRole::cla
     Route::get('settings/gateways', Gateways::class)->name('settings.gateways');
     Route::get('settings/security', Security::class)->name('settings.security');
 
-    // کلید امضای لایسنس: ساخت/تعویض EC P-256 از پنل — بدون نیاز به شِل (هاست اشتراکی)
-    Route::get('settings/license-key', LicenseKey::class)->name('settings.license-key');
+    // سئو: متاهای همهٔ صفحات + خزنده‌های AI + سایت‌مپ/llms.txt (Task 82)
+    Route::get('settings/seo', SeoSettings::class)->name('settings.seo');
+
+    // کلید امضای لایسنس: مدیریت آن به تب دوم «تنظیمات برنامه‌نویس» منتقل شد —
+    // این مسیر فقط لینک‌های قدیمی را به صفحهٔ جدید هدایت می‌کند
+    Route::get('settings/license-key', fn () => redirect()->route('admin.settings.developer'))->name('settings.license-key');
 
     // تنظیمات برنامه‌نویس: محیط/دیباگ (.env)، کش‌ها، بهینه‌سازی و مایگریشن‌های در انتظار
     Route::get('settings/developer', Developer::class)->name('settings.developer');

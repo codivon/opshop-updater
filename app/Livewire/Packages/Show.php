@@ -3,11 +3,13 @@
 namespace App\Livewire\Packages;
 
 use App\Livewire\Concerns\WithToasts;
+use App\Models\Category;
 use App\Models\Package;
 use App\Models\PackageImage;
 use App\Models\PackagePricingPlan;
 use App\Models\PackagePurchase;
 use App\Models\PackageVersion;
+use App\Models\Project;
 use App\Services\ImageUploadService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -15,6 +17,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 use RuntimeException;
@@ -36,10 +39,10 @@ class Show extends Component
 
     public bool $removeThumbnail = false;
 
-    /** @var \Livewire\TemporaryUploadedFile|null */
+    /** @var TemporaryUploadedFile|null */
     public $thumbnailFile = null;
 
-    /** @var array<int, \Livewire\TemporaryUploadedFile> */
+    /** @var array<int, TemporaryUploadedFile> */
     public array $newGallery = [];
 
     public ?int $deleteId = null;
@@ -53,7 +56,7 @@ class Show extends Component
     /** @var array<string, mixed> */
     public array $versionForm = [];
 
-    /** @var \Livewire\TemporaryUploadedFile|null */
+    /** @var TemporaryUploadedFile|null */
     public $versionFile = null;
 
     public ?int $deleteVersionId = null;
@@ -71,7 +74,7 @@ class Show extends Component
 
     /* ---------------- images tab ---------------- */
 
-    /** @var array<int, \Livewire\TemporaryUploadedFile> */
+    /** @var array<int, TemporaryUploadedFile> */
     public array $newImages = [];
 
     public ?int $deleteImageId = null;
@@ -82,7 +85,7 @@ class Show extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Computed lists                                                   */
+    /*  Computed lists */
     /* ---------------------------------------------------------------- */
 
     #[Computed]
@@ -116,11 +119,11 @@ class Show extends Component
     public function counts(): array
     {
         return [
-            'versions'        => $this->package->versions()->count(),
+            'versions' => $this->package->versions()->count(),
             'active_licenses' => $this->package->licenses()->where('status', 'active')->count(),
-            'licenses'        => $this->package->licenses()->count(),
-            'plans'           => $this->package->pricingPlans()->count(),
-            'images'          => $this->package->images()->count(),
+            'licenses' => $this->package->licenses()->count(),
+            'plans' => $this->package->pricingPlans()->count(),
+            'images' => $this->package->images()->count(),
         ];
     }
 
@@ -134,10 +137,10 @@ class Show extends Component
     {
         $paid = $this->package->purchases()->where('status', PackagePurchase::STATUS_PAID);
 
-        $count    = (clone $paid)->count();
-        $revenue  = (clone $paid)->sum('amount');
+        $count = (clone $paid)->count();
+        $revenue = (clone $paid)->sum('amount');
         $discount = (clone $paid)->sum('discount_amount');
-        $buyers   = (clone $paid)->distinct('customer_id')->count('customer_id');
+        $buyers = (clone $paid)->distinct('customer_id')->count('customer_id');
 
         // تفکیک فروش به تفکیک نسخه (نسخه حذف‌شده = بدون برچسب)
         $byVersion = (clone $paid)
@@ -148,20 +151,20 @@ class Show extends Component
             ->get()
             ->map(function ($row) {
                 $row->version_label = $row->version_id
-                    ? \App\Models\PackageVersion::query()->find($row->version_id)?->version
+                    ? PackageVersion::query()->find($row->version_id)?->version
                     : null;
 
                 return $row;
             });
 
         return [
-            'count'        => $count,
-            'revenue'      => (int) $revenue,
-            'discount'     => (int) $discount,
-            'buyers'       => $buyers,
-            'average'      => $count > 0 ? (int) round($revenue / $count) : 0,
-            'by_version'   => $byVersion,
-            'recent'       => (clone $paid)->latest('id')
+            'count' => $count,
+            'revenue' => (int) $revenue,
+            'discount' => (int) $discount,
+            'buyers' => $buyers,
+            'average' => $count > 0 ? (int) round($revenue / $count) : 0,
+            'by_version' => $byVersion,
+            'recent' => (clone $paid)->latest('id')
                 ->with(['customer:id,name,phone', 'version:id,version'])
                 ->limit(10)
                 ->get(),
@@ -171,18 +174,18 @@ class Show extends Component
     #[Computed]
     public function projects()
     {
-        return \App\Models\Project::query()->orderBy('name')->get(['id', 'name']);
+        return Project::query()->orderBy('name')->get(['id', 'name']);
     }
 
     /** دسته‌بندی‌های ساختاریافته پکیج (جدول categories) — سلسله‌مراتبی برای سلکت */
     #[Computed]
     public function categories()
     {
-        return \App\Models\Category::flatOptions(\App\Models\Category::TYPE_PACKAGE);
+        return Category::flatOptions(Category::TYPE_PACKAGE);
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Package edit (all fields of the old edit form)                   */
+    /*  Package edit (all fields of the old edit form) */
     /* ---------------------------------------------------------------- */
 
     public function openEditPackage(): void
@@ -192,6 +195,7 @@ class Show extends Component
             'project_id', 'name', 'slug', 'short_description', 'description',
             'author', 'is_free', 'default_price', 'status',
             'module_name', 'sort_order',
+            'meta_title', 'meta_description',
         ]);
         $this->form['category_id'] = (string) ($this->package->category_id ?? '');
         $this->form['thumbnail_url'] = '';
@@ -208,27 +212,31 @@ class Show extends Component
         }
 
         $validated = $this->validate([
-            'form.project_id'        => ['required', 'exists:projects,id'],
-            'form.name'              => ['required', 'string', 'max:255'],
-            'form.slug'              => ['nullable', 'string', 'max:100', 'unique:packages,slug,' . $this->package->id],
+            'form.project_id' => ['required', 'exists:projects,id'],
+            'form.name' => ['required', 'string', 'max:255'],
+            'form.slug' => ['nullable', 'string', 'max:100', 'unique:packages,slug,'.$this->package->id],
             'form.short_description' => ['nullable', 'string', 'max:10000'],
-            'form.description'       => ['nullable', 'string'],
-            'form.author'            => ['nullable', 'string', 'max:100'],
-            'form.category_id'       => ['nullable', 'exists:categories,id'],
-            'form.thumbnail_url'     => ['nullable', 'url', 'max:255'],
-            'form.is_free'           => ['nullable', 'boolean'],
-            'form.default_price'     => ['nullable', 'integer', 'min:0'],
-            'form.status'            => ['required', 'in:draft,active,archived'],
-            'form.module_name'       => ['nullable', 'string', 'max:100'],
-            'form.sort_order'        => ['nullable', 'integer', 'min:0'],
-            'thumbnailFile'          => ['nullable', 'image', 'mimes:jpeg,png,webp,gif', 'max:3072'],
-            'newGallery'             => ['nullable', 'array', 'max:10'],
-            'newGallery.*'           => ['image', 'mimes:jpeg,png,webp,gif', 'max:3072'],
+            'form.description' => ['nullable', 'string'],
+            'form.author' => ['nullable', 'string', 'max:100'],
+            'form.category_id' => ['nullable', 'exists:categories,id'],
+            'form.thumbnail_url' => ['nullable', 'url', 'max:255'],
+            'form.is_free' => ['nullable', 'boolean'],
+            'form.default_price' => ['nullable', 'integer', 'min:0'],
+            'form.status' => ['required', 'in:draft,active,archived'],
+            'form.module_name' => ['nullable', 'string', 'max:100'],
+            'form.sort_order' => ['nullable', 'integer', 'min:0'],
+
+            // سئوی اختصاصی پکیج (Task 82)
+            'form.meta_title' => ['nullable', 'string', 'max:200'],
+            'form.meta_description' => ['nullable', 'string', 'max:500'],
+            'thumbnailFile' => ['nullable', 'image', 'mimes:jpeg,png,webp,gif', 'max:3072'],
+            'newGallery' => ['nullable', 'array', 'max:10'],
+            'newGallery.*' => ['image', 'mimes:jpeg,png,webp,gif', 'max:3072'],
         ], [
-            'form.name.required'       => 'نام پکیج الزامی است.',
-            'form.slug.unique'         => 'این نامک قبلاً استفاده شده است.',
-            'form.thumbnail_url.url'   => 'آدرس تصویر شاخص معتبر نیست.',
-            'form.status.required'     => 'وضعیت را انتخاب کنید.',
+            'form.name.required' => 'نام پکیج الزامی است.',
+            'form.slug.unique' => 'این نامک قبلاً استفاده شده است.',
+            'form.thumbnail_url.url' => 'آدرس تصویر شاخص معتبر نیست.',
+            'form.status.required' => 'وضعیت را انتخاب کنید.',
         ]);
 
         $form = $validated['form'];
@@ -248,7 +256,7 @@ class Show extends Component
         // دسته‌بندی ساختاریافته → هم category_id و هم ستون قدیمی category (سازگاری API)
         $form['category_id'] = filled($form['category_id'] ?? '') ? (int) $form['category_id'] : null;
         $form['category'] = $form['category_id']
-            ? (string) \App\Models\Category::find($form['category_id'])?->name
+            ? (string) Category::find($form['category_id'])?->name
             : null;
 
         $imageService = app(ImageUploadService::class);
@@ -260,7 +268,7 @@ class Show extends Component
         } elseif ($this->thumbnailFile) {
             $imageService->deleteThumbnail($this->package);
             $form['thumbnail'] = $imageService->uploadThumbnail($this->thumbnailFile, $form['slug']);
-        } elseif (!blank($form['thumbnail_url'] ?? null)) {
+        } elseif (! blank($form['thumbnail_url'] ?? null)) {
             $imageService->deleteThumbnail($this->package);
             $form['thumbnail'] = $form['thumbnail_url'];
         }
@@ -297,8 +305,8 @@ class Show extends Component
 
         // حذف فایل‌های ZIP نسخه‌ها
         foreach ($this->package->versions()->get() as $version) {
-            if ($version->file_path && file_exists(storage_path('app/' . $version->file_path))) {
-                @unlink(storage_path('app/' . $version->file_path));
+            if ($version->file_path && file_exists(storage_path('app/'.$version->file_path))) {
+                @unlink(storage_path('app/'.$version->file_path));
             }
         }
 
@@ -309,7 +317,7 @@ class Show extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Versions                                                         */
+    /*  Versions */
     /* ---------------------------------------------------------------- */
 
     public function openVersionCreate(): void
@@ -318,19 +326,19 @@ class Show extends Component
         $this->editingVersionId = null;
         $this->versionFile = null;
         $this->versionForm = [
-            'version'             => '',
-            'type'                => 'minor',
-            'changelog'           => '',
-            'what_added'          => '',
-            'what_changed'        => '',
-            'what_fixed'          => '',
+            'version' => '',
+            'type' => 'minor',
+            'changelog' => '',
+            'what_added' => '',
+            'what_changed' => '',
+            'what_fixed' => '',
             'min_project_version' => '',
-            'min_php_version'     => '',
+            'min_php_version' => '',
             'min_laravel_version' => '',
-            'dependencies'        => '',
-            'is_mandatory'        => false,
-            'status'              => 'active',
-            'release_date'        => now()->format('Y-m-d'),
+            'dependencies' => '',
+            'is_mandatory' => false,
+            'status' => 'active',
+            'release_date' => now()->format('Y-m-d'),
         ];
         $this->showVersionModal = true;
     }
@@ -342,50 +350,50 @@ class Show extends Component
         $this->editingVersionId = $version->id;
         $this->versionFile = null;
         $this->versionForm = [
-            'version'             => $version->version,
-            'type'                => $version->type,
-            'changelog'           => $version->changelog ?? '',
-            'what_added'          => $version->what_added ?? '',
-            'what_changed'        => $version->what_changed ?? '',
-            'what_fixed'          => $version->what_fixed ?? '',
+            'version' => $version->version,
+            'type' => $version->type,
+            'changelog' => $version->changelog ?? '',
+            'what_added' => $version->what_added ?? '',
+            'what_changed' => $version->what_changed ?? '',
+            'what_fixed' => $version->what_fixed ?? '',
             'min_project_version' => $version->min_project_version ?? '',
-            'min_php_version'     => $version->min_php_version ?? '',
+            'min_php_version' => $version->min_php_version ?? '',
             'min_laravel_version' => $version->min_laravel_version ?? '',
-            'dependencies'        => filled($version->dependencies) ? json_encode($version->dependencies, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '',
-            'is_mandatory'        => (bool) $version->is_mandatory,
-            'status'              => $version->status,
-            'release_date'        => $version->release_date?->format('Y-m-d') ?? now()->format('Y-m-d'),
+            'dependencies' => filled($version->dependencies) ? json_encode($version->dependencies, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '',
+            'is_mandatory' => (bool) $version->is_mandatory,
+            'status' => $version->status,
+            'release_date' => $version->release_date?->format('Y-m-d') ?? now()->format('Y-m-d'),
         ];
         $this->showVersionModal = true;
     }
 
     public function saveVersion(): void
     {
-        $unique = 'unique:package_versions,version,' . ($this->editingVersionId ?? 'NULL') . ',id,package_id,' . $this->package->id;
+        $unique = 'unique:package_versions,version,'.($this->editingVersionId ?? 'NULL').',id,package_id,'.$this->package->id;
 
         $validated = $this->validate([
-            'versionForm.version'             => ['required', 'string', 'max:50', $unique],
-            'versionForm.type'                => ['required', 'in:major,minor,patch'],
-            'versionForm.changelog'           => ['nullable', 'string'],
-            'versionForm.what_added'          => ['nullable', 'string'],
-            'versionForm.what_changed'        => ['nullable', 'string'],
-            'versionForm.what_fixed'          => ['nullable', 'string'],
+            'versionForm.version' => ['required', 'string', 'max:50', $unique],
+            'versionForm.type' => ['required', 'in:major,minor,patch'],
+            'versionForm.changelog' => ['nullable', 'string'],
+            'versionForm.what_added' => ['nullable', 'string'],
+            'versionForm.what_changed' => ['nullable', 'string'],
+            'versionForm.what_fixed' => ['nullable', 'string'],
             'versionForm.min_project_version' => ['nullable', 'string', 'max:20'],
-            'versionForm.min_php_version'     => ['nullable', 'string', 'max:20'],
+            'versionForm.min_php_version' => ['nullable', 'string', 'max:20'],
             'versionForm.min_laravel_version' => ['nullable', 'string', 'max:20'],
-            'versionForm.dependencies'        => ['nullable', 'string'],
-            'versionForm.is_mandatory'        => ['nullable', 'boolean'],
-            'versionForm.status'              => ['required', 'in:draft,active,archived'],
-            'versionForm.release_date'        => ['nullable', 'date'],
-            'versionFile'                     => array_filter([
+            'versionForm.dependencies' => ['nullable', 'string'],
+            'versionForm.is_mandatory' => ['nullable', 'boolean'],
+            'versionForm.status' => ['required', 'in:draft,active,archived'],
+            'versionForm.release_date' => ['nullable', 'date'],
+            'versionFile' => array_filter([
                 $this->editingVersionId ? 'nullable' : 'required',
                 'file', 'mimes:zip', 'max:307200',
             ]),
         ], [
             'versionForm.version.required' => 'شماره نسخه الزامی است.',
-            'versionForm.version.unique'   => 'این نسخه برای همین پکیج قبلاً ثبت شده است.',
-            'versionFile.required'         => 'فایل ZIP نسخه الزامی است.',
-            'versionFile.mimes'            => 'فقط فایل ZIP مجاز است.',
+            'versionForm.version.unique' => 'این نسخه برای همین پکیج قبلاً ثبت شده است.',
+            'versionFile.required' => 'فایل ZIP نسخه الزامی است.',
+            'versionFile.mimes' => 'فقط فایل ZIP مجاز است.',
         ]);
 
         $form = $this->versionForm;
@@ -401,20 +409,20 @@ class Show extends Component
         $releaseDate = blank($form['release_date'] ?? null) ? now() : $form['release_date'];
 
         $data = [
-            'package_id'         => $this->package->id,
-            'version'            => $form['version'],
-            'type'               => $form['type'],
-            'changelog'          => $form['changelog'] ?: null,
-            'what_added'         => $form['what_added'] ?: null,
-            'what_changed'       => $form['what_changed'] ?: null,
-            'what_fixed'         => $form['what_fixed'] ?: null,
+            'package_id' => $this->package->id,
+            'version' => $form['version'],
+            'type' => $form['type'],
+            'changelog' => $form['changelog'] ?: null,
+            'what_added' => $form['what_added'] ?: null,
+            'what_changed' => $form['what_changed'] ?: null,
+            'what_fixed' => $form['what_fixed'] ?: null,
             'min_project_version' => $form['min_project_version'] ?: null,
-            'min_php_version'     => $form['min_php_version'] ?: null,
+            'min_php_version' => $form['min_php_version'] ?: null,
             'min_laravel_version' => $form['min_laravel_version'] ?: null,
-            'dependencies'       => $dependencies,
-            'is_mandatory'       => (bool) ($form['is_mandatory'] ?? false),
-            'status'             => $form['status'],
-            'release_date'       => $releaseDate,
+            'dependencies' => $dependencies,
+            'is_mandatory' => (bool) ($form['is_mandatory'] ?? false),
+            'status' => $form['status'],
+            'release_date' => $releaseDate,
         ];
 
         // آپلود فایل ZIP جدید (در ایجاد الزامی، در ویرایش اختیاری)
@@ -426,7 +434,7 @@ class Show extends Component
                 }
             }
 
-            $filename = $this->package->slug . '_v' . Str::slug($form['version']) . '_' . time() . '.zip';
+            $filename = $this->package->slug.'_v'.Str::slug($form['version']).'_'.time().'.zip';
             $path = $this->versionFile->storeAs('packages', $filename, 'local');
             $absolutePath = Storage::disk('local')->path($path);
 
@@ -462,7 +470,7 @@ class Show extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Pricing plans                                                    */
+    /*  Pricing plans */
     /* ---------------------------------------------------------------- */
 
     public function openPlanCreate(): void
@@ -470,14 +478,14 @@ class Show extends Component
         $this->resetValidation();
         $this->editingPlanId = null;
         $this->planForm = [
-            'name'            => '',
+            'name' => '',
             'duration_months' => 12,
-            'price'           => '',
-            'discount_price'  => '',
-            'is_one_time'     => false,
-            'description'     => '',
-            'is_active'       => true,
-            'sort_order'      => 0,
+            'price' => '',
+            'discount_price' => '',
+            'is_one_time' => false,
+            'description' => '',
+            'is_active' => true,
+            'sort_order' => 0,
         ];
         $this->showPlanModal = true;
     }
@@ -501,18 +509,18 @@ class Show extends Component
         }
 
         $validated = $this->validate([
-            'planForm.name'            => ['required', 'string', 'max:50'],
+            'planForm.name' => ['required', 'string', 'max:50'],
             'planForm.duration_months' => ['required', 'integer', 'min:0', 'max:120'],
-            'planForm.price'           => ['required', 'integer', 'min:0'],
-            'planForm.discount_price'  => ['nullable', 'integer', 'min:0', 'lt:planForm.price'],
-            'planForm.is_one_time'     => ['nullable', 'boolean'],
-            'planForm.description'     => ['nullable', 'string', 'max:500'],
-            'planForm.is_active'       => ['nullable', 'boolean'],
-            'planForm.sort_order'      => ['nullable', 'integer', 'min:0'],
+            'planForm.price' => ['required', 'integer', 'min:0'],
+            'planForm.discount_price' => ['nullable', 'integer', 'min:0', 'lt:planForm.price'],
+            'planForm.is_one_time' => ['nullable', 'boolean'],
+            'planForm.description' => ['nullable', 'string', 'max:500'],
+            'planForm.is_active' => ['nullable', 'boolean'],
+            'planForm.sort_order' => ['nullable', 'integer', 'min:0'],
         ], [
-            'planForm.name.required'           => 'نام طرح الزامی است.',
-            'planForm.price.required'          => 'قیمت الزامی است.',
-            'planForm.discount_price.lt'       => 'قیمت با تخفیف باید کمتر از قیمت اصلی باشد.',
+            'planForm.name.required' => 'نام طرح الزامی است.',
+            'planForm.price.required' => 'قیمت الزامی است.',
+            'planForm.discount_price.lt' => 'قیمت با تخفیف باید کمتر از قیمت اصلی باشد.',
         ]);
 
         $form = $validated['planForm'];
@@ -542,17 +550,17 @@ class Show extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Gallery images                                                   */
+    /*  Gallery images */
     /* ---------------------------------------------------------------- */
 
     public function uploadImages(): void
     {
         $this->validate([
-            'newImages'   => ['required', 'array', 'max:10'],
+            'newImages' => ['required', 'array', 'max:10'],
             'newImages.*' => ['image', 'mimes:jpeg,png,webp,gif', 'max:3072'],
         ], [
             'newImages.required' => 'ابتدا تصاویر را انتخاب کنید.',
-            'newImages.max'      => 'حداکثر ۱۰ تصویر در هر بار.',
+            'newImages.max' => 'حداکثر ۱۰ تصویر در هر بار.',
         ]);
 
         try {
@@ -565,7 +573,7 @@ class Show extends Component
 
         $count = count($this->newImages);
         $this->newImages = [];
-        $this->toast('تعداد ' . fa_num($count) . ' تصویر به گالری اضافه شد.');
+        $this->toast('تعداد '.fa_num($count).' تصویر به گالری اضافه شد.');
     }
 
     public function deleteImage(): void
@@ -605,14 +613,12 @@ class Show extends Component
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Helpers                                                          */
+    /*  Helpers */
     /* ---------------------------------------------------------------- */
 
     /**
      * JSON وابستگی‌ها را به آرایه نگاشت slug => version تبدیل می‌کند.
      * خروجی false یعنی JSON نامعتبر است.
-     *
-     * @return array|false|null
      */
     private function parseDependenciesJson(string $raw): array|false|null
     {
@@ -622,7 +628,7 @@ class Show extends Component
 
         $decoded = json_decode($raw, true);
 
-        if (!is_array($decoded)) {
+        if (! is_array($decoded)) {
             return false;
         }
 

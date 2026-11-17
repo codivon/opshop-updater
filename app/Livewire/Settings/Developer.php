@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Livewire\Concerns\WithToasts;
+use App\Services\LicenseSigningKeyService;
 use App\Support\EnvEditor;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -20,6 +21,9 @@ use Livewire\Component;
  *   در database/migrations باشد که هنوز در جدول migrations دیتابیس ثبت نشده است؛
  *   دکمهٔ اجرا (php artisan migrate) جداول/ستون‌های جدید را می‌سازد و در صورت
  *   انتخاب مدیر، سیدرهای دیتابیس (db:seed) هم اجرا می‌شوند.
+ * - تب «کلید امضای لایسنس» (انتقال از صفحهٔ مستقل به درخواست کاربر): ساخت/تعویض
+ *   جفت‌کلید EC P-256 بدون نیاز به شِل + پاک‌سازی کش پیکربندی. کلید خصوصی هرگز
+ *   به کلاینت نمی‌رود — فقط وضعیت، اثرانگشت و کلید عمومی نمایش داده می‌شود.
  *
  * امنیت: علاوه بر میان‌افزار پنل، همهٔ اکشن‌های این صفحه فقط برای نقش admin
  * پاسخ داده می‌شوند (حتی وقتی قفل نقش‌ها در «امنیت و امکانات» خاموش است).
@@ -66,6 +70,27 @@ class Developer extends Component
     /** خروجی آخرین اجرای مایگریشن (برای نمایش در کد-باکس) */
     public ?string $migrateOutput = null;
 
+    /* ------------------------------------------------------------------ */
+    /*  کلید امضای لایسنس (تب دوم — منطق منتقل‌شده از Settings\LicenseKey) */
+    /* ------------------------------------------------------------------ */
+
+    /** وضعیت جاری از سرویس (منبع حقیقت: خود فایل .env) */
+    public array $licenseKeyStatus = [];
+
+    /** کلید عمومیِ تازه‌ساخته‌شده — فقط بلافاصله پس از ساخت/تعویض برای بکاپ نمایش داده می‌شود */
+    public ?string $lastPublicKey = null;
+
+    public ?string $lastFingerprint = null;
+
+    /** خطِ آمادهٔ .env برای فروشگاه — متناظر با کلید تازه‌ساخته */
+    public ?string $lastShopEnvValue = null;
+
+    public bool $confirmGenerateKey = false;
+
+    public bool $confirmRotateKey = false;
+
+    public bool $confirmClearConfigCache = false;
+
     public function mount(): void
     {
         if (! $this->authorizeDeveloper()) {
@@ -74,6 +99,7 @@ class Developer extends Component
 
         $this->environment = (string) config('app.env');
         $this->debug = (bool) config('app.debug');
+        $this->refreshLicenseKeyStatus();
     }
 
     public function render()
@@ -351,6 +377,83 @@ class Developer extends Component
     /* ------------------------------------------------------------------ */
     /*  داخلی */
     /* ------------------------------------------------------------------ */
+
+    /* ------------------------------------------------------------------ */
+    /*  کلید امضای لایسنس — اکشن‌ها */
+    /* ------------------------------------------------------------------ */
+
+    /** ساخت کلید جدید (وقتی کلیدی وجود ندارد) */
+    public function generateLicenseKey(): void
+    {
+        if (! $this->authorizeDeveloper()) {
+            return;
+        }
+
+        $this->confirmGenerateKey = false;
+
+        $this->finishLicenseKeyAction(app(LicenseSigningKeyService::class)->generate(false));
+    }
+
+    /** تعویض کلید موجود — پاکت‌های امضاشده با کلید قبلی بی‌اعتبار می‌شوند */
+    public function rotateLicenseKey(): void
+    {
+        if (! $this->authorizeDeveloper()) {
+            return;
+        }
+
+        $this->confirmRotateKey = false;
+
+        $this->finishLicenseKeyAction(app(LicenseSigningKeyService::class)->generate(true));
+    }
+
+    /**
+     * پاک‌سازی دستی کش پیکربندی — برای وقتی مدیر .env را از File Manager
+     * ویرایش کرده و معادل artisan config:clear را لازم دارد.
+     */
+    public function clearLicenseConfigCache(): void
+    {
+        if (! $this->authorizeDeveloper()) {
+            return;
+        }
+
+        $this->confirmClearConfigCache = false;
+
+        $ok = app(LicenseSigningKeyService::class)->clearConfigCache();
+        $this->refreshLicenseKeyStatus();
+
+        $this->toast(
+            $ok
+                ? 'کش پیکربندی پاک شد — از این به بعد .env مستقیم خوانده می‌شود.'
+                : 'پاک‌سازی کش ناموفق بود؛ لاگ سیستم را بررسی کنید.',
+            $ok ? 'success' : 'error'
+        );
+    }
+
+    private function finishLicenseKeyAction(array $result): void
+    {
+        $this->refreshLicenseKeyStatus();
+
+        if ($result['ok'] ?? false) {
+            $this->lastPublicKey = $result['public_key'] ?? null;
+            $this->lastFingerprint = $result['fingerprint'] ?? null;
+            $this->lastShopEnvValue = $result['shop_env_value'] ?? null;
+
+            $message = (string) ($result['message'] ?? 'انجام شد.');
+
+            if (($result['config_cache_cleared'] ?? true) === false) {
+                $message .= ' (پاک‌سازی کش پیکربندی ناموفق بود — از دکمهٔ «پاک‌سازی کش پیکربندی» دستی انجام دهید.)';
+            }
+
+            $this->toast($message, 'success');
+        } else {
+            $this->toast((string) ($result['message'] ?? 'عملیات ناموفق بود.'), 'error');
+        }
+    }
+
+    private function refreshLicenseKeyStatus(): void
+    {
+        $this->licenseKeyStatus = app(LicenseSigningKeyService::class)->status();
+    }
 
     /**
      * محافظت اضافی: این صفحه/اکشن‌ها فقط برای نقش admin (حتی با قفل نقش‌های خاموش).

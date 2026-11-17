@@ -64,9 +64,9 @@ class TemplatesIndex extends Component
     /** عبارت SQL «قیمت مؤثر» قالب */
     private function templateEffectivePriceSql(): string
     {
-        return "CASE WHEN templates.is_free = 1 OR templates.price <= 0 OR templates.discount >= 100 THEN 0 "
-            . "WHEN templates.discount > 0 THEN ROUND(templates.price * (100 - templates.discount) / 100) "
-            . "ELSE templates.price END";
+        return 'CASE WHEN templates.is_free = 1 OR templates.price <= 0 OR templates.discount >= 100 THEN 0 '
+            .'WHEN templates.discount > 0 THEN ROUND(templates.price * (100 - templates.discount) / 100) '
+            .'ELSE templates.price END';
     }
 
     #[Computed]
@@ -106,14 +106,30 @@ class TemplatesIndex extends Component
         return Category::shopTree(Category::TYPE_TEMPLATE);
     }
 
+    /** آمار نوار هیرو — مستقل از فیلترهای جستجو (Task 82) */
+    #[Computed]
+    public function heroStats(): array
+    {
+        $effective = $this->templateEffectivePriceSql();
+
+        return [
+            'total' => Template::where('status', Template::STATUS_ACTIVE)
+                ->where('is_sold_exclusively', false)->count(),
+            'free' => Template::where('status', Template::STATUS_ACTIVE)
+                ->where('is_sold_exclusively', false)
+                ->whereRaw("{$effective} <= 0")->count(),
+            'categories' => Category::ofType(Category::TYPE_TEMPLATE)->active()->count(),
+        ];
+    }
+
     public function getSortOptionsProperty(): array
     {
         return [
-            'newest'    => 'جدیدترین',
-            'oldest'    => 'قدیمی‌ترین',
-            'cheap'     => 'ارزان‌ترین',
+            'newest' => 'جدیدترین',
+            'oldest' => 'قدیمی‌ترین',
+            'cheap' => 'ارزان‌ترین',
             'expensive' => 'گران‌ترین',
-            'popular'   => 'محبوب‌ترین',
+            'popular' => 'محبوب‌ترین',
         ];
     }
 

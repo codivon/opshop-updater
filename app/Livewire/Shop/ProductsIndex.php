@@ -64,9 +64,9 @@ class ProductsIndex extends Component
     /** عبارت SQL «قیمت مؤثر» محصول */
     private function productEffectivePriceSql(): string
     {
-        return "CASE WHEN products.is_free = 1 OR products.price <= 0 OR products.discount >= 100 THEN 0 "
-            . "WHEN products.discount > 0 THEN ROUND(products.price * (100 - products.discount) / 100) "
-            . "ELSE products.price END";
+        return 'CASE WHEN products.is_free = 1 OR products.price <= 0 OR products.discount >= 100 THEN 0 '
+            .'WHEN products.discount > 0 THEN ROUND(products.price * (100 - products.discount) / 100) '
+            .'ELSE products.price END';
     }
 
     #[Computed]
@@ -104,14 +104,28 @@ class ProductsIndex extends Component
         return Category::shopTree(Category::TYPE_PRODUCT);
     }
 
+    /** آمار نوار هیرو — مستقل از فیلترهای جستجو (Task 82) */
+    #[Computed]
+    public function heroStats(): array
+    {
+        $effective = $this->productEffectivePriceSql();
+
+        return [
+            'total' => Product::where('status', Product::STATUS_ACTIVE)->count(),
+            'free' => Product::where('status', Product::STATUS_ACTIVE)
+                ->whereRaw("{$effective} <= 0")->count(),
+            'categories' => Category::ofType(Category::TYPE_PRODUCT)->active()->count(),
+        ];
+    }
+
     public function getSortOptionsProperty(): array
     {
         return [
-            'newest'    => 'جدیدترین',
-            'oldest'    => 'قدیمی‌ترین',
-            'cheap'     => 'ارزان‌ترین',
+            'newest' => 'جدیدترین',
+            'oldest' => 'قدیمی‌ترین',
+            'cheap' => 'ارزان‌ترین',
             'expensive' => 'گران‌ترین',
-            'popular'   => 'محبوب‌ترین',
+            'popular' => 'محبوب‌ترین',
         ];
     }
 

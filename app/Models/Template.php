@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Str;
 
 /**
  * قالب پروژه (Template) — بخش فروش قالب‌ها، مشابه پکیج‌ها/محصولات.
@@ -14,22 +15,25 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  */
 class Template extends Model
 {
-    public const STATUS_DRAFT    = 'draft';
-    public const STATUS_ACTIVE   = 'active';
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_ACTIVE = 'active';
+
     public const STATUS_ARCHIVED = 'archived';
 
     /** انواع خرید — معمولی و اختصاصی */
-    public const PURCHASE_NORMAL    = 'normal';
+    public const PURCHASE_NORMAL = 'normal';
+
     public const PURCHASE_EXCLUSIVE = 'exclusive';
 
     public const PURCHASE_LABELS = [
-        self::PURCHASE_NORMAL    => 'خرید معمولی',
+        self::PURCHASE_NORMAL => 'خرید معمولی',
         self::PURCHASE_EXCLUSIVE => 'خرید اختصاصی',
     ];
 
     public const STATUS_LABELS = [
-        self::STATUS_DRAFT    => 'پیش‌نویس',
-        self::STATUS_ACTIVE   => 'فعال',
+        self::STATUS_DRAFT => 'پیش‌نویس',
+        self::STATUS_ACTIVE => 'فعال',
         self::STATUS_ARCHIVED => 'آرشیو',
     ];
 
@@ -37,6 +41,7 @@ class Template extends Model
         'category_id', 'name', 'slug', 'short_description', 'description',
         'thumbnail', 'price', 'discount', 'exclusive_price', 'exclusive_discount',
         'exclusive_note', 'exclusive_buyer_label', 'is_free', 'status', 'sort_order',
+        'meta_title', 'meta_description',
     ];
 
     /**
@@ -48,17 +53,17 @@ class Template extends Model
     protected $appends = ['thumbnail_url'];
 
     protected $casts = [
-        'price'                => 'integer',
-        'discount'             => 'integer',
-        'exclusive_price'      => 'integer',
-        'exclusive_discount'   => 'integer',
-        'is_free'              => 'boolean',
-        'is_sold_exclusively'  => 'boolean',
-        'sold_exclusively_at'  => 'datetime',
-        'sort_order'           => 'integer',
-        'sales_count'          => 'integer',
-        'downloads_count'      => 'integer',
-        'views_count'          => 'integer',
+        'price' => 'integer',
+        'discount' => 'integer',
+        'exclusive_price' => 'integer',
+        'exclusive_discount' => 'integer',
+        'is_free' => 'boolean',
+        'is_sold_exclusively' => 'boolean',
+        'sold_exclusively_at' => 'datetime',
+        'sort_order' => 'integer',
+        'sales_count' => 'integer',
+        'downloads_count' => 'integer',
+        'views_count' => 'integer',
     ];
 
     /* ---------------- Relationships ---------------- */
@@ -162,10 +167,10 @@ class Template extends Model
         }
 
         if ($purchaseType === self::PURCHASE_EXCLUSIVE) {
-            $price    = $this->exclusive_price;
+            $price = $this->exclusive_price;
             $discount = $this->exclusive_discount;
         } else {
-            $price    = $this->price;
+            $price = $this->price;
             $discount = $this->discount;
         }
 
@@ -280,17 +285,17 @@ class Template extends Model
 
     public static function generateSlug(string $name, ?int $ignoreId = null): string
     {
-        $base = \Illuminate\Support\Str::slug($name);
+        $base = Str::slug($name);
 
         if ($base === '') {
-            $base = 'template-' . \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(6));
+            $base = 'template-'.Str::lower(Str::random(6));
         }
 
         $slug = $base;
         $i = 2;
 
         while (self::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
-            $slug = $base . '-' . $i++;
+            $slug = $base.'-'.$i++;
         }
 
         return $slug;

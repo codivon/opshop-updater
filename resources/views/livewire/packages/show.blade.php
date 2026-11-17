@@ -743,6 +743,22 @@
                 <x-input wire:model="form.sort_order" type="number" min="0" icon="list" dir="ltr" class="sm:w-44 {{ $errors->has('form.sort_order') ? 'input-error' : '' }}" />
             </x-field>
 
+            {{-- سئوی اختصاصی پکیج (Task 82) --}}
+            <div class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 dark:bg-zinc-800/40 dark:ring-zinc-700/60">
+                <p class="mb-3 flex items-center gap-2 text-sm font-black text-zinc-700 dark:text-zinc-200">
+                    <x-icon name="trending-up" class="size-4 text-brand-600" />
+                    سئو (خالی = خود پکیج استفاده می‌شود)
+                </p>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-field label="عنوان متا (Title)" for="form_meta_title" hint="حداکثر ۲۰۰ کاراکتر — عنوانی که در گوگل نمایش داده می‌شود.">
+                        <x-input id="form_meta_title" wire:model="form.meta_title" dir="ltr" placeholder="{{ $package->name }}" />
+                    </x-field>
+                    <x-field label="توضیح متا (Description)" for="form_meta_description" hint="۱۵۰ تا ۱۶۰ کاراکتر گویا با کلمات کلیدی هدف.">
+                        <x-textarea id="form_meta_description" wire:model="form.meta_description" rows="3" placeholder="{{ Str::limit($package->short_description ?: '', 155) }}" />
+                    </x-field>
+                </div>
+            </div>
+
             <div class="flex items-center justify-end gap-2 pt-2">
                 <x-btn variant="secondary" wire:click="$set('showModal', false)">انصراف</x-btn>
                 <x-btn type="submit" icon="save" :loading="true">ذخیره</x-btn>

@@ -146,6 +146,11 @@ class HomePage
 
         /* -------------------- فوتر — اینماد -------------------- */
         'footer_enamad_code' => '',
+
+        /* -------------------- فوتر — مجوزها و نشان‌های اعتماد (Task 82) --------------------
+         * JSON فهرست مجوزها؛ هر آیتم: type=image|code، title، image، code، link، enabled.
+         * کد اینماد قدیمی (footer_enamad_code) به‌صورت خودکار به این فهرست منتقل می‌شود. */
+        'footer_badges' => '[]',
     ];
 
     /** کلیدهای بولی (toggle) */
@@ -213,6 +218,88 @@ class HomePage
     public static function enamadCode(): string
     {
         return self::str('footer_enamad_code');
+    }
+
+    /**
+     * مجوزها و نشان‌های اعتماد فوتر (Task 82) — تصویر یا کد HTML.
+     *
+     * شکل هر آیتم: ['type' => 'image'|'code', 'title' => string, 'image' => string,
+     *               'code' => string, 'link' => string, 'enabled' => bool]
+     *
+     * سازگاری با قبل: تا وقتی فهرست جدید خالی باشد و کد اینماد قدیمی ثبت شده باشد،
+     * همان کد به‌صورت یک آیتمِ کد برگردانده می‌شود (بدون هیچ تغییری در نمایش فعلی).
+     *
+     * @return array<int, array{type: string, title: string, image: string, code: string, link: string, enabled: bool}>
+     */
+    public static function badges(): array
+    {
+        $raw = trim((string) setting('footer_badges', '[]'));
+        $badges = [];
+
+        if ($raw !== '') {
+            $decoded = json_decode($raw, true);
+
+            if (is_array($decoded)) {
+                foreach ($decoded as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+
+                    $type = ($item['type'] ?? 'image') === 'code' ? 'code' : 'image';
+                    $title = trim((string) ($item['title'] ?? ''));
+                    $image = trim((string) ($item['image'] ?? ''));
+                    $code = (string) ($item['code'] ?? '');
+                    $link = trim((string) ($item['link'] ?? ''));
+                    $enabled = filter_var($item['enabled'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
+                    // آیتم بی‌محتوا نمایش داده نمی‌شود
+                    if ($type === 'image' && $image === '') {
+                        continue;
+                    }
+
+                    if ($type === 'code' && trim($code) === '') {
+                        continue;
+                    }
+
+                    $badges[] = [
+                        'type' => $type,
+                        'title' => $title,
+                        'image' => $image,
+                        'code' => $code,
+                        'link' => $link,
+                        'enabled' => $enabled,
+                    ];
+                }
+            }
+        }
+
+        // فال‌بک سازگاری: فهرست جدید خالی است اما کد اینماد قدیمی ثبت شده است
+        if ($badges === []) {
+            $legacy = self::enamadCode();
+
+            if ($legacy !== '') {
+                $badges[] = [
+                    'type' => 'code',
+                    'title' => 'اینماد',
+                    'image' => '',
+                    'code' => $legacy,
+                    'link' => '',
+                    'enabled' => true,
+                ];
+            }
+        }
+
+        return array_values(array_filter($badges, fn (array $b) => $b['enabled']));
+    }
+
+    /** آدرس کامل تصویر یک مجوز (پشتیبانی از URL کامل و مسیر نسبی uploads/) */
+    public static function badgeImageUrl(string $image): string
+    {
+        if (str_starts_with($image, 'http://') || str_starts_with($image, 'https://')) {
+            return $image;
+        }
+
+        return asset($image);
     }
 
     /** آیتم‌های «چرا ما» به‌صورت آرایه — فقط موارد پُر */

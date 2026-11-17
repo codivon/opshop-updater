@@ -385,6 +385,29 @@ class ImageUploadService
     }
 
     /* ===================================================================
+     *  آپلود تصویر مجوز/نشان اعتماد فوتر (Task 82)
+     *  Returns: مسیر نسبی (uploads/footer-badges/badge-xxx.png)
+     * =================================================================== */
+    public function uploadFooterBadgeImage(UploadedFile $file): string
+    {
+        if (! $file->isValid()) {
+            throw new RuntimeException('فایل تصویر مجاز نیست.');
+        }
+
+        $mime = $file->getMimeType();
+
+        if (! in_array($mime, self::ALLOWED_MIMES, true)) {
+            throw new RuntimeException('فرمت تصویر مجاز نیست؛ فقط JPG, PNG, WEBP, GIF.');
+        }
+
+        $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+        $ext = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true) ? ($ext === 'jpeg' ? 'jpg' : $ext) : 'png';
+        $filename = 'badge-'.time().'-'.Str::random(6).'.'.$ext;
+
+        return $this->storeFile($file, 'uploads/footer-badges', $filename);
+    }
+
+    /* ===================================================================
      *  آپلود لوگوی درگاه (عمومی — در Gateways استفاده می‌شود)
      *  Returns: مسیر نسبی (uploads/gateways/logos/xxx.svg) یا null
      * =================================================================== */

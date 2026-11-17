@@ -36,17 +36,17 @@ class LicenseSigningKeyService
      */
     public function status(): array
     {
-        $pem        = $this->resolvePrivatePem();
-        $state      = 'missing';
+        $pem = $this->resolvePrivatePem();
+        $state = 'missing';
         $fingerprint = null;
-        $publicKey  = null;
+        $publicKey = null;
 
         if ($pem !== '') {
             $key = openssl_pkey_get_private($pem);
 
             if ($key !== false) {
-                $state     = 'ok';
-                $details   = openssl_pkey_get_details($key);
+                $state = 'ok';
+                $details = openssl_pkey_get_details($key);
                 $publicKey = (string) ($details['key'] ?? '');
                 $fingerprint = $publicKey !== '' ? $this->fingerprint($publicKey) : null;
             } else {
@@ -55,14 +55,16 @@ class LicenseSigningKeyService
         }
 
         return [
-            'state'                => $state,
-            'fingerprint'          => $fingerprint,
-            'public_key'           => $publicKey,
-            'shop_env_value'       => $publicKey !== '' ? self::shopEnvValue($publicKey) : null,
-            'env_exists'           => is_file(base_path('.env')),
-            'env_writable'         => is_file(base_path('.env')) ? is_writable(base_path('.env')) : is_writable(base_path()),
-            'config_cached'        => is_file(base_path('bootstrap/cache/config.php')),
-            'grace_hours'          => (int) config('services.license_envelope.grace_hours', 24),
+            'state' => $state,
+            'fingerprint' => $fingerprint,
+            'public_key' => $publicKey,
+            // گاتچ: وقتی کلیدی وجود ندارد publicKey === null است (نه '') —
+            // مقایسه با !== '' درست نیست و TypeError می‌دهد
+            'shop_env_value' => ! empty($publicKey) ? self::shopEnvValue($publicKey) : null,
+            'env_exists' => is_file(base_path('.env')),
+            'env_writable' => is_file(base_path('.env')) ? is_writable(base_path('.env')) : is_writable(base_path()),
+            'config_cached' => is_file(base_path('bootstrap/cache/config.php')),
+            'grace_hours' => (int) config('services.license_envelope.grace_hours', 24),
             'check_interval_hours' => (int) config('services.license_envelope.check_interval_hours', 24),
         ];
     }
@@ -99,7 +101,7 @@ class LicenseSigningKeyService
         // ساخت جفت‌کلید — دقیقاً مطابق فرمان license:generate-signing-keys
         $key = openssl_pkey_new([
             'private_key_type' => OPENSSL_KEYTYPE_EC,
-            'curve_name'       => 'prime256v1',
+            'curve_name' => 'prime256v1',
         ]);
 
         if ($key === false) {
@@ -112,7 +114,7 @@ class LicenseSigningKeyService
             return $fail('خروجی گرفتن کلید خصوصی ناموفق بود ('.$this->opensslLastError().').');
         }
 
-        $details   = openssl_pkey_get_details($key);
+        $details = openssl_pkey_get_details($key);
         $publicPem = (string) ($details['key'] ?? '');
 
         // نوشتن در .env — مقدار تک‌خطی با دنباله‌های literal \n (سرویس امضا نرمال‌سازی می‌کند)
@@ -143,19 +145,19 @@ class LicenseSigningKeyService
         $manifestCacheFlushed = $this->flushManifestSignatureCache();
 
         Log::warning('License signing key '.($force ? 'ROTATED' : 'generated').' from admin panel', [
-            'fingerprint'              => $this->fingerprint($publicPem),
-            'config_cache_cleared'     => $cacheCleared,
-            'manifest_cache_flushed'   => $manifestCacheFlushed,
+            'fingerprint' => $this->fingerprint($publicPem),
+            'config_cache_cleared' => $cacheCleared,
+            'manifest_cache_flushed' => $manifestCacheFlushed,
         ]);
 
         return [
-            'ok'                   => true,
-            'message'              => $force
+            'ok' => true,
+            'message' => $force
                 ? 'کلید با موفقیت تعویض شد — قبل از فعال‌شدنِ فروشگاه‌ها، کلید عمومی جدید را در .env هر فروشگاه (PACKAGE_LICENSE_PUBLIC_KEY) ثبت کنید.'
                 : 'کلید با موفقیت ساخته و در .env ثبت شد.',
-            'public_key'           => $publicPem,
-            'fingerprint'          => $this->fingerprint($publicPem),
-            'shop_env_value'       => self::shopEnvValue($publicPem),
+            'public_key' => $publicPem,
+            'fingerprint' => $this->fingerprint($publicPem),
+            'shop_env_value' => self::shopEnvValue($publicPem),
             'config_cache_cleared' => $cacheCleared,
         ];
     }
@@ -224,7 +226,7 @@ class LicenseSigningKeyService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Private helpers                                                    */
+    /*  Private helpers */
     /* ------------------------------------------------------------------ */
 
     /** خواندن مقدار خام خط کلید از .env — مستقل از کش پیکربندی */
@@ -263,7 +265,7 @@ class LicenseSigningKeyService
         // اگر به‌اشتباه کلاً داخل کوتیشن مانده باشد، جدا می‌کنیم (۳۴="، ۳۹=')
         if (strlen($pem) > 1) {
             $first = ord($pem[0]);
-            $last  = ord($pem[strlen($pem) - 1]);
+            $last = ord($pem[strlen($pem) - 1]);
 
             if (($first === 34 && $last === 34) || ($first === 39 && $last === 39)) {
                 $pem = trim(substr($pem, 1, -1));

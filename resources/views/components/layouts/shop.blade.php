@@ -11,6 +11,10 @@
     $footerDescription = \App\Support\Features::footerDescription();
     $footerText = \App\Support\Features::footerText();
     $socialLinks = \App\Support\Features::socialLinks();
+
+    // سئوی مرکزی (Task 82) — عنوان/توضیح/canonical/OG/JSON-LD از Seo::meta()
+    // منبع یکتای حقیقت؛ #[Title] استاتیک کامپوننت‌ها از این پس بی‌اثر است.
+    $seo = \App\Support\Seo::meta();
 @endphp
 
 <!DOCTYPE html>
@@ -19,7 +23,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'فروشگاه پکیج‌ها' }} · {{ $siteName }}</title>
+    <title>{{ $seo['title'] }}</title>
+
+    <x-seo-head :seo="$seo" :siteSchemas="\App\Support\Seo::siteSchemas()" />
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -181,12 +187,32 @@
     {{-- فوتر چسبیده به محتوای بالای خود (جریان عادی سند) — نه چسبیده به پایین ویوپورت --}}
     <footer class="border-t border-zinc-200/70 bg-white dark:border-zinc-800 dark:bg-zinc-900">
 
-        {{-- نشان‌های اعتماد (اینماد) — کد از پنل «صفحهٔ اصلی فروشگاه» (Task 56) --}}
-        @php($enamadCode = \App\Support\HomePage::enamadCode())
-        @if($enamadCode !== '')
-            <div class="mx-auto w-full max-w-7xl border-b border-zinc-200/70 px-4 py-4 sm:px-6 dark:border-zinc-800" aria-label="نشان‌های اعتماد">
+        {{-- مجوزها و نشان‌های اعتماد — تصویر یا کد HTML از پنل «صفحهٔ اصلی فروشگاه» (Task 82؛ سازگار با کد اینماد قدیمی) --}}
+        @php($footerBadges = \App\Support\HomePage::badges())
+        @if(count($footerBadges) > 0)
+            <div class="mx-auto w-full max-w-7xl border-b border-zinc-200/70 px-4 py-4 sm:px-6 dark:border-zinc-800" aria-label="نشان‌های اعتماد و مجوزها">
                 <div class="flex flex-wrap items-center justify-center gap-5 text-center">
-                    {!! $enamadCode !!}
+                    @foreach($footerBadges as $badge)
+                        @if($badge['type'] === 'image')
+                            @php($badgeHref = $badge['link'] !== '' ? $badge['link'] : null)
+                            @if($badgeHref)
+                                <a href="{{ $badgeHref }}" @if(! str_starts_with($badgeHref, url('/'))) target="_blank" rel="noopener noreferrer nofollow" @endif
+                                   title="{{ $badge['title'] }}" aria-label="{{ $badge['title'] ?: 'مجوز' }}">
+                                    <img src="{{ \App\Support\HomePage::badgeImageUrl($badge['image']) }}"
+                                         alt="{{ $badge['title'] ?: 'مجوز' }}"
+                                         loading="lazy" decoding="async"
+                                         class="h-24 w-auto max-w-[180px] rounded-lg object-contain">
+                                </a>
+                            @else
+                                <img src="{{ \App\Support\HomePage::badgeImageUrl($badge['image']) }}"
+                                     alt="{{ $badge['title'] ?: 'مجوز' }}"
+                                     loading="lazy" decoding="async" title="{{ $badge['title'] }}"
+                                     class="h-24 w-auto max-w-[180px] rounded-lg object-contain">
+                            @endif
+                        @else
+                            {!! $badge['code'] !!}
+                        @endif
+                    @endforeach
                 </div>
             </div>
         @endif
@@ -256,6 +282,44 @@
     @if(session('success') || session('error') || session('warning'))
         <div x-data x-init="$store.toasts.push(@js(session('success') ?? session('error') ?? session('warning')), @js(session('error') ? 'error' : (session('warning') ? 'warning' : 'success')))" class="hidden"></div>
     @endif
+
+    {{-- ============ به‌روزرسانی متاها در ناوبری SPA (wire:navigate — Task 82) ============
+         خزنده‌ها HTML سرورساید هر URL را با متاهای درست می‌گیرند (سئوی SPA سالم است)؛
+         این اسکریپت فقط برای تجربهٔ کاربری است: هنگام ناوبری Livewire، description/canonical/
+         og/twitter از JSON همین صفحه در head مرورگر به‌روز می‌شوند (title را خود Livewire عوض می‌کند). --}}
+    <script type="application/json" id="seo-page-meta">{!! json_encode(array_filter($seo, fn ($v, $k) => in_array($k, ['description', 'canonical', 'image', 'ogType', 'title'], true), ARRAY_FILTER_USE_BOTH), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
+    <script>
+        (function () {
+            function applySeoMeta() {
+                var el = document.getElementById('seo-page-meta');
+                if (!el) return;
+                var data;
+                try { data = JSON.parse(el.textContent); } catch (e) { return; }
+                if (!data) return;
+                function meta(selector) { return document.head.querySelector(selector); }
+                function ensureMeta(name, attrName) {
+                    var m = meta('[' + attrName + '="' + name + '"]');
+                    if (!m) { m = document.createElement('meta'); m.setAttribute(attrName, name); document.head.appendChild(m); }
+                    return m;
+                }
+                if (data.description) ensureMeta('description', 'name').setAttribute('content', data.description);
+                if (data.canonical) {
+                    var link = meta('link[rel="canonical"]');
+                    if (!link) { link = document.createElement('link'); link.rel = 'canonical'; document.head.appendChild(link); }
+                    link.href = data.canonical;
+                }
+                if (data.title) ensureMeta('og:title', 'property').setAttribute('content', data.title);
+                if (data.description) ensureMeta('og:description', 'property').setAttribute('content', data.description);
+                if (data.canonical) ensureMeta('og:url', 'property').setAttribute('content', data.canonical);
+                if (data.ogType) ensureMeta('og:type', 'property').setAttribute('content', data.ogType);
+                if (data.image) ensureMeta('og:image', 'property').setAttribute('content', data.image);
+                if (data.title) ensureMeta('twitter:title', 'name').setAttribute('content', data.title);
+                if (data.description) ensureMeta('twitter:description', 'name').setAttribute('content', data.description);
+                if (data.image) ensureMeta('twitter:image', 'name').setAttribute('content', data.image);
+            }
+            document.addEventListener('livewire:navigated', applySeoMeta);
+        })();
+    </script>
 
 </body>
 </html>

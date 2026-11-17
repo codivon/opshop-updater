@@ -51,10 +51,7 @@
                 ['route' => 'admin.reports.index', 'title' => 'گزارش‌ها', 'icon' => 'bar-chart', 'match' => ['admin.reports*']],
                 ['route' => 'admin.logs.index', 'title' => 'لاگ‌ها', 'icon' => 'terminal', 'match' => ['admin.logs*']],
                 ['route' => 'admin.tools.backup', 'title' => 'پشتیبان‌گیری', 'icon' => 'archive', 'match' => ['admin.tools*']],
-                ['route' => 'admin.settings.index', 'title' => 'تنظیمات', 'icon' => 'settings', 'match' => ['admin.settings.index', 'admin.settings.gateways']],
-                ['route' => 'admin.settings.home', 'title' => 'صفحهٔ اصلی فروشگاه', 'icon' => 'panel-top', 'match' => ['admin.settings.home']],
                 ['route' => 'admin.settings.security', 'title' => 'امنیت و امکانات', 'icon' => 'shield', 'match' => ['admin.settings.security']],
-                ['route' => 'admin.settings.developer', 'title' => 'تنظیمات برنامه‌نویس', 'icon' => 'wrench', 'match' => ['admin.settings.developer']],
                 ['route' => 'admin.users.index', 'title' => 'کاربران', 'icon' => 'shield-check', 'match' => ['admin.users*']],
                 ['route' => 'admin.profile', 'title' => 'پروفایل مدیر', 'icon' => 'user-check', 'match' => ['admin.profile']],
             ],
@@ -64,6 +61,16 @@
             'items' => [
                 ['route' => 'admin.sms.templates', 'title' => 'قالب‌های پیامک', 'icon' => 'message-square', 'match' => ['admin.sms.templates']],
                 ['route' => 'admin.sms.logs', 'title' => 'لاگ پیامک‌ها', 'icon' => 'send', 'match' => ['admin.sms.logs']],
+            ],
+        ],
+        [
+            // آخرین گروه منو: صفحه‌های تنظیمات (درخواست کاربر — جدا شدن از گروه سیستم)
+            'label' => 'تنظیمات',
+            'items' => [
+                ['route' => 'admin.settings.home', 'title' => 'صفحهٔ اصلی فروشگاه', 'icon' => 'panel-top', 'match' => ['admin.settings.home']],
+                ['route' => 'admin.settings.index', 'title' => 'تنظیمات', 'icon' => 'settings', 'match' => ['admin.settings.index', 'admin.settings.gateways']],
+                ['route' => 'admin.settings.seo', 'title' => 'سئو', 'icon' => 'trending-up', 'match' => ['admin.settings.seo']],
+                ['route' => 'admin.settings.developer', 'title' => 'تنظیمات برنامه‌نویس', 'icon' => 'wrench', 'match' => ['admin.settings.developer']],
             ],
         ],
     ];

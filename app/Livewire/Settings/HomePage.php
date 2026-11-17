@@ -11,6 +11,7 @@ use App\Services\ImageUploadService;
 use App\Support\HomePage as HomeSettings;
 use App\Support\ShopMenu;
 use App\Support\Showcase as ShowcaseSupport;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -42,6 +43,19 @@ class HomePage extends Component
     use WithToasts;
 
     public array $form = [];
+
+    /** مجوزها و نشان‌های اعتماد فوتر (Task 82) — فهرست پویا با آپلود/کد */
+    public array $badges = [];
+
+    /** شکل پیش‌فرض هر آیتم مجوز */
+    private const BADGE_DEFAULT = [
+        'type' => 'image',
+        'title' => '',
+        'image' => '',
+        'code' => '',
+        'link' => '',
+        'enabled' => true,
+    ];
 
     /** ماژول‌های تنظیماتی این پنل (هرکدام DEFAULTS + BOOL_KEYS + group() دارند) */
     private function modules(): array
@@ -77,11 +91,137 @@ class HomePage extends Component
                     : (string) $value;
             }
         }
+
+        // مجوزها و نشان‌های اعتماد فوتر (Task 82)
+        $this->loadBadges();
+    }
+
+    /** بارگذاری فهرست مجوزها از تنظیمات + انتقال خودکار کد اینماد قدیمی */
+    private function loadBadges(): void
+    {
+        $decoded = json_decode(trim((string) setting('footer_badges', '[]')), true);
+        $badges = [];
+
+        if (is_array($decoded)) {
+            foreach ($decoded as $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+
+                $badge = self::BADGE_DEFAULT;
+
+                foreach ($badge as $field => $default) {
+                    if (array_key_exists($field, $item)) {
+                        $badge[$field] = $field === 'enabled'
+                            ? filter_var($item[$field], FILTER_VALIDATE_BOOLEAN)
+                            : (string) $item[$field];
+                    }
+                }
+
+                $badges[] = $badge;
+            }
+        }
+
+        // سازگاری: کد اینماد ثبت‌شدهٔ قبلی → یک آیتم کد در فهرست (یک‌بار، وقتی فهرست خالی است)
+        if ($badges === [] && ($legacy = trim((string) $this->form['footer_enamad_code'] ?? '')) !== '') {
+            $badges[] = array_merge(self::BADGE_DEFAULT, ['type' => 'code', 'title' => 'اینماد', 'code' => $legacy]);
+        }
+
+        $this->badges = $badges;
+    }
+
+    /** افزودن آیتم جدید به فهرست مجوزها */
+    public function addFooterBadge(): void
+    {
+        $this->badges[] = self::BADGE_DEFAULT;
+    }
+
+    /** حذف آیتم */
+    public function removeFooterBadge(int $index): void
+    {
+        if (isset($this->badges[$index])) {
+            unset($this->badges[$index]);
+            $this->badges = array_values($this->badges);
+        }
+    }
+
+    /** جابه‌جایی بالا/پایین */
+    public function moveFooterBadge(int $index, string $direction): void
+    {
+        $target = $direction === 'up' ? $index - 1 : $index + 1;
+
+        if (! isset($this->badges[$index]) || ! isset($this->badges[$target]) || $target < 0) {
+            return;
+        }
+
+        [$this->badges[$index], $this->badges[$target]] = [$this->badges[$target], $this->badges[$index]];
+        $this->badges = array_values($this->badges);
+    }
+
+    /** سریال‌سازی فهرست مجوزها به JSON برای ذخیره در تنظیمات */
+    private function persistBadges(ImageUploadService $uploader): void
+    {
+        $clean = [];
+
+        foreach ($this->badges as $badge) {
+            $type = ($badge['type'] ?? 'image') === 'code' ? 'code' : 'image';
+            $title = trim((string) ($badge['title'] ?? ''));
+            $image = trim((string) ($badge['image'] ?? ''));
+            $code = (string) ($badge['code'] ?? '');
+            $link = trim((string) ($badge['link'] ?? ''));
+
+            // آپلود فایل تصویر (در صورت انتخاب) — فایل بر URL می‌چربد
+            $file = $badge['file'] ?? null;
+
+            if ($file instanceof TemporaryUploadedFile && $file->isValid()) {
+                try {
+                    $image = $uploader->uploadFooterBadgeImage(new UploadedFile(
+                        $file->getRealPath(),
+                        $file->getClientOriginalName(),
+                        $file->getMimeType(),
+                        null,
+                        true // test mode — فایل tmp از قبل روی دیسک است
+                    ));
+                } catch (\Throwable $e) {
+                    $this->addError('badges', 'آپلود تصویر مجوز «'.$title.'» ناموفق بود: '.$e->getMessage());
+
+                    continue;
+                }
+            }
+
+            if ($type === 'image' && $image === '') {
+                continue; // آیتم بی‌محتوا ذخیره نمی‌شود
+            }
+
+            if ($type === 'code' && trim($code) === '') {
+                continue;
+            }
+
+            $clean[] = [
+                'type' => $type,
+                'title' => $title,
+                'image' => $image,
+                'code' => $code,
+                'link' => $link,
+                'enabled' => (bool) ($badge['enabled'] ?? true),
+            ];
+        }
+
+        $this->form['footer_badges'] = json_encode($clean, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?: '[]';
+
+        // state پنل هم بدون فایل‌ها تازه شود (بعد از ذخیره، فایل tmp دیگر معنا ندارد)
+        $this->badges = array_map(function (array $badge) {
+            unset($badge['file']);
+
+            return $badge;
+        }, $clean);
     }
 
     public function save(): void
     {
         $this->validate();
+
+        $this->persistBadges(app(ImageUploadService::class));
 
         $boolKeys = $this->boolKeys();
 
@@ -751,6 +891,14 @@ class HomePage extends Component
 
             // فوتر — اینماد
             'form.footer_enamad_code' => ['nullable', 'string', 'max:5000'],
+
+            // فوتر — مجوزها و نشان‌های اعتماد (Task 82)
+            'badges.*.type' => ['required', 'in:image,code'],
+            'badges.*.title' => ['nullable', 'string', 'max:60'],
+            'badges.*.image' => ['nullable', 'string', 'max:500'],
+            'badges.*.code' => ['nullable', 'string', 'max:5000'],
+            'badges.*.link' => ['nullable', 'string', 'max:500'],
+            'badges.*.file' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:3072'],
         ];
 
         // ترتیب بخش‌ها — عدد مثبت؛ از فلش‌های پنل تغییر می‌کند
@@ -781,6 +929,11 @@ class HomePage extends Component
             'form.contact_email.email' => 'ایمیل معتبر نیست.',
             'form.contact_email.max' => 'ایمیل حداکثر ۱۹۰ کاراکتر است.',
             'form.footer_enamad_code.max' => 'کد اینماد حداکثر ۵٬۰۰۰ کاراکتر است.',
+            'badges.*.file.image' => 'فایل انتخاب‌شده باید تصویر باشد.',
+            'badges.*.file.mimes' => 'فرمت تصویر مجوز باید JPG، PNG، WEBP یا GIF باشد.',
+            'badges.*.file.max' => 'حجم تصویر مجوز حداکثر ۳ مگابایت است.',
+            'badges.*.code.max' => 'کد مجوز حداکثر ۵٬۰۰۰ کاراکتر است.',
+            'badges.*.link.max' => 'لینک مجوز حداکثر ۵۰۰ کاراکتر است.',
             'form.home_showcase_eyebrow.max' => 'برچسب سربرگ اسلایدر حداکثر ۶۰ کاراکتر است.',
             'form.home_showcase_heading.max' => 'عنوان سربرگ اسلایدر حداکثر ۱۲۰ کاراکتر است.',
             'form.home_showcase_autoplay_speed.required' => 'سرعت پخش خودکار الزامی است.',

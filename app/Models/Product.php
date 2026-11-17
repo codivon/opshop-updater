@@ -7,29 +7,33 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
-    public const STATUS_DRAFT    = 'draft';
-    public const STATUS_ACTIVE   = 'active';
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_ACTIVE = 'active';
+
     public const STATUS_ARCHIVED = 'archived';
 
     public const STATUS_LABELS = [
-        self::STATUS_DRAFT    => 'پیش‌نویس',
-        self::STATUS_ACTIVE   => 'فعال',
+        self::STATUS_DRAFT => 'پیش‌نویس',
+        self::STATUS_ACTIVE => 'فعال',
         self::STATUS_ARCHIVED => 'آرشیو',
     ];
 
     protected $fillable = [
         'category_id', 'name', 'slug', 'short_description', 'description',
         'thumbnail', 'price', 'discount', 'is_free', 'status', 'sort_order',
+        'meta_title', 'meta_description',
     ];
 
     protected $casts = [
-        'price'       => 'integer',
-        'discount'    => 'integer',
-        'is_free'     => 'boolean',
-        'sort_order'  => 'integer',
+        'price' => 'integer',
+        'discount' => 'integer',
+        'is_free' => 'boolean',
+        'sort_order' => 'integer',
         'sales_count' => 'integer',
         'views_count' => 'integer',
     ];
@@ -150,17 +154,17 @@ class Product extends Model
 
     public static function generateSlug(string $name, ?int $ignoreId = null): string
     {
-        $base = \Illuminate\Support\Str::slug($name);
+        $base = Str::slug($name);
 
         if ($base === '') {
-            $base = 'product-' . \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(6));
+            $base = 'product-'.Str::lower(Str::random(6));
         }
 
         $slug = $base;
         $i = 2;
 
         while (self::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
-            $slug = $base . '-' . $i++;
+            $slug = $base.'-'.$i++;
         }
 
         return $slug;

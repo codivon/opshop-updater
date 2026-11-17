@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Facades\Storage;
 
@@ -17,20 +17,23 @@ class Package extends Model
         'project_id', 'slug', 'name', 'short_description', 'description',
         'author', 'category', 'thumbnail', 'is_free', 'default_price',
         'status', 'module_name', 'downloads_count', 'purchases_count', 'sort_order',
+        'meta_title', 'meta_description',
     ];
 
     protected $casts = [
-        'is_free'         => 'boolean',
-        'default_price'   => 'integer',
+        'is_free' => 'boolean',
+        'default_price' => 'integer',
         'downloads_count' => 'integer',
         'purchases_count' => 'integer',
-        'sort_order'      => 'integer',
+        'sort_order' => 'integer',
     ];
 
     protected $appends = ['thumbnail_url'];
 
-    public const STATUS_DRAFT    = 'draft';
-    public const STATUS_ACTIVE   = 'active';
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_ACTIVE = 'active';
+
     public const STATUS_ARCHIVED = 'archived';
 
     /* ---------------- Relationships ---------------- */
@@ -125,7 +128,7 @@ class Package extends Model
 
     public function getFormattedPriceAttribute(): string
     {
-        return $this->is_free ? 'رایگان' : number_format($this->default_price) . ' تومان';
+        return $this->is_free ? 'رایگان' : number_format($this->default_price).' تومان';
     }
 
     /**
@@ -149,6 +152,6 @@ class Package extends Model
     public function getIsThumbnailUploadedAttribute(): bool
     {
         return $this->thumbnail
-            && !preg_match('#^https?://#', $this->thumbnail);
+            && ! preg_match('#^https?://#', $this->thumbnail);
     }
 }
