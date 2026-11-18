@@ -240,12 +240,13 @@ class ApiPackageController extends Controller
 
                 if (! $license) {
                     $license = $subscription->order
-                        ? $this->subscriptionService->grantPackageAccess($customer, $package, $freeMonths, $subscription->order)
+                        ? $this->subscriptionService->grantPackageAccess($customer, $package, $freeMonths, $subscription->order, $subscription)
                         : $this->subscriptionService->grantFreeAccess(
                             $customer,
                             $package,
                             $freeMonths,
-                            'دسترسی رایگان از طریق اشتراک «'.($plan?->name ?? 'طرح اشتراک').'» (API).'
+                            'دسترسی رایگان از طریق اشتراک «'.($plan?->name ?? 'طرح اشتراک').'» (API).',
+                            $subscription
                         );
                 }
 
@@ -539,12 +540,13 @@ class ApiPackageController extends Controller
                         $freeMonths = (int) ($covered?->pivot->free_months ?? 1);
 
                         $license = $covering->order
-                            ? $this->subscriptionService->grantPackageAccess($customer, $package, $freeMonths, $covering->order)
+                            ? $this->subscriptionService->grantPackageAccess($customer, $package, $freeMonths, $covering->order, $covering)
                             : $this->subscriptionService->grantFreeAccess(
                                 $customer,
                                 $package,
                                 $freeMonths,
-                                'صدور خودکار از طریق اشتراک فعال «'.($covering->plan?->name ?? 'طرح اشتراک').'» (verify-license).'
+                                'صدور خودکار از طریق اشتراک فعال «'.($covering->plan?->name ?? 'طرح اشتراک').'» (verify-license).',
+                                $covering
                             );
                     }
                 } else {

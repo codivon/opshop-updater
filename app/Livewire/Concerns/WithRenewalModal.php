@@ -70,7 +70,8 @@ trait WithRenewalModal
         $plan = null;
 
         if ($license) {
-            $plan = app(RenewalService::class)->licensePlanLabel($license);
+            // Task 89: اگر لایسنس از طریق اشتراک صادر شده، برچسب «اشتراک «X»» نمایش داده می‌شود
+            $plan = app(RenewalService::class)->licenseSourceLabel($license);
         } elseif ($subscription) {
             $plan = $subscription->plan?->name ?? 'طرح فعلی';
         }

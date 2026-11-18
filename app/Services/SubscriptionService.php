@@ -409,12 +409,13 @@ class SubscriptionService
                 ]);
 
                 // ۲) لایسنس رایگان پکیج‌های همراه طرح (فقط اشتراکِ فوری — رزروشده بعداً در فعال‌سازی)
+                // Task 89: اشتراکِ صادرکننده پاس می‌شود تا لایسنس دقیقاً با اشتراک شروع/پایان یابد
                 $granted = [];
                 $packages = $this->resolveOrderPackages($subscription);
 
                 foreach ($packages as $package) {
                     $freeMonths = (int) ($package->pivot->free_months ?? 1);
-                    $license = $this->grantPackageAccess($customer, $package, $freeMonths, $order);
+                    $license = $this->grantPackageAccess($customer, $package, $freeMonths, $order, $subscription);
 
                     if ($license) {
                         $granted[] = [
@@ -588,29 +589,45 @@ class SubscriptionService
      * صدور یا تمدید لایسنس رایگان یک پکیج برای مشتری (با سفارش اشتراک).
      *
      * @param  int  $freeMonths  مدت دسترسی رایگان (۰ = نامحدود)
+     * @param  Subscription|null  $subscription  اشتراکِ صادرکننده — وقتی پاس شود لایسنسِ صادرشده
+     *                                           با اشتراک شروع/پایان می‌یابد (cap تا انضای اشتراک) و subscription_id ثبت می‌شود؛
+     *                                           انقضای اشتراک → لایسنس هم بسته (Task 89).
      */
-    public function grantPackageAccess(Customer $customer, Package $package, int $freeMonths, SubscriptionOrder $order): PackageLicense
+    public function grantPackageAccess(Customer $customer, Package $package, int $freeMonths, SubscriptionOrder $order, ?Subscription $subscription = null): PackageLicense
     {
         return $this->grantFreeAccess(
             $customer,
             $package,
             $freeMonths,
-            'دسترسی رایگان از طریق اشتراک «'.$order->plan_name.'».'
+            'دسترسی رایگان از طریق اشتراک «'.$order->plan_name.'».',
+            $subscription
         );
     }
 
     /**
      * هسته صدور/تمدید لایسنس رایگان — بدون نیاز به سفارش اشتراک
      * (برای مسیر API: وقتی اشتراک فعال هست ولی سفارشی به آن متصل نیست).
+     *
+     * بدون $subscription (مسیر مستقل/دستی):
      *  - اگر لایسنس فعال/منقضی (غیر باطل‌شده) دارد → تمدید: از انقضای فعلی + free_months
      *  - در غیر این صورت → لایسنس جدید از الان + free_months
      *
+     * با $subscription (مسیر اشتراکی — Task 89):
+     *  - انضای لایسنس از خودِ اشتراک محاسبه می‌شود، هرگز از لایسنس قبلی ادامه نمی‌گیرد
+     *    (رفع باگ «۳۸ روز مانده» — انضای قبلی + مدت از انضای اشتراک جلو می‌زد).
+     *  - cap: انضای لایسنس هرگز از انضای اشتراک بیشتر نمی‌شود؛ یعنی با پایان اشتراک
+     *    دسترسی پکیج هم بسته می‌شود (اشتراک تمام‌شده از پکیج استفاده نمی‌تواند).
+     *    فرمول: min(شروع‌اشتراک + free_months ماه، انضای اشتراک) — free_months=۰ یعنی تا انضای اشتراک.
+     *  - اگر لایسنس فعال قبلی «بیشتر از cap» اعتبار دارد (خرید مستقل پولی)، دست‌نخورده می‌ماند
+     *    و همان برمی‌گردد؛ در غیر این صورت قبلی باطل و لایسنس اشتراکی جدید صادر می‌شود.
+     *
      * @param  int  $freeMonths  مدت دسترسی رایگان (۰ = نامحدود)
      * @param  string|null  $note  یادداشت لایسنس (منبع دسترسی رایگان)
+     * @param  Subscription|null  $subscription  اشتراکِ صادرکننده (لایسنس با اشتراک هم‌عمر می‌شود)
      */
-    public function grantFreeAccess(Customer $customer, Package $package, int $freeMonths, ?string $note = null): PackageLicense
+    public function grantFreeAccess(Customer $customer, Package $package, int $freeMonths, ?string $note = null, ?Subscription $subscription = null): PackageLicense
     {
-        $license = DB::transaction(function () use ($customer, $package, $freeMonths, $note) {
+        $license = DB::transaction(function () use ($customer, $package, $freeMonths, $note, $subscription) {
             $existing = PackageLicense::query()
                 ->where('package_id', $package->id)
                 ->where('customer_id', $customer->id)
@@ -618,11 +635,28 @@ class SubscriptionService
                 ->latest('id')
                 ->first();
 
-            $startsAt = now();
-            $baseDate = ($existing && $existing->isActive() && $existing->expires_at)
-                ? Carbon::parse($existing->expires_at)
-                : now();
-            $expiresAt = $freeMonths > 0 ? (clone $baseDate)->addMonths($freeMonths) : null;
+            // ---- محاسبهٔ انضا (Task 89) ----
+            if ($subscription !== null) {
+                $startsAt = $subscription->start_date
+                    ? Carbon::parse($subscription->start_date)->startOfDay()
+                    : now();
+                $expiresAt = $this->subscriptionGrantExpiry($subscription, $freeMonths);
+
+                // لایسنس فعال قبلی با اعتبارِ بیشتر از cap (خرید مستقل) → دست‌نخورده؛ اشتراک چیزی اضافه نمی‌کند
+                if ($existing && $existing->isActive() && ($existing->expires_at === null || $expiresAt === null || $existing->expires_at->greaterThan($expiresAt))) {
+                    return $existing;
+                }
+            } else {
+                $startsAt = now();
+                $expiresAt = null;
+            }
+
+            if ($subscription === null) {
+                $baseDate = ($existing && $existing->isActive() && $existing->expires_at)
+                    ? Carbon::parse($existing->expires_at)
+                    : now();
+                $expiresAt = $freeMonths > 0 ? (clone $baseDate)->addMonths($freeMonths) : null;
+            }
 
             $license = PackageLicense::create([
                 'license_key' => PackageLicense::generateKey(),
@@ -634,6 +668,7 @@ class SubscriptionService
                 'expires_at' => $expiresAt,
                 'duration_months' => $freeMonths,
                 'notes' => $note ?: 'دسترسی رایگان از طریق اشتراک.',
+                'subscription_id' => $subscription?->id,
             ]);
 
             if ($existing) {
@@ -666,6 +701,55 @@ class SubscriptionService
         });
 
         return $license;
+    }
+
+    /**
+     * انضای لایسنسِ صادرشده از طریق اشتراک — cap تا انضای اشتراک (Task 89).
+     *  - اشتراک نامحدود + free_months=۰ → null (نامحدود)
+     *  - اشتراک نامحدود + free_months>۰ → شروع اشتراک + مدت
+     *  - اشتراک محدود → min(شروع + مدت، انضای اشتراک)
+     */
+    public function subscriptionGrantExpiry(Subscription $subscription, int $freeMonths): ?Carbon
+    {
+        $base = $subscription->start_date
+            ? Carbon::parse($subscription->start_date)->startOfDay()
+            : now();
+        $subEnd = $subscription->expires_at ? $subscription->expires_at->copy() : null;
+
+        if ($subEnd === null) {
+            return $freeMonths > 0 ? (clone $base)->addMonths($freeMonths) : null;
+        }
+
+        $planned = $freeMonths > 0 ? (clone $base)->addMonths($freeMonths) : null;
+
+        return $planned === null ? $subEnd : ($planned->lessThan($subEnd) ? $planned : $subEnd);
+    }
+
+    /**
+     * همگام‌سازی انضای لایسنس‌های صادرشده از طریق یک اشتراک (Task 89).
+     * پس از تغییر انضای اشتراک (ویرایش مدیر / +۳م / -۱م) صدازده می‌شود و
+     * کالکسیون subscriptions:sync-licenses هم برای اصلاح دادهٔ خراب قدیمی از آن استفاده می‌کند.
+     */
+    public function syncSubscriptionLicenses(Subscription $subscription): int
+    {
+        if ($subscription->status === Subscription::STATUS_RESERVED) {
+            return 0; // رزروشده هنوز شروع نشده
+        }
+
+        $updated = 0;
+
+        foreach ($this->resolveOrderPackages($subscription) as $package) {
+            $freeMonths = (int) ($package->pivot->free_months ?? 1);
+            $expiry = $this->subscriptionGrantExpiry($subscription, $freeMonths);
+
+            $updated += PackageLicense::query()
+                ->where('subscription_id', $subscription->id)
+                ->where('package_id', $package->id)
+                ->where('status', PackageLicense::STATUS_ACTIVE)
+                ->update(['expires_at' => $expiry]);
+        }
+
+        return $updated;
     }
 
     /* ===================================================================

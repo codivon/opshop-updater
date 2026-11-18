@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
 class Subscription extends Model
@@ -60,6 +61,12 @@ class Subscription extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(SubscriptionOrder::class, 'subscription_order_id');
+    }
+
+    /** لایسنس‌های پکیج صادرشده از طریق این اشتراک — Task 89 */
+    public function packageLicenses(): HasMany
+    {
+        return $this->hasMany(PackageLicense::class);
     }
 
     /**
@@ -124,6 +131,15 @@ class Subscription extends Model
             if ($subscription->final_amount < 0) {
                 $subscription->final_amount = 0;
             }
+        });
+
+        // Task 89: حذف اشتراک → لایسنس‌های صادرشده از طریق آن باطل می‌شوند
+        // (حذف اشتراک نباید دسترسی پکیج‌های همراه را زنده نگه دارد — هر مسیر حذف پوشیده می‌شود)
+        static::deleting(function ($subscription) {
+            PackageLicense::query()
+                ->where('subscription_id', $subscription->id)
+                ->where('status', PackageLicense::STATUS_ACTIVE)
+                ->update(['status' => PackageLicense::STATUS_REVOKED]);
         });
     }
 

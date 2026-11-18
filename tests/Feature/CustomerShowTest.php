@@ -333,7 +333,10 @@ class CustomerShowTest extends TestCase
 
     public function test_admin_can_grant_plan_subscription_with_package_licenses(): void
     {
-        [$customer, $package] = $this->makePaidPurchase();
+        [$customer, $package] = $this->makePaidPurchase([
+            // لایسنس قبلی کوتاه‌مدت — اشتراک جدید باید آن را تمدید کند
+            'expires_at' => now()->addDays(10),
+        ]);
 
         $plan = SubscriptionPlan::create([
             'name' => 'طرح طلایی',
@@ -367,11 +370,12 @@ class CustomerShowTest extends TestCase
         $component->saveSubscription();
 
         // اشتراک طرح‌محور صادر شد
-        $this->assertDatabaseHas('subscriptions', [
-            'customer_id' => $customer->id,
-            'subscription_plan_id' => $plan->id,
-            'status' => 'active',
-        ]);
+        $subscription = Subscription::query()
+            ->where('customer_id', $customer->id)
+            ->where('subscription_plan_id', $plan->id)
+            ->where('status', 'active')
+            ->first();
+        $this->assertNotNull($subscription);
 
         // لایسنس پکیج همراه صادر شد (پایه ۱ + تازه ۱ = حداقل ۲)
         $licenseCount = PackageLicense::query()
@@ -379,6 +383,18 @@ class CustomerShowTest extends TestCase
             ->where('package_id', $package->id)
             ->count();
         $this->assertGreaterThanOrEqual(2, $licenseCount);
+
+        // Task 89: لایسنس جدید از طریق اشتراک صادر شده و انضایش capِ اشتراک است
+        // (شروع اشتراک + ۳ ماه رایگان، نه از انضای لایسنس قبلی + ۳ ماه)
+        $granted = PackageLicense::query()
+            ->where('customer_id', $customer->id)
+            ->where('package_id', $package->id)
+            ->where('status', 'active')
+            ->whereNotNull('subscription_id')
+            ->first();
+        $this->assertNotNull($granted);
+        $this->assertSame($subscription->id, $granted->subscription_id);
+        $this->assertTrue($granted->expires_at->lessThanOrEqualTo($subscription->expires_at));
     }
 
     /* ---------------- مدیریت لایسنس ---------------- */

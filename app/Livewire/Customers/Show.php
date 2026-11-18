@@ -473,6 +473,9 @@ class Show extends Component
                 'description' => $data['description'] ?: null,
             ]);
 
+            // Task 89: لایسنس‌های صادرشده از طریق این اشتراک با انضای جدید همگام می‌شوند
+            app(SubscriptionService::class)->syncSubscriptionLicenses($subscription->refresh());
+
             $this->toast('اشتراک با موفقیت به‌روزرسانی شد.');
         } else {
             if ($this->subscriptionMode === 'plan') {
@@ -528,13 +531,14 @@ class Show extends Component
         ]);
 
         // صدور لایسنس پکیج‌های همراه طرح (مطابق جریان تأیید سفارش)
+        // Task 89: اشتراکِ صادرکننده پاس می‌شود تا لایسنس‌ها تا انضای همین اشتراک معتبر باشند
         if ($this->grantPlanPackages) {
             $packages = $plan->packagesForDuration($duration);
             $service = app(SubscriptionService::class);
 
             foreach ($packages as $package) {
                 $freeMonths = (int) ($package->pivot->free_months ?? 1);
-                $service->grantFreeAccess($this->customer, $package, $freeMonths, 'صدور دستی از طرح «'.$plan->name.'»');
+                $service->grantFreeAccess($this->customer, $package, $freeMonths, 'صدور دستی از طرح «'.$plan->name.'»', $subscription);
             }
         }
 
@@ -577,6 +581,9 @@ class Show extends Component
             'expires_at' => $new,
         ]);
 
+        // Task 89: لایسنس‌های صادرشده از طریق این اشتراک همگام می‌شوند
+        app(SubscriptionService::class)->syncSubscriptionLicenses($subscription->refresh());
+
         $this->toast(($months >= 0 ? 'اعتبار اشتراک '.fa_num($months).' ماه افزایش یافت (تا '.verta_date($new).').' : 'اعتبار اشتراک '.fa_num(abs($months)).' ماه کاهش یافت (تا '.verta_date($new).').'));
     }
 
@@ -592,6 +599,8 @@ class Show extends Component
         if ($subscription->customer_id !== $this->customer->id) {
             abort(404);
         }
+
+        // Task 89: لایسنس‌های وابسته در hook deleting مدل Subscription باطل می‌شوند
 
         $label = $subscription->plan?->name ?? 'اشتراک دستی';
         $subscription->delete();

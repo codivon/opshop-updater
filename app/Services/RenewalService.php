@@ -126,11 +126,14 @@ class RenewalService
 
         $daysRemaining = max(0, (int) floor(now()->diffInDays($license->expires_at, false)));
 
+        // Task 89: برچسب منبع دسترسی — اگر لایسنس از طریق اشتراک صادر شده، نام طرح اشتراک گفته می‌شود
+        $sourceLabel = $this->licenseSourceLabel($license);
+
         // هنوز در پنجرهٔ بستهٔ خرید
         if ($daysRemaining > self::WINDOW_DAYS) {
             return [
                 'allowed' => false, 'reserved' => false,
-                'message' => 'شما این پکیج را با طرح «'.$this->licensePlanLabel($license).'» خریداری کرده‌اید و اعتبار آن تا '
+                'message' => 'شما این پکیج را با '.$sourceLabel.' در اختیار دارید و اعتبار آن تا '
                     .fa_num($daysRemaining).' روز دیگر به پایان می‌رسد. از '.fa_num(self::WINDOW_DAYS).' روز مانده به پایان اعتبار می‌توانید طرح بعدی را خریداری کنید؛ '
                     .'خرید جدید پس از پایان دورهٔ فعلی به‌صورت خودکار فعال خواهد شد.',
                 'reason' => 'window_closed',
@@ -475,12 +478,13 @@ class RenewalService
             ]);
 
             // صدور لایسنس پکیج‌های همراه (همان پیکربندیِ مؤثرِ سفارش)
+            // Task 89: اشتراک پاس می‌شود تا لایسنس تا انضای همین اشتراک معتبر باشد
             $service = app(SubscriptionService::class);
             $packages = $service->resolveOrderPackages($subscription);
 
             foreach ($packages as $package) {
                 try {
-                    $service->grantPackageAccess($customer, $package, (int) ($package->pivot->free_months ?? 1), $order);
+                    $service->grantPackageAccess($customer, $package, (int) ($package->pivot->free_months ?? 1), $order, $subscription);
                 } catch (\Throwable $e) {
                     Log::warning('Failed granting reserved-subscription package access', [
                         'subscription_id' => $subscription->id,
@@ -563,7 +567,7 @@ class RenewalService
         }
 
         $days = max(0, (int) floor(now()->diffInDays($license->expires_at, false)));
-        $planLabel = $this->licensePlanLabel($license);
+        $planLabel = $this->licenseSourceLabel($license);
 
         if ($days > self::WINDOW_DAYS) {
             return [
@@ -571,7 +575,7 @@ class RenewalService
                 'days' => $days,
                 'plan' => $planLabel,
                 'activate_at' => null,
-                'message' => 'شما این پکیج را با طرح «'.$planLabel.'» خریداری کرده‌اید و اعتبار آن تا '
+                'message' => 'شما این پکیج را با '.$planLabel.' در اختیار دارید و اعتبار آن تا '
                     .fa_num($days).' روز دیگر به پایان می‌رسد. از '.fa_num(self::WINDOW_DAYS).' روز مانده به پایان اعتبار می‌توانید طرح بعدی را رزرو کنید.',
             ];
         }
@@ -669,6 +673,22 @@ class RenewalService
         return $license->duration_months > 0
             ? 'طرح '.fa_num($license->duration_months).' ماهه'
             : 'نامحدود';
+    }
+
+    /**
+     * برچسب «منبعِ» اعتبارِ فعلی پکیج (Task 89):
+     * لایسنس صادرشده از طریق اشتراک → «اشتراک «نام طرح»»؛
+     * در غیر این صورت برچسب طرح خریدِ مستقل (طرح قیمت‌گذاری / مدت).
+     */
+    public function licenseSourceLabel(PackageLicense $license): string
+    {
+        $planName = $license->subscription?->plan?->name;
+
+        if ($planName) {
+            return 'اشتراک «'.$planName.'»';
+        }
+
+        return $this->licensePlanLabel($license);
     }
 
     /** تاریخ شمسی برای پیام‌ها */

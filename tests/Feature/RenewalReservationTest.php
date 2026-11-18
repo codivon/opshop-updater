@@ -75,7 +75,7 @@ class RenewalReservationTest extends TestCase
 
         $this->assertFalse($result['allowed']);
         $this->assertFalse($result['reserved']);
-        $this->assertStringContainsString('خریداری کرده‌اید', $result['message']);
+        $this->assertStringContainsString('در اختیار دارید', $result['message']);
         $this->assertStringContainsString('روز دیگر به پایان می‌رسد', $result['message']);
         $this->assertStringContainsString('۵ روز مانده', $result['message']);
     }
