@@ -7,30 +7,40 @@ use App\Models\Customer;
 use App\Models\Package;
 use App\Models\PackageLicense;
 use App\Models\PackagePurchase;
+use App\Models\Subscription;
+use App\Models\SubscriptionOrder;
 use App\Models\Ticket;
 use App\Models\TicketReply;
 use App\Services\LicenseSigningKeyService;
 use App\Services\SubscriptionService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * پروفایل مشتری فروشگاه:
- * - مشاهده پکیج‌های خریده + وضعیت لایسنس (نصب فقط با کد آپدیت در فروشگاه‌ساز — بدون دانلود مستقیم)
- * - مشاهده اشتراک فعال
+ * - مشاهده پکیج‌های خریده + پکیج‌های همراهِ اشتراک + وضعیت لایسنس
+ *   (نصب فقط با کد آپدیت در فروشگاه‌ساز — بدون دانلود مستقیم)
+ * - مشاهده اشتراک‌های خریداری‌شده + سفارش‌های در انتظار تأیید مدیر
  * - ویرایش مشخصات (نام، ایمیل، موبایل)
+ *
+ * Task 96 — WithPagination: بدون این تریت، ویوهای صفحه‌بندیِ منتشرشدهٔ اپ
+ * (<a href>) در درخواست‌های update لایووایر آدرسشان به livewire/update حل می‌شد
+ * و کلیک صفحهٔ ۲ خطای «The GET method is not supported for route livewire/update»
+ * می‌داد؛ با تریت، ویوهای لایووایر (wire:click) استفاده می‌شوند.
  */
 #[Layout('components.layouts.shop')]
 #[Title('پروفایل من')]
 class CustomerProfile extends Component
 {
-    use WithToasts;
+    use WithPagination, WithToasts;
 
-    /** تب فعال: purchases | licenses | tickets | info */
+    /** تب فعال: purchases | subscriptions | licenses | tickets | info */
     public string $tab = 'purchases';
 
     /* ---- فیلتر بخش لایسنس‌ها ---- */
@@ -59,7 +69,7 @@ class CustomerProfile extends Component
 
     public string $replyBody = '';
 
-    protected const TABS = ['purchases', 'licenses', 'tickets', 'info'];
+    protected const TABS = ['purchases', 'subscriptions', 'licenses', 'tickets', 'info'];
 
     public function mount(): void
     {
@@ -360,6 +370,113 @@ class CustomerProfile extends Component
         return $this->customer()?->activePlanSubscription();
     }
 
+    /* ---------------------------------------------------------------- */
+    /*  Task 96 — اشتراک‌های خریداری‌شده */
+    /* ---------------------------------------------------------------- */
+
+    /** تاریخچهٔ اشتراک‌های مشتری (فعال/منقضی/رزروشده) — با طرح و پروژه و سفارش */
+    #[Computed]
+    public function mySubscriptions()
+    {
+        $customer = $this->customer();
+
+        if (! $customer) {
+            return Subscription::query()->whereRaw('1 = 0')->paginate(10, pageName: 'subsPage');
+        }
+
+        return $customer->subscriptions()
+            ->with(['plan:id,name,slug,duration_months', 'project:id,name,slug', 'order:id,meta'])
+            ->orderByDesc('id')
+            ->paginate(10, pageName: 'subsPage');
+    }
+
+    /** سفارش‌های پرداخت‌شده که هنوز اشتراکِ صادرشده ندارند (در انتظار تأیید مدیر) */
+    #[Computed]
+    public function pendingSubscriptionOrders(): Collection
+    {
+        $customer = $this->customer();
+
+        if (! $customer) {
+            return collect();
+        }
+
+        return $customer->subscriptionOrders()
+            ->whereNull('subscription_id')
+            ->where('status', SubscriptionOrder::STATUS_PAID)
+            ->where('admin_status', SubscriptionOrder::ADMIN_STATUS_PENDING)
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    /**
+     * پکیج‌های همراهِ اشتراک‌های فعالِ پرداخت‌شده — Task 96 (درخواست کاربر):
+     * «بعضی از اشتراک‌ها چندتا پکیج رایگان همراه خود دارند، اون پکیج‌ها رو نمایش بده
+     * در تب پکیج‌ها و بنویسه که به واسطهٔ اشتراک هست که این پکیج را دارد.»
+     *
+     * خروجی: مجموعه‌ای از ['subscription' => ..., 'packages' => Collection<Package>]
+     * فقط اشتراک‌های فعالِ پرداخت‌شده و منقضی‌نشده.
+     */
+    #[Computed]
+    public function subscriptionBundles(): Collection
+    {
+        $customer = $this->customer();
+
+        if (! $customer) {
+            return collect();
+        }
+
+        return $customer->subscriptions()
+            ->whereNotNull('subscription_plan_id')
+            ->where('status', 'active')
+            ->where('payment_status', 'paid')
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->with('order:id,meta')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (Subscription $s) => ['subscription' => $s, 'packages' => $s->effectivePackages()])
+            ->filter(fn (array $bundle) => $bundle['packages']->isNotEmpty())
+            ->values();
+    }
+
+    /**
+     * Task 96 — هشدار انقضای اشتراک: رکوردی برای بنر بالای تب‌ها.
+     *  - expiring: اشتراک فعال تا ۷ روز دیگر منقضی می‌شود
+     *  - expired: اشتراک فعالی نیست ولی اشتراکِ منقضی‌شده در پروفایل هست
+     */
+    #[Computed]
+    public function subscriptionNotice(): ?array
+    {
+        $customer = $this->customer();
+
+        if (! $customer) {
+            return null;
+        }
+
+        $active = $this->mySubscription;
+
+        if ($active && $active->effective_expires_at) {
+            $days = (int) floor(now()->diffInDays($active->effective_expires_at, false));
+
+            if ($days >= 0 && $days <= 7) {
+                return [
+                    'type' => 'expiring',
+                    'days' => $days,
+                    'plan' => $active->plan?->name,
+                ];
+            }
+        }
+
+        if (! $active && $customer->subscriptions()
+            ->where('status', 'active')
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now())
+            ->exists()) {
+            return ['type' => 'expired', 'days' => null, 'plan' => null];
+        }
+
+        return null;
+    }
+
     /**
      * Task 92/95 — کلید عمومی لایسنس برای فروشگاه‌ساز مشتری:
      * کلید «عمومی» است و راز نیست؛ در فیلد پنل نمایش داده می‌شود و با دکمهٔ
@@ -441,6 +558,16 @@ class CustomerProfile extends Component
             return ['purchases' => 0, 'licenses' => 0, 'licenses_total' => 0, 'spent' => 0];
         }
 
+        // Task 96 — مجموع خرید = خریدهای پکیج + خریدهای اشتراک (پرداخت‌شده)
+        // گزارش کاربر: با خرید اشتراک، «مجموع خرید» صفر نشان می‌شد چون فقط پکیج‌ها شمرده می‌شدند.
+        $packageSpent = (int) $customer->purchases()
+            ->where('status', PackagePurchase::STATUS_PAID)
+            ->sum('amount');
+
+        $subscriptionSpent = (int) $customer->subscriptionOrders()
+            ->where('status', SubscriptionOrder::STATUS_PAID)
+            ->sum('final_amount');
+
         return [
             // تعداد پکیج‌های متمایز خریده‌شده (بدون تکرار خریدهای مجدد یک پکیج)
             'purchases' => $customer->purchases()
@@ -449,7 +576,7 @@ class CustomerProfile extends Component
                 ->count('package_id'),
             'licenses' => $customer->licenses()->where('status', PackageLicense::STATUS_ACTIVE)->count(),
             'licenses_total' => $customer->licenses()->count(),
-            'spent' => (int) $customer->purchases()->where('status', PackagePurchase::STATUS_PAID)->sum('amount'),
+            'spent' => $packageSpent + $subscriptionSpent,
         ];
     }
 

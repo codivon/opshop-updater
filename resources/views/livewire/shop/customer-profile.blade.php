@@ -240,7 +240,7 @@
     @endif
 
     {{-- ============ Stats ============ --}}
-    <section class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="card flex items-center gap-4 p-5">
             <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
                 <x-icon name="package" class="size-5.5" />
@@ -264,15 +264,65 @@
                 <x-icon name="wallet" class="size-5.5" />
             </span>
             <div>
-                <p class="text-xs text-zinc-500 dark:text-zinc-400">مجموع خرید</p>
-                <p class="text-xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($this->stats['spent']) }} تومان</p>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400">مجموع خرید <span class="text-[10px]">(پکیج + اشتراک)</span></p>
+                <p class="text-xl font-black tabular-nums text-zinc-900 dark:text-zinc-50">{{ money($this->stats['spent']) }}</p>
+            </div>
+        </div>
+        {{-- Task 96 — کارت اشتراک فعال --}}
+        <div class="card flex items-center gap-4 p-5">
+            <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400">
+                <x-icon name="crown" class="size-5.5" />
+            </span>
+            <div class="min-w-0">
+                @if($this->mySubscription)
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">اشتراک فعال</p>
+                    <p class="truncate text-sm font-black text-zinc-900 dark:text-zinc-50">{{ $this->mySubscription->plan?->name ?? 'اشتراک' }}</p>
+                    @if($this->mySubscription->effective_expires_at)
+                        @php($daysLeft = (int) floor(now()->diffInDays($this->mySubscription->effective_expires_at, false)))
+                        <p class="mt-0.5 text-[11px] font-bold {{ $daysLeft <= 7 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400' }}">
+                            {{ $daysLeft >= 0 ? fa_num($daysLeft).' روز باقی‌مانده' : 'منقضی شده' }}
+                        </p>
+                    @else
+                        <p class="mt-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">بدون محدودیت زمان</p>
+                    @endif
+                @else
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">اشتراک فعال</p>
+                    <a href="{{ route('shop.subscriptions') }}" wire:navigate class="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold text-brand-600 hover:underline dark:text-brand-400">
+                        اشتراکی ندارید — مشاهده طرح‌ها
+                        <x-icon name="chevron-left" class="size-3" />
+                    </a>
+                @endif
             </div>
         </div>
     </section>
 
+    {{-- ============ Task 96 — بنر هشدار انقضای اشتراک ============ --}}
+    @if($notice = $this->subscriptionNotice)
+        @php($expiringSoon = $notice['type'] === 'expiring')
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 ring-1 {{ $expiringSoon
+                ? 'bg-amber-50 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/20'
+                : 'bg-rose-50 ring-rose-200 dark:bg-rose-500/10 dark:ring-rose-400/20' }}">
+            <p class="flex items-center gap-2 text-xs font-bold {{ $expiringSoon ? 'text-amber-800 dark:text-amber-300' : 'text-rose-800 dark:text-rose-300' }}">
+                <x-icon name="alert-circle" class="size-4 shrink-0" />
+                @if($expiringSoon)
+                    @if($notice['days'] === 0)
+                        اشتراک «{{ $notice['plan'] }}» شما امروز منقضی می‌شود — برای قطع نشدن خدمات همین امروز تمدید کنید.
+                    @else
+                        اشتراک «{{ $notice['plan'] }}» شما تا {{ fa_num($notice['days']) }} روز دیگر منقضی می‌شود — برای قطع نشدن خدمات تمدید کنید.
+                    @endif
+                @else
+                    اشتراک شما منقضی شده است؛ برای ادامهٔ پشتیبانی و دسترسی‌ها، یک طرح جدید تهیه کنید.
+                @endif
+            </p>
+            <a href="{{ route('shop.subscriptions') }}" wire:navigate>
+                <x-btn variant="secondary" size="sm" icon="crown">{{ $expiringSoon ? 'تمدید اشتراک' : 'مشاهده طرح‌ها' }}</x-btn>
+            </a>
+        </div>
+    @endif
+
     {{-- ============ Tabs ============ --}}
     <div class="flex items-center justify-center px-3">
-        {{-- max-w-full + اسکرول افقی: با ۴ تب، در موبایل سرریز نمی‌کند (نوار پنهان) --}}
+        {{-- max-w-full + اسکرول افقی: با ۵ تب، در موبایل سرریز نمی‌کند (نوار پنهان) --}}
         <div class="inline-flex max-w-full overflow-x-auto rounded-2xl bg-zinc-200/70 p-1 [scrollbar-width:none] dark:bg-zinc-800/70 [&::-webkit-scrollbar]:hidden" role="tablist">
             <button type="button" wire:click="switchTab('purchases')" role="tab"
                     @class(['flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black transition-all',
@@ -281,6 +331,15 @@
                 <x-icon name="package" class="size-4" /> پکیج‌های من
                 @if($this->purchases->total())
                     <span class="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] tabular-nums text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">{{ fa_num($this->purchases->total()) }}</span>
+                @endif
+            </button>
+            <button type="button" wire:click="switchTab('subscriptions')" role="tab"
+                    @class(['flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black transition-all',
+                        $tab === 'subscriptions' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400'])
+                    aria-current="{{ $tab === 'subscriptions' ? 'true' : 'false' }}">
+                <x-icon name="crown" class="size-4" /> اشتراک‌های من
+                @if($this->mySubscriptions->total())
+                    <span class="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] tabular-nums text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">{{ fa_num($this->mySubscriptions->total()) }}</span>
                 @endif
             </button>
             <button type="button" wire:click="switchTab('licenses')" role="tab"
@@ -312,89 +371,321 @@
 
     {{-- ==================== TAB: پکیج‌های من ==================== --}}
     @if($tab === 'purchases')
-        @if($this->purchases->count())
+        @if($this->purchases->count() || $this->subscriptionBundles->isNotEmpty())
             <div class="space-y-4">
-                @foreach($this->purchases as $purchase)
-                    @php($license = \App\Models\PackageLicense::query()
-                        ->where('customer_id', $customer->id)
-                        ->where('package_id', $purchase->package_id)
-                        ->where('status', \App\Models\PackageLicense::STATUS_ACTIVE)
-                        ->latest('id')->first())
-                    <div wire:key="purchase-{{ $purchase->id }}" class="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
-                        {{-- thumbnail --}}
-                        <div class="h-24 w-full shrink-0 overflow-hidden rounded-xl bg-zinc-100 sm:h-20 sm:w-32 dark:bg-zinc-800">
-                            <img src="{{ $purchase->package->thumbnail_url }}" alt="{{ $purchase->package->name }}"
-                                 class="size-full object-cover" onerror="this.style.display='none';this.parentElement.classList.add('shop-thumb')">
-                        </div>
 
-                        {{-- info --}}
-                        <div class="min-w-0 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <a href="{{ route('shop.package', $purchase->package->slug) }}" wire:navigate
-                                   class="text-sm font-black text-zinc-900 transition-colors hover:text-brand-600 dark:text-zinc-50">
-                                    {{ $purchase->package->name }}
-                                </a>
-                                @if($license)
-                                    <x-badge variant="success" icon="shield-check">لایسنس فعال</x-badge>
-                                @elseif($purchase->isReserved())
-                                    {{-- Task 87 — خرید رزروشده: فعال‌سازی خودکار پس از پایان دورهٔ فعلی --}}
-                                    <x-badge variant="violet" icon="clock">رزروشده — فعال‌سازی خودکار {{ $purchase->reserved_activate_at ? verta_date($purchase->reserved_activate_at, 'Y/m/d') : '' }}</x-badge>
-                                @else
-                                    <x-badge variant="neutral" icon="receipt">خرید موفق</x-badge>
-                                @endif
+                {{-- --- خریدهای مستقیم پکیج --- --}}
+                @if($this->purchases->count())
+                    <div class="space-y-4">
+                        @foreach($this->purchases as $purchase)
+                            @php($license = \App\Models\PackageLicense::query()
+                                ->where('customer_id', $customer->id)
+                                ->where('package_id', $purchase->package_id)
+                                ->where('status', \App\Models\PackageLicense::STATUS_ACTIVE)
+                                ->latest('id')->first())
+                            <div wire:key="purchase-{{ $purchase->id }}" class="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+                                {{-- thumbnail --}}
+                                <div class="h-24 w-full shrink-0 overflow-hidden rounded-xl bg-zinc-100 sm:h-20 sm:w-32 dark:bg-zinc-800">
+                                    <img src="{{ $purchase->package->thumbnail_url }}" alt="{{ $purchase->package->name }}"
+                                         class="size-full object-cover" onerror="this.style.display='none';this.parentElement.classList.add('shop-thumb')">
+                                </div>
+
+                                {{-- info --}}
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <a href="{{ route('shop.package', $purchase->package->slug) }}" wire:navigate
+                                           class="text-sm font-black text-zinc-900 transition-colors hover:text-brand-600 dark:text-zinc-50">
+                                            {{ $purchase->package->name }}
+                                        </a>
+                                        @if($license)
+                                            <x-badge variant="success" icon="shield-check">لایسنس فعال</x-badge>
+                                        @elseif($purchase->isReserved())
+                                            {{-- Task 87 — خرید رزروشده: فعال‌سازی خودکار پس از پایان دورهٔ فعلی --}}
+                                            <x-badge variant="violet" icon="clock">رزروشده — فعال‌سازی خودکار {{ $purchase->reserved_activate_at ? verta_date($purchase->reserved_activate_at, 'Y/m/d') : '' }}</x-badge>
+                                        @else
+                                            <x-badge variant="neutral" icon="receipt">خرید موفق</x-badge>
+                                        @endif
+                                    </div>
+                                    <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                        @if($purchase->version)
+                                            <span class="font-mono" dir="ltr">v{{ $purchase->version->version }}</span>
+                                        @endif
+                                        @if($purchase->pricingPlan)
+                                            <span class="inline-flex items-center gap-1"><x-icon name="layers" class="size-3.5" /> {{ $purchase->pricingPlan->name }}</span>
+                                        @endif
+                                        <span class="inline-flex items-center gap-1"><x-icon name="calendar" class="size-3.5" /> {{ verta_date($purchase->paid_at) }}</span>
+                                        @if($purchase->amount > 0)
+                                            <span class="inline-flex items-center gap-1 tabular-nums">{{ money($purchase->amount) }}</span>
+                                        @else
+                                            <span class="text-emerald-600 dark:text-emerald-400">رایگان</span>
+                                        @endif
+                                    </div>
+                                    @if($license?->expires_at)
+                                        <p class="mt-1 inline-flex items-center gap-1 text-xs text-zinc-400">
+                                            <x-icon name="calendar-clock" class="size-3.5" />
+                                            اعتبار تا {{ verta_date($license->expires_at) }}
+                                        </p>
+                                    @endif
+                                </div>
+
+                                {{-- actions --}}
+                                <div class="flex shrink-0 items-center gap-2">
+                                    <a href="{{ route('shop.package', $purchase->package->slug) }}" wire:navigate>
+                                        <x-btn variant="secondary" size="sm" icon="external-link">صفحه پکیج</x-btn>
+                                    </a>
+                                </div>
                             </div>
-                            <div class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                @if($purchase->version)
-                                    <span class="font-mono" dir="ltr">v{{ $purchase->version->version }}</span>
-                                @endif
-                                @if($purchase->pricingPlan)
-                                    <span class="inline-flex items-center gap-1"><x-icon name="layers" class="size-3.5" /> {{ $purchase->pricingPlan->name }}</span>
-                                @endif
-                                <span class="inline-flex items-center gap-1"><x-icon name="calendar" class="size-3.5" /> {{ verta_date($purchase->paid_at) }}</span>
-                                @if($purchase->amount > 0)
-                                    <span class="inline-flex items-center gap-1 tabular-nums">{{ money($purchase->amount) }} تومان</span>
-                                @else
-                                    <span class="text-emerald-600 dark:text-emerald-400">رایگان</span>
-                                @endif
-                            </div>
-                            @if($license?->expires_at)
-                                <p class="mt-1 inline-flex items-center gap-1 text-xs text-zinc-400">
+                        @endforeach
+                    </div>
+
+                    <div>{{ $this->purchases->links() }}</div>
+                @endif
+
+                {{-- --- Task 96 — پکیج‌های همراه اشتراک (به واسطهٔ اشتراک) --- --}}
+                @foreach($this->subscriptionBundles as $bundle)
+                    <div wire:key="bundle-{{ $bundle['subscription']->id }}" class="card overflow-hidden p-0 ring-1 ring-amber-200/70 dark:ring-amber-400/20">
+                        {{-- سربرگ بخش: این پکیج‌ها به واسطهٔ اشتراک فعال شده‌اند --}}
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 bg-amber-50/70 px-4 py-3 sm:px-5 dark:border-amber-400/10 dark:bg-amber-500/10">
+                            <p class="flex flex-wrap items-center gap-2 text-xs font-black text-amber-800 dark:text-amber-300">
+                                <x-icon name="crown" class="size-4" />
+                                همراه اشتراک «{{ $bundle['subscription']->plan?->name ?? 'اشتراک' }}»
+                                <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+                                    {{ fa_num($bundle['packages']->count()) }} پکیج رایگان
+                                </span>
+                            </p>
+                            @if($bundle['subscription']->effective_expires_at)
+                                <p class="flex items-center gap-1 text-[11px] text-amber-700/80 dark:text-amber-300/70">
                                     <x-icon name="calendar-clock" class="size-3.5" />
-                                    اعتبار تا {{ verta_date($license->expires_at) }}
+                                    تا {{ verta_date($bundle['subscription']->effective_expires_at) }} همراه شماست
                                 </p>
                             @endif
                         </div>
 
-                        {{-- actions --}}
-                        <div class="flex shrink-0 items-center gap-2">
-                            <a href="{{ route('shop.package', $purchase->package->slug) }}" wire:navigate>
-                                <x-btn variant="secondary" size="sm" icon="external-link">صفحه پکیج</x-btn>
-                            </a>
+                        <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                            @foreach($bundle['packages'] as $package)
+                                {{-- تک‌خطی php-directive — بدون بلوک انتهایی (گاتچای ترکیب با storePhpBlocks بلید) --}}
+                                @php($fm = (int) ($package->pivot->free_months ?? 1))
+                                @php($bundleLicense = \App\Models\PackageLicense::query()->where('customer_id', $customer->id)->where('package_id', $package->id)->where('subscription_id', $bundle['subscription']->id)->where('status', \App\Models\PackageLicense::STATUS_ACTIVE)->latest('id')->first())
+                                <div wire:key="bundle-{{ $bundle['subscription']->id }}-pkg-{{ $package->id }}"
+                                     class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
+                                    <div class="h-24 w-full shrink-0 overflow-hidden rounded-xl bg-zinc-100 sm:h-20 sm:w-32 dark:bg-zinc-800">
+                                        <img src="{{ $package->thumbnail_url }}" alt="{{ $package->name }}"
+                                             class="size-full object-cover" onerror="this.style.display='none';this.parentElement.classList.add('shop-thumb')">
+                                    </div>
+
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <a href="{{ route('shop.package', $package->slug) }}" wire:navigate
+                                               class="text-sm font-black text-zinc-900 transition-colors hover:text-brand-600 dark:text-zinc-50">
+                                                {{ $package->name }}
+                                            </a>
+                                            @if($bundleLicense)
+                                                <x-badge variant="success" icon="shield-check">لایسنس فعال</x-badge>
+                                            @endif
+                                            <x-badge variant="warning" icon="crown">به واسطهٔ اشتراک</x-badge>
+                                        </div>
+                                        <p class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-icon name="gift" class="size-3.5 text-amber-500" />
+                                                این پکیج به واسطهٔ اشتراک «{{ $bundle['subscription']->plan?->name ?? 'اشتراک' }}» برای شما فعال شده است
+                                            </span>
+                                        </p>
+                                        <p class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400">
+                                            @if($fm === 0)
+                                                <span class="font-bold text-emerald-600 dark:text-emerald-400">دسترسی نامحدود</span>
+                                            @else
+                                                <span>{{ fa_num($fm) }} ماه رایگان</span>
+                                            @endif
+                                            @if($bundleLicense?->expires_at)
+                                                <span class="inline-flex items-center gap-1">
+                                                    <x-icon name="calendar-clock" class="size-3.5" />
+                                                    اعتبار تا {{ verta_date($bundleLicense->expires_at) }}
+                                                </span>
+                                            @endif
+                                        </p>
+                                    </div>
+
+                                    <div class="flex shrink-0 items-center gap-2">
+                                        <a href="{{ route('shop.package', $package->slug) }}" wire:navigate>
+                                            <x-btn variant="secondary" size="sm" icon="external-link">صفحه پکیج</x-btn>
+                                        </a>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+
+                {{-- راهنمای نصب: مشتری پکیج را مستقیم دانلود نمی‌کند؛ با کد آپدیت در فروشگاه خودش نصب می‌کند --}}
+                <div class="flex items-start gap-3 rounded-2xl bg-brand-50 p-4 ring-1 ring-brand-100 dark:bg-brand-500/10 dark:ring-brand-400/20">
+                    <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-600 shadow-xs dark:bg-zinc-900 dark:text-brand-400">
+                        <x-icon name="info" class="size-4.5" />
+                    </span>
+                    <p class="text-xs leading-6 text-brand-800/90 dark:text-brand-200/80">
+                        دانلود مستقیم فایل پکیج‌ها ممکن نیست؛ برای نصب، در افزونه/فروشگاه ساز خود
+                        <span class="font-black">کد آپدیت</span>
+                        (<span class="font-mono font-bold" dir="ltr">{{ $customer->update_code }}</span>) را وارد کنید و
+                        پکیج خریداری‌شده به‌صورت خودکار نصب و به‌روزرسانی می‌شود.
+                    </p>
+                </div>
+            </div>
+        @else
+            <div class="card">
+                <x-empty icon="package" title="هنوز پکیجی نخریده‌اید"
+                         description="از فروشگاه پکیج موردنظرتان را تهیه کنید تا با کد آپدیت، در فروشگاه ساز شما قابل نصب باشد. با خرید طرح اشتراک، پکیج‌های رایگانِ همراهِ طرح هم به‌صورت خودکار همین‌جا فعال می‌شوند.">
+                    <a href="{{ route('shop.home') }}" wire:navigate>
+                        <x-btn variant="soft" size="sm" icon="store">رفتن به فروشگاه</x-btn>
+                    </a>
+                </x-empty>
+            </div>
+        @endif
+
+    {{-- ==================== TAB: اشتراک‌های من (Task 96) ==================== --}}
+    @elseif($tab === 'subscriptions')
+
+        {{-- --- سفارش‌های پرداخت‌شده که هنوز اشتراکشان صادر نشده (در انتظار تأیید مدیر) --- --}}
+        @if($this->pendingSubscriptionOrders->isNotEmpty())
+            <div class="space-y-3">
+                @foreach($this->pendingSubscriptionOrders as $order)
+                    <div wire:key="pending-order-{{ $order->id }}"
+                         class="card flex flex-wrap items-center justify-between gap-3 border-s-4 border-s-amber-400 p-4 sm:p-5">
+                        <div class="min-w-0">
+                            <p class="flex flex-wrap items-center gap-2 text-sm font-black text-zinc-900 dark:text-zinc-50">
+                                <x-icon name="crown" class="size-4 text-amber-500" />
+                                خرید اشتراک «{{ $order->plan_name }}»
+                                <x-badge variant="warning" icon="clock">در انتظار تأیید مدیر</x-badge>
+                            </p>
+                            <p class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                <span class="inline-flex items-center gap-1"><x-icon name="calendar" class="size-3.5" /> {{ verta_date($order->paid_at) }}</span>
+                                <span class="inline-flex items-center gap-1 tabular-nums">{{ money($order->final_amount) }}</span>
+                                <span class="inline-flex items-center gap-1">{{ $order->duration_label }}</span>
+                            </p>
+                            <p class="mt-1.5 text-[11px] leading-5 text-zinc-400">
+                                پرداخت شما با موفقیت انجام شده؛ پس از تأیید مدیر، اشتراک فعال شده و همین‌جا نمایش داده می‌شود.
+                            </p>
                         </div>
                     </div>
                 @endforeach
             </div>
+        @endif
 
-            {{-- راهنمای نصب: مشتری پکیج را مستقیم دانلود نمی‌کند؛ با کد آپدیت در فروشگاه خودش نصب می‌کند --}}
-            <div class="flex items-start gap-3 rounded-2xl bg-brand-50 p-4 ring-1 ring-brand-100 dark:bg-brand-500/10 dark:ring-brand-400/20">
-                <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-600 shadow-xs dark:bg-zinc-900 dark:text-brand-400">
-                    <x-icon name="info" class="size-4.5" />
-                </span>
-                <p class="text-xs leading-6 text-brand-800/90 dark:text-brand-200/80">
-                    دانلود مستقیم فایل پکیج‌ها ممکن نیست؛ برای نصب، در افزونه/فروشگاه ساز خود
-                    <span class="font-black">کد آپدیت</span>
-                    (<span class="font-mono font-bold" dir="ltr">{{ $customer->update_code }}</span>) را وارد کنید و
-                    پکیج خریداری‌شده به‌صورت خودکار نصب و به‌روزرسانی می‌شود.
-                </p>
+        @if($this->mySubscriptions->count())
+            <div class="space-y-4">
+                @foreach($this->mySubscriptions as $subscription)
+                    {{-- نکته: فقط تک‌خطیِ دایرکتیو php — ترکیب تک‌خطی با بلوک چندخطی php در یک فایل،
+                         storePhpBlocks بلید را از اولین تگ تا اولین بسته‌شدن می‌بلعد و کامپایل را خراب می‌کند --}}
+                    @php($reserved = $subscription->isReserved())
+                    @php($expired = $subscription->isExpired())
+                    @php($isActive = $subscription->status === 'active' && ! $expired && ! $reserved)
+                    @php($expiresAt = $subscription->effective_expires_at)
+                    @php($daysLeft = $expiresAt ? (int) floor(now()->diffInDays($expiresAt, false)) : null)
+                    @php($totalDays = ($subscription->start_date && $subscription->end_date) ? max(1, (int) abs($subscription->start_date->diffInDays($subscription->end_date))) : null)
+                    @php($progress = ($isActive && $expiresAt && $totalDays) ? max(0, min(100, (int) round(max(0, (int) abs(now()->diffInDays($subscription->start_date))) / $totalDays * 100))) : null)
+                    @php($bundlePackages = $subscription->effectivePackages())
+                    <div wire:key="sub-{{ $subscription->id }}" class="card overflow-hidden p-0">
+                        {{-- سربرگ کارت --}}
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3 sm:px-5 dark:border-zinc-800">
+                            <p class="flex flex-wrap items-center gap-2 text-sm font-black text-zinc-900 dark:text-zinc-50">
+                                <span class="flex size-8 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                                    <x-icon name="crown" class="size-4" />
+                                </span>
+                                {{ $subscription->plan?->name ?? $subscription->order?->meta['plan']['name'] ?? 'اشتراک' }}
+                            </p>
+                            @if($reserved)
+                                <x-badge variant="violet" icon="clock">رزروشده — فعال‌سازی خودکار {{ $subscription->reserved_activate_at ? verta_date($subscription->reserved_activate_at) : '' }}</x-badge>
+                            @elseif($isActive)
+                                <x-badge variant="success" icon="shield-check">فعال</x-badge>
+                            @elseif($expired)
+                                <x-badge variant="warning" icon="clock">منقضی‌شده</x-badge>
+                            @else
+                                <x-badge variant="neutral" icon="clock">{{ $subscription->status }}</x-badge>
+                            @endif
+                        </div>
+
+                        {{-- بدنه --}}
+                        <div class="grid gap-4 p-4 sm:p-5 sm:grid-cols-2 lg:grid-cols-4">
+                            <div>
+                                <p class="text-[11px] font-bold text-zinc-400">پروژه</p>
+                                <p class="mt-1 text-xs font-black text-zinc-800 dark:text-zinc-100">
+                                    {{ $subscription->project?->name ?? '—' }}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-bold text-zinc-400">مدت اعتبار</p>
+                                <p class="mt-1 text-xs font-black text-zinc-800 dark:text-zinc-100">
+                                    {{ $subscription->order?->duration_label ?? ($subscription->plan?->duration_months ? fa_num($subscription->plan->duration_months).' ماه' : '—') }}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-bold text-zinc-400">بازهٔ اعتبار</p>
+                                <p class="mt-1 text-xs font-bold tabular-nums text-zinc-700 dark:text-zinc-200">
+                                    @if($subscription->start_date)
+                                        {{ verta_date($subscription->start_date) }}
+                                        @if($expiresAt)
+                                            تا {{ verta_date($expiresAt) }}
+                                        @else
+                                            — بدون محدودیت
+                                        @endif
+                                    @elseif($reserved && $subscription->reserved_activate_at)
+                                        فعال‌سازی از {{ verta_date($subscription->reserved_activate_at) }}
+                                    @else
+                                        —
+                                    @endif
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-bold text-zinc-400">مبلغ پرداختی</p>
+                                <p class="mt-1 text-xs font-black tabular-nums text-zinc-800 dark:text-zinc-100">
+                                    {{ money((float) $subscription->final_amount) }}
+                                </p>
+                            </div>
+                        </div>
+
+                        {{-- وضعیت زمانی + نوار پیشرفت --}}
+                        @if($isActive && $expiresAt && $daysLeft !== null)
+                            <div class="px-4 pb-4 sm:px-5">
+                                <div class="mb-1.5 flex items-center justify-between text-[11px] font-bold">
+                                    <span class="text-zinc-500 dark:text-zinc-400">
+                                        {{ $daysLeft >= 0 ? fa_num($daysLeft).' روز باقی‌مانده' : 'منقضی شده' }}
+                                    </span>
+                                    <span class="tabular-nums text-zinc-400">{{ verta_date($expiresAt) }}</span>
+                                </div>
+                                @if($progress !== null)
+                                    <div class="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800" role="progressbar"
+                                         aria-valuenow="{{ $progress }}" aria-valuemin="0" aria-valuemax="100" aria-label="پیشرفت دورهٔ اشتراک">
+                                        <div class="h-full rounded-full {{ $daysLeft <= 7 ? 'bg-amber-500' : 'bg-brand-500' }}" style="width: {{ $progress }}%"></div>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+
+                        {{-- پکیج‌های همراه این اشتراک --}}
+                        @if($bundlePackages->isNotEmpty())
+                            <div class="flex flex-wrap items-center gap-2 border-t border-zinc-100 bg-zinc-50/60 px-4 py-3 sm:px-5 dark:border-zinc-800 dark:bg-zinc-800/30">
+                                <span class="inline-flex items-center gap-1 text-[11px] font-black text-zinc-500 dark:text-zinc-400">
+                                    <x-icon name="gift" class="size-3.5 text-amber-500" />
+                                    پکیج‌های همراه ({{ fa_num($bundlePackages->count()) }}):
+                                </span>
+                                @foreach($bundlePackages as $package)
+                                    <a href="{{ route('shop.package', $package->slug) }}" wire:navigate
+                                       class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200 transition-colors hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20">
+                                        {{ $package->name }}
+                                    </a>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+
+                <div>{{ $this->mySubscriptions->links() }}</div>
             </div>
-
-            <div>{{ $this->purchases->links() }}</div>
-        @else
+        @elseif($this->pendingSubscriptionOrders->isEmpty())
             <div class="card">
-                <x-empty icon="package" title="هنوز پکیجی نخریده‌اید"
-                         description="از فروشگاه پکیج موردنظرتان را تهیه کنید تا با کد آپدیت، در فروشگاه ساز شما قابل نصب باشد.">
-                    <a href="{{ route('shop.home') }}" wire:navigate>
-                        <x-btn variant="soft" size="sm" icon="store">رفتن به فروشگاه</x-btn>
+                <x-empty icon="crown"
+                         title="هنوز اشتراکی نخریده‌اید"
+                         description="با خرید طرح اشتراک، پشتیبانی تیکتی و پکیج‌های رایگانِ همراهِ طرح برای شما فعال می‌شود.">
+                    <a href="{{ route('shop.subscriptions') }}" wire:navigate>
+                        <x-btn variant="soft" size="sm" icon="crown">مشاهده طرح‌های اشتراک</x-btn>
                     </a>
                 </x-empty>
             </div>
@@ -427,6 +718,7 @@
                                 <th class="px-4 py-3 text-start font-bold">پکیج</th>
                                 <th class="px-4 py-3 text-start font-bold">کلید لایسنس</th>
                                 <th class="px-4 py-3 text-start font-bold">وضعیت</th>
+                                <th class="px-4 py-3 text-start font-bold">منبع</th>
                                 <th class="px-4 py-3 text-start font-bold">اعتبار</th>
                             </tr>
                         </thead>
@@ -442,6 +734,14 @@
                                             <x-badge variant="warning" icon="clock">منقضی</x-badge>
                                         @else
                                             <x-badge variant="danger" icon="x-circle">لغو شده</x-badge>
+                                        @endif
+                                    </td>
+                                    {{-- Task 96 — منبع صدور لایسنس: خرید مستقیم یا اشتراک --}}
+                                    <td class="px-4 py-3">
+                                        @if($license->isViaSubscription())
+                                            <x-badge variant="warning" icon="crown">اشتراک</x-badge>
+                                        @else
+                                            <span class="text-xs text-zinc-400">خرید مستقیم</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 tabular-nums text-zinc-500">
