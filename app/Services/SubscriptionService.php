@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\DiscountCode;
 use App\Models\Package;
 use App\Models\PackageLicense;
+use App\Models\Project;
 use App\Models\Subscription;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
@@ -46,14 +47,28 @@ class SubscriptionService
      * @param  DiscountCode|null  $coupon  کد تخفیف اعمال‌شده (از قبل اعتبارسنجی‌شده توسط DiscountService)
      * @param  int|null  $durationMonths  مدت اعتبار انتخابی مشتری (از طرح‌هایی که چند مدت دارند) —
      *                                    null = فال‌بک به تک‌مدت پیش‌فرض طرح (سازگاری با داده‌های قدیمی)
+     * @param  int|null  $projectId  Task 94 — پروژهٔ انتخابی خریدار (روی فیلد کد آپدیت صفحهٔ اشتراک);
+     *                               اشتراک صادرشده به همین پروژه گره می‌خورد تا API پکیج/قالبِ
+     *                               فروشگاهِ خریدار بر اساس همان پروژه کار کند. null = فقط رایگان‌های طرح.
      * @return array{order: SubscriptionOrder, payment_url?: string, transaction_id?: string, is_free?: bool, message?: string}
      *
-     * @throws RuntimeException (طرح غیرفعال / یک‌بارمصرفِ استفاده‌شده / مدت نامعتبر / خطای درگاه)
+     * @throws RuntimeException (طرح غیرفعال / یک‌بارمصرفِ استفاده‌شده / مدت نامعتبر / پروژهٔ نامعتبر / خطای درگاه)
      */
-    public function purchase(Customer $customer, SubscriptionPlan $plan, ?string $gatewayKey = null, ?string $callbackUrl = null, ?DiscountCode $coupon = null, ?int $durationMonths = null): array
+    public function purchase(Customer $customer, SubscriptionPlan $plan, ?string $gatewayKey = null, ?string $callbackUrl = null, ?DiscountCode $coupon = null, ?int $durationMonths = null, ?int $projectId = null): array
     {
         if (! $plan->is_active) {
             throw new RuntimeException('این طرح اشتراک فعال نیست.');
+        }
+
+        // ---- Task 94 — اعتبارسنجی پروژهٔ انتخابی (باید فعال باشد) ----
+        $project = null;
+
+        if ($projectId !== null) {
+            $project = Project::query()->active()->find($projectId);
+
+            if (! $project) {
+                throw new RuntimeException('پروژهٔ انتخاب‌شده معتبر نیست.');
+            }
         }
 
         if ($customer->status !== 'active') {
@@ -147,6 +162,15 @@ class SubscriptionService
                 'type' => $coupon->type,
                 'value' => (int) $coupon->value,
                 'discount' => $couponDiscount,
+            ];
+        }
+
+        // Task 94 — snapshot پروژهٔ انتخابی (برای زمانی که پروژه بعداً حذف/ویرایش شود)
+        if ($project) {
+            $snapshot['project'] = [
+                'id' => $project->id,
+                'name' => $project->name,
+                'slug' => $project->slug,
             ];
         }
 
@@ -368,12 +392,16 @@ class SubscriptionService
                 ?? $order->meta['plan']['duration_months']
                 ?? 1);
 
+            // Task 94 — پروژهٔ انتخابی خریدار از snapshot سفارش (اشتراک به همان پروژه گره می‌خورد
+            // تا API پکیج/قالبِ فروشگاهِ خریدار فقط همان پروژه را ببیند)
+            $projectId = is_array($order->meta) ? ($order->meta['project']['id'] ?? null) : null;
+
             if ($isReservedOrder && $reservedActivateAt) {
                 // رزروشده: بدون تاریخ شروع — کالکسیون renewals:activate بعد از پایان
                 // اشتراک فعلی، تاریخ‌ها را ست می‌کند، لایسنس‌های پکیج‌ها را می‌دهد و پیامک می‌فرستد
                 $subscription = Subscription::create([
                     'customer_id' => $customer->id,
-                    'project_id' => null,
+                    'project_id' => $projectId,
                     'subscription_plan_id' => $plan?->id,
                     'subscription_order_id' => $order->id,
                     'start_date' => null,
@@ -394,7 +422,7 @@ class SubscriptionService
                 // ۱) اشتراک فعال
                 $subscription = Subscription::create([
                     'customer_id' => $customer->id,
-                    'project_id' => null, // اشتراکِ طرح‌محور، پروژه خاصی ندارد
+                    'project_id' => $projectId, // Task 94 — پروژهٔ انتخابی خریدار (null = اشتراکِ بدون پروژه)
                     'subscription_plan_id' => $plan?->id,
                     'subscription_order_id' => $order->id,
                     'start_date' => $startsAt->toDateString(),

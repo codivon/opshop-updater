@@ -15,6 +15,7 @@ use App\Services\PaymentService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -23,9 +24,10 @@ use RuntimeException;
  *
  *  - احراز هویت: توکن (Bearer / X-Project-Key / ?token=) = update_code مشتری
  *    + هدر X-Project-Url (بررسی دامنه با PackageApiAuthService — همان سرویس پکیج‌ها)
- *  - 🚩 گیت اشتراک: لیست/نمایش/خرید فقط برای مشتریِ دارای اشتراکِ فعال
- *    (پرداخت‌شده و منقضی‌نشده) — اشتراک منقضی/پایان‌یافته/ناموجود مثل پکیج‌ها
- *    لیست خالی (و در نمایش تکی ۴۰۳) می‌دهد.
+ *  - 🚩 گیت اشتراک (Task 94 — مثل API پکیج‌ها، این‌بار «بر اساس پروژه»):
+ *    لیست فقط قالب‌های پروژه‌هایی را می‌بیند که مشتری رویشان اشتراکِ فعالِ
+ *    پرداخت‌شده و منقضی‌نشده دارد (subscriptions.project_id)؛ نمایش تک‌قالب و
+ *    خرید هم فقط برای قالب‌های همین پروژه‌ها مجاز است — بقیه ۴۰۳ می‌گیرند.
  *  - فقط قالب‌های «فعال» دیده می‌شوند
  *  - دانلود فقط برای خریدِ پرداخت‌شده (is_purchased) مجاز است
  *  - لینک دانلود: یک‌بارمصرف با انقضای ۱۵ دقیقه
@@ -49,9 +51,11 @@ class ApiTemplateController extends Controller
         try {
             $customer = $this->authService->authenticate($request);
 
-            // 🚩 گیت اشتراک (مثل لیست پکیج‌ها): بدون اشتراکِ فعالِ پرداخت‌شده و
-            // منقضی‌نشده، هیچ قالبی برگردانده نمی‌شود — پاسخ موفق اما خالی.
-            if (! $this->subscriptionService->hasActiveSubscription($customer)) {
+            // 🚩 گیت اشتراک بر اساس پروژه (Task 94 — همان الگوی لیست پکیج‌ها):
+            // پکیج‌های پروژه‌های دارای اشتراکِ فعال → projectIds؛ قالب‌ها فقط از همین پروژه‌ها
+            $projectIds = $this->subscriptionProjectIds($customer);
+
+            if ($projectIds->isEmpty()) {
                 return response()->json([
                     'data' => [],
                     'meta' => [
@@ -65,10 +69,11 @@ class ApiTemplateController extends Controller
             }
 
             // activeImages: گالری تصاویر فعال — برای نمایش تصاویر قالب در سایت خریدار
-            $templates = Template::with(['latestVersion', 'category.parent', 'activeImages'])
+            $templates = Template::with(['latestVersion', 'category.parent', 'activeImages', 'project:id,name,slug'])
                 // تعداد خریدهای پرداخت‌شدهٔ هر قالب (چند نفر استفاده می‌کنند/خریده‌اند) — درخواست کاربر برای API
                 ->withCount(['purchases as purchases_count' => fn ($q) => $q->where('status', TemplatePurchase::STATUS_PAID)])
                 ->where('status', Template::STATUS_ACTIVE)
+                ->whereIn('project_id', $projectIds)
                 // قالب‌های واگذارشده (خرید اختصاصی) از فهرست API حذف می‌شوند — مثل فروشگاه
                 ->where('is_sold_exclusively', false)
                 ->when($request->filled('search'), function ($q) use ($request) {
@@ -123,9 +128,10 @@ class ApiTemplateController extends Controller
                 return response()->json(['error' => 'قالب یافت نشد.'], 404);
             }
 
-            // 🚩 گیت اشتراک (مثل نمایش تک‌پکیج): بدون اشتراکِ فعالِ پرداخت‌شده و
-            // منقضی‌نشده، نمایش جزئیات قالب هم مجاز نیست.
-            if (! $this->subscriptionService->hasActiveSubscription($customer)) {
+            // 🚩 گیت اشتراک بر اساس پروژه (Task 94 — مثل نمایش تک‌پکیج): فقط قالبِ
+            // پروژه‌ای که مشتری اشتراکِ فعالِ پرداخت‌شده و منقضی‌نشده دارد.
+            if ($template->project_id === null
+                || ! $this->subscriptionService->hasActiveSubscriptionForProject($customer, $template->project_id)) {
                 return response()->json(['error' => 'دسترسی غیرمجاز.'], 403);
             }
 
@@ -189,6 +195,13 @@ class ApiTemplateController extends Controller
 
             if (! $template) {
                 return response()->json(['error' => 'قالب یافت نشد.'], 404);
+            }
+
+            // 🚩 گیت اشتراک بر اساس پروژه (Task 94): خرید فقط برای قالب‌های پروژه‌ای که
+            // مشتری اشتراکِ فعالِ پرداخت‌شده و منقضی‌نشده دارد.
+            if ($template->project_id === null
+                || ! $this->subscriptionService->hasActiveSubscriptionForProject($customer, $template->project_id)) {
+                return response()->json(['error' => 'دسترسی غیرمجاز؛ اشتراکِ فعالِ این پروژه را ندارید.'], 403);
             }
 
             // خرید اختصاصی: گاردها
@@ -412,6 +425,22 @@ class ApiTemplateController extends Controller
         } catch (RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], exception_status($e, 403));
         }
+    }
+
+    /* ===================================================================
+     *  Helper - شناسهٔ پروژه‌های دارای اشتراکِ فعالِ پرداخت‌شده و منقضی‌نشدهٔ مشتری
+     *  (Task 94 — همان کوئریِ گیت لیست پکیج‌ها؛ API قالب‌ها هم بر همین اساس فیلتر می‌شود)
+     * =================================================================== */
+    private function subscriptionProjectIds(Customer $customer): Collection
+    {
+        return $customer->subscriptions()
+            ->where('status', 'active')
+            ->where('payment_status', 'paid')
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->pluck('project_id')
+            ->filter()
+            ->unique()
+            ->values();
     }
 
     /* ===================================================================

@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\DiscountCode;
 use App\Models\Gateway;
 use App\Models\Package;
+use App\Models\Project;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanDuration;
@@ -31,6 +32,9 @@ class SubscriptionsIndex extends Component
     /** کد آپدیت مشتری */
     public string $updateCode = '';
 
+    /** Task 94 — پروژهٔ انتخابی برای اشتراک (روی فیلد «کد آپدیت پروژه شما») */
+    public string $project = '';
+
     /** درگاه انتخابی برای خرید */
     public string $gatewayKey = '';
 
@@ -50,6 +54,11 @@ class SubscriptionsIndex extends Component
     {
         $this->updateCode = (string) session('shop_update_code', '');
         $this->gatewayKey = (string) $this->gateways->first()?->key ?? '';
+
+        // Task 94 — اگر فروشگاه فقط یک پروژهٔ فعال دارد، همان از قبل انتخاب است
+        if ($this->projectOptions->count() === 1) {
+            $this->project = (string) $this->projectOptions->first()->id;
+        }
 
         // کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات)
         $this->initPaymentCaptcha();
@@ -201,6 +210,20 @@ class SubscriptionsIndex extends Component
             ->orderBy('ordering')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Task 94 — پروژه‌های فعال برای سلکتِ خرید اشتراک (فقط همین صفحهٔ فروشگاه):
+     * اشتراک صادرشده به همین پروژه گره می‌خورد و API پکیج/قالبِ فروشگاهِ خریدار
+     * بر اساس project_idِ اشتراک کار می‌کند — بدون پروژه، فروشگاهِ خریدار محتوایی نمی‌بیند.
+     */
+    #[Computed]
+    public function projectOptions()
+    {
+        return Project::query()
+            ->active()
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 
     /** وضعیت سفارش‌های این مشتری برای هر طرح (یک‌بارمصرف/قبلاً خریداری) */
@@ -422,6 +445,25 @@ class SubscriptionsIndex extends Component
             return;
         }
 
+        // ---- Task 94 — پروژهٔ اشتراک (الزامی وقتی فروشگاه پروژهٔ فعال دارد) ----
+        $projectId = null;
+
+        if ($this->projectOptions->isNotEmpty()) {
+            if ($this->project === '') {
+                $this->toast('پروژهٔ موردنظر را انتخاب کنید؛ اشتراک برای همان پروژه ثبت می‌شود.', 'error');
+
+                return;
+            }
+
+            $projectId = (int) $this->project;
+
+            if (! $this->projectOptions->firstWhere('id', $projectId)) {
+                $this->toast('پروژهٔ انتخاب‌شده معتبر نیست.', 'error');
+
+                return;
+            }
+        }
+
         // ---- Task 88 — گارد خرید مجدد طرح (مودال مدرن محدودیت) ----
         $renewal = app(RenewalService::class)->evaluateSubscriptionRenewal($customer->id, $plan->id);
 
@@ -481,6 +523,7 @@ class SubscriptionsIndex extends Component
                 null,
                 $coupon,
                 $durationMonths,
+                $projectId,
             );
         } catch (\Throwable $e) {
             $this->toast($e->getMessage(), 'error');

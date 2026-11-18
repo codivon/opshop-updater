@@ -369,6 +369,19 @@
                     @endif
                 @endif
 
+                {{-- Task 94 — پروژهٔ اشتراک: روی فیلد «کد آپدیت» قرار می‌گیرد؛
+                     اشتراک صادرشده به همین پروژه گره می‌خورد و API پکیج/قالبِ
+                     فروشگاهِ خریدار فقط محتوای همین پروژه را می‌بیند.
+                     اگر فروشگاه فقط یک پروژهٔ فعال داشته باشد همان از قبل انتخاب است. --}}
+                @if($this->projectOptions->isNotEmpty())
+                    <x-field label="پروژهٔ شما" for="project" required
+                             hint="اشتراک، پکیج‌ها و قالب‌ها برای همین پروژه ثبت و نمایش داده می‌شوند.">
+                        <x-select id="project" wire:model="project"
+                                  :options="$this->projectOptions->pluck('name', 'id')->all()"
+                                  placeholder="انتخاب پروژه…" />
+                    </x-field>
+                @endif
+
                 {{-- کد آپدیت --}}
                 <x-field label="کد آپدیت مشتری" for="updateCode" required hint="کد آپدیت در پنل مشتری شما موجود است.">
                     <x-input id="updateCode" wire:model="updateCode" icon="key" placeholder="کد آپدیت مشتری…" dir="ltr" class="text-start font-mono" />

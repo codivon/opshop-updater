@@ -43,14 +43,12 @@ class WebPaymentController extends Controller
     public function callback(Request $request): RedirectResponse
     {
         // شناسه تراکنش با کلیدهای متداول درگاه‌ها (همان جریان API)
-        // transactionId (camelCase) → درگاه آزمایشی local
         // Task 92: سگمنت مسیر {reference} هم شناسهٔ تراکنش می‌تواند باشد (کال‌بک با شناسهٔ جاسازی‌شده)
-        $transactionId = $request->input('transaction_id')
-            ?? $request->input('transactionId')
-            ?? $request->input('Authority')
-            ?? $request->input('tracking_code')
-            ?? $request->input('token')
-            ?? $request->route('reference');
+        // Task 94: تطبیق «بی‌حساس به بزرگی/کوچکی حروف» — درگاه‌هایی مثل پارسیان پارامتر را با
+        // کلید «Token» (حروف بزرگ) برمی‌گردانند و تطبیق حساسِ قبلی شناسه را نمی‌یافت؛ نتیجه:
+        // مسیر redirectByReference با پیام «به پایان نرسید…» فعال می‌شد درحالی‌که پرداخت موفق بود
+        // و صفحهٔ نتیجه سفارش را تأیید و فعال می‌کرد (هیروی سبز + توستِ متناقض — گزارش کاربر)
+        $transactionId = $this->extractGatewayTransactionId($request);
 
         if (! $transactionId) {
             // درگاه کاملاً خالی برگشته (بدون شناسهٔ تراکنش و بدون شناسهٔ ارجاع مسیر)
@@ -65,18 +63,9 @@ class WebPaymentController extends Controller
             $result = $this->subscriptionService->verifyPayment($transactionId);
             $subscriptionOrder->refresh();
 
-            // 📱 پیامک: پرداخت اشتراک تأیید شد (در انتظار تأیید مدیر) + اطلاع مدیر
+            // 📱 پیامک: پرداخت اشتراک تأیید شد (در انتظار تأیید مدیر) + اطلاع مدیر (Task 94: متد مشترک)
             if (($result['paid'] ?? false) && $subscriptionOrder->status === SubscriptionOrder::STATUS_PAID) {
-                $customer = $subscriptionOrder->customer;
-
-                $vars = [
-                    'customer_name' => $customer?->name ?? 'مشتری',
-                    'plan_name' => $subscriptionOrder->plan_name,
-                    'amount' => number_format((int) $subscriptionOrder->final_amount),
-                ];
-
-                $this->smsManager->send('subscription_paid', $customer?->phone, $vars, $subscriptionOrder, once: true);
-                $this->smsManager->notifyAdminSale('subscription', 'admin_subscription_paid', $vars, $subscriptionOrder);
+                $this->notifySubscriptionPaid($subscriptionOrder);
             }
 
             // سفارش API (callback_url بیرونی) → صفحه نتیجه + شمارش معکوس، سپس فروشگاه
@@ -102,15 +91,9 @@ class WebPaymentController extends Controller
             $result = $this->paymentService->verifyProductPayment($transactionId);
             $productPurchase->refresh();
 
-            // 📱 پیامک مدیر: فروش موفق محصول
+            // 📱 پیامک مدیر: فروش موفق محصول (Task 94: متد مشترک)
             if (($result['paid'] ?? false) && $productPurchase->isPaid()) {
-                $vars = [
-                    'product_name' => $productPurchase->product?->name ?? 'محصول',
-                    'amount' => number_format((int) $productPurchase->amount),
-                    'gateway' => $productPurchase->gateway ?? '-',
-                ];
-
-                $this->smsManager->notifyAdminSale('product', 'admin_product_paid', $vars, $productPurchase);
+                $this->notifyProductPaid($productPurchase);
             }
 
             return redirect()
@@ -128,15 +111,9 @@ class WebPaymentController extends Controller
             $result = $this->paymentService->verifyTemplatePayment($transactionId);
             $templatePurchase->refresh();
 
-            // 📱 پیامک مدیر: فروش موفق قالب
+            // 📱 پیامک مدیر: فروش موفق قالب (Task 94: متد مشترک)
             if (($result['paid'] ?? false) && $templatePurchase->isPaid()) {
-                $vars = [
-                    'template_name' => $templatePurchase->template?->name ?? 'قالب',
-                    'amount' => number_format((int) $templatePurchase->amount),
-                    'gateway' => $templatePurchase->gateway ?? '-',
-                ];
-
-                $this->smsManager->notifyAdminSale('template', 'admin_template_paid', $vars, $templatePurchase);
+                $this->notifyTemplatePaid($templatePurchase);
             }
 
             return redirect()
@@ -165,27 +142,9 @@ class WebPaymentController extends Controller
 
         $purchase->refresh();
 
-        // 📱 پیامک: خرید پکیج پرداخت شد + اطلاع مدیر
+        // 📱 پیامک: خرید پکیج پرداخت شد + اطلاع مدیر (Task 94: متد مشترک)
         if (($result['paid'] ?? false) && $purchase->isPaid()) {
-            $vars = [
-                'customer_name' => $purchase->customer?->name ?? 'مشتری',
-                'package_name' => $purchase->package?->name ?? 'پکیج',
-                'amount' => number_format((int) $purchase->amount),
-                'license_key' => (string) ($result['license_key'] ?? $purchase->license?->license_key ?? ''),
-            ];
-
-            // Task 87 — خرید رزروشده → پیامک «رزرو شد» به‌جای پیامک لایسنس
-            if ($purchase->isReserved()) {
-                $this->smsManager->send('package_reserved', $purchase->customer?->phone, array_merge($vars, [
-                    'end_date' => $purchase->reserved_activate_at
-                        ? (verta_date($purchase->reserved_activate_at, 'Y/m/d') ?? $purchase->reserved_activate_at->format('Y/m/d'))
-                        : '',
-                ]), $purchase, once: true);
-            } else {
-                $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
-            }
-
-            $this->smsManager->notifyAdminSale('package', 'admin_purchase_paid', $vars, $purchase);
+            $this->notifyPackagePaid($purchase, $result);
         }
 
         // خرید فروشگاه (API): ابتدا صفحه‌ی نتیجه + شمارش معکوس، سپس بازگشت به فروشگاه
@@ -205,10 +164,38 @@ class WebPaymentController extends Controller
     }
 
     /**
+     * Task 94 — استخراج شناسهٔ تراکنش از درخواست درگاه با تطبیق «بی‌حساس به بزرگی/کوچکی حروف»
+     * کلیدهای رایج. بعضی درگاه‌ها (مثل پارسیان: Token، بعضی شاپرکی: RefID) کلید را با
+     * حروف متفاوت می‌فرستند و تطبیق حساسِ قبلی آن‌ها را نمی‌یافت.
+     * ترتیب اهمیت: شناسهٔ تراکنش ما > شناسه‌های مرجع درگاه > سگمنت مسیر (Task 92).
+     */
+    private function extractGatewayTransactionId(Request $request)
+    {
+        $normalized = collect($request->input())
+            ->mapWithKeys(fn ($value, $key) => [strtolower((string) $key) => $value])
+            ->filter(fn ($value) => filled($value));
+
+        foreach (['transaction_id', 'transactionid', 'authority', 'tracking_code', 'token', 'refid', 'ref_id'] as $key) {
+            if ($normalized->has($key)) {
+                return $normalized->get($key);
+            }
+        }
+
+        return $request->route('reference');
+    }
+
+    /**
      * Task 92 — شناسایی سفارش از روی reference مسیر کال‌بک (access_token) و هدایت به
-     * صفحهٔ نتیجهٔ خودش. برای بازگشت‌های لغو/ناتمام درگاه‌هایی است که شناسهٔ تراکنش
-     * را در کال‌بک نمی‌فرستند؛ وضعیت سفارش بدون تغییر می‌ماند و صفحهٔ نتیجه آن را
-     * «در انتظار پرداخت/ناموفق» نشان می‌دهد.
+     * صفحهٔ نتیجهٔ خودش. برای بازگشت‌های درگاه‌هایی است که شناسهٔ تراکنش
+     * را در کال‌بک نمی‌فرستند.
+     *
+     * Task 94 — پیام دیگر نباید با واقعیت سفارش تناقض داشته باشد (گزارش کاربر:
+     * «هیروی سبز اشتراک فعال شد» + توستِ «پرداخت به پایان نرسید» هم‌زمان دیده می‌شد):
+     *  - سفارشِ پرداخت‌شده → پیام موفق/اطلاع‌رسانی (نه پیام خطای ناتمام!)
+     *  - سفارشِ pending با تراکنش → یک‌بار تأیید از درگاه امتحان می‌شود (همان رفتار
+     *    mount صفحهٔ نتیجه) و پیام بر اساس نتیجهٔ واقعی تنظیم + پیامک با once ارسال می‌شود
+     *  - سفارشِ واقعاً ناتمام (بدون تراکنش یا failed) → همان پیام «به پایان نرسید…»
+     *    (رفتار و تست‌های Task 92 حفظ می‌شود — سفارش بدون تراکنش وضعیتش ثابت می‌ماند)
      */
     private function redirectByReference(string $reference, Request $request): ?RedirectResponse
     {
@@ -216,39 +203,211 @@ class WebPaymentController extends Controller
         $subscriptionOrder = SubscriptionOrder::where('access_token', $reference)->first();
 
         if ($subscriptionOrder) {
-            return redirect()
-                ->route('subscription.result', ['order' => $subscriptionOrder, 'token' => $subscriptionOrder->access_token])
-                ->with('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+            return $this->redirectSubscriptionByReference($subscriptionOrder);
         }
 
         // خرید پکیج
         $purchase = PackagePurchase::where('access_token', $reference)->first();
 
         if ($purchase) {
-            return redirect()
-                ->route('payment.result', ['purchase' => $purchase, 'token' => $purchase->access_token])
-                ->with('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+            return $this->redirectPackageByReference($purchase);
         }
 
         // خرید محصول
         $productPurchase = ProductPurchase::where('access_token', $reference)->first();
 
         if ($productPurchase) {
-            return redirect()
-                ->route('payment.result.product', ['purchase' => $productPurchase, 'token' => $productPurchase->access_token])
-                ->with('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+            return $this->redirectProductByReference($productPurchase);
         }
 
         // خرید قالب
         $templatePurchase = TemplatePurchase::where('access_token', $reference)->first();
 
         if ($templatePurchase) {
-            return redirect()
-                ->route('payment.result.template', ['purchase' => $templatePurchase, 'token' => $templatePurchase->access_token])
-                ->with('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+            return $this->redirectTemplateByReference($templatePurchase);
         }
 
         return null;
+    }
+
+    private function redirectSubscriptionByReference(SubscriptionOrder $order): RedirectResponse
+    {
+        $redirect = fn (string $type, string $message) => redirect()
+            ->route('subscription.result', ['order' => $order, 'token' => $order->access_token])
+            ->with($type, $message);
+
+        if ($order->isPaid()) {
+            // کال‌بک قبلی (مثلاً سرور-به-سرور) پرداخت را تأیید کرده و بازگشتِ مرورگر بدون شناسه است
+            return $redirect('success', $order->admin_status === SubscriptionOrder::ADMIN_STATUS_APPROVED
+                ? 'پرداخت این سفارش تأیید و اشتراک شما فعال شده است.'
+                : 'پرداخت این سفارش با موفقیت تأیید شده است؛ در انتظار تأیید مدیر.');
+        }
+
+        if ($order->status === SubscriptionOrder::STATUS_PENDING && $order->transaction_id) {
+            $result = $this->subscriptionService->verifyPayment($order->transaction_id);
+            $order->refresh();
+
+            if ($result['paid'] ?? false) {
+                $this->notifySubscriptionPaid($order);
+
+                return $redirect('success', $result['message'] ?? 'پرداخت با موفقیت تأیید شد.');
+            }
+
+            if ($order->status === SubscriptionOrder::STATUS_FAILED) {
+                return $redirect('warning', 'تأیید این پرداخت از سمت درگاه ناموفق بود؛ اگر مبلغ کسر شده، حداکثر تا ۷۲ ساعت به‌صورت خودکار برمی‌گردد.');
+            }
+        }
+
+        return $redirect('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+    }
+
+    private function redirectPackageByReference(PackagePurchase $purchase): RedirectResponse
+    {
+        $redirect = fn (string $type, string $message) => redirect()
+            ->route('payment.result', ['purchase' => $purchase, 'token' => $purchase->access_token])
+            ->with($type, $message);
+
+        if ($purchase->isPaid()) {
+            return $redirect('success', 'این پرداخت قبلاً با موفقیت تأیید و لایسنس صادر شده است.');
+        }
+
+        if ($purchase->status === PackagePurchase::STATUS_PENDING && $purchase->transaction_id) {
+            $result = $this->paymentService->verifyPayment($purchase->transaction_id, renew: true);
+            $purchase->refresh();
+
+            if ($result['paid'] ?? false) {
+                $this->notifyPackagePaid($purchase, $result);
+
+                return $redirect('success', $result['message'] ?? 'پرداخت با موفقیت تأیید شد.');
+            }
+
+            if ($purchase->status === PackagePurchase::STATUS_FAILED) {
+                return $redirect('warning', 'تأیید این پرداخت از سمت درگاه ناموفق بود؛ اگر مبلغ کسر شده، حداکثر تا ۷۲ ساعت به‌صورت خودکار برمی‌گردد.');
+            }
+        }
+
+        return $redirect('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+    }
+
+    private function redirectProductByReference(ProductPurchase $purchase): RedirectResponse
+    {
+        $redirect = fn (string $type, string $message) => redirect()
+            ->route('payment.result.product', ['purchase' => $purchase, 'token' => $purchase->access_token])
+            ->with($type, $message);
+
+        if ($purchase->isPaid()) {
+            return $redirect('success', 'این پرداخت قبلاً با موفقیت تأیید شده است.');
+        }
+
+        if ($purchase->status === ProductPurchase::STATUS_PENDING && $purchase->transaction_id) {
+            $result = $this->paymentService->verifyProductPayment($purchase->transaction_id);
+            $purchase->refresh();
+
+            if ($result['paid'] ?? false) {
+                $this->notifyProductPaid($purchase);
+
+                return $redirect('success', $result['message'] ?? 'پرداخت با موفقیت تأیید شد.');
+            }
+
+            if ($purchase->status === ProductPurchase::STATUS_FAILED) {
+                return $redirect('warning', 'تأیید این پرداخت از سمت درگاه ناموفق بود؛ اگر مبلغ کسر شده، حداکثر تا ۷۲ ساعت به‌صورت خودکار برمی‌گردد.');
+            }
+        }
+
+        return $redirect('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+    }
+
+    private function redirectTemplateByReference(TemplatePurchase $purchase): RedirectResponse
+    {
+        $redirect = fn (string $type, string $message) => redirect()
+            ->route('payment.result.template', ['purchase' => $purchase, 'token' => $purchase->access_token])
+            ->with($type, $message);
+
+        if ($purchase->isPaid()) {
+            return $redirect('success', 'این پرداخت قبلاً با موفقیت تأیید شده است.');
+        }
+
+        if ($purchase->status === TemplatePurchase::STATUS_PENDING && $purchase->transaction_id) {
+            $result = $this->paymentService->verifyTemplatePayment($purchase->transaction_id);
+            $purchase->refresh();
+
+            if ($result['paid'] ?? false) {
+                $this->notifyTemplatePaid($purchase);
+
+                return $redirect('success', $result['message'] ?? 'پرداخت با موفقیت تأیید شد.');
+            }
+
+            if ($purchase->status === TemplatePurchase::STATUS_FAILED) {
+                return $redirect('warning', 'تأیید این پرداخت از سمت درگاه ناموفق بود؛ اگر مبلغ کسر شده، حداکثر تا ۷۲ ساعت به‌صورت خودکار برمی‌گردد.');
+            }
+        }
+
+        return $redirect('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+    }
+
+    /* ===================================================================
+     *  Task 94 — پیامک‌های «پرداخت شد» به‌صورت متد مشترک:
+     *  هم مسیر اصلی کال‌بک و هم مسیر بازگشتِ بدون شناسه (redirectByReference)
+     *  همین‌ها را صدا می‌زنند؛ once: true تکرار را در هر دو مسیر منتفی می‌کند.
+     * =================================================================== */
+
+    private function notifySubscriptionPaid(SubscriptionOrder $order): void
+    {
+        $customer = $order->customer;
+
+        $vars = [
+            'customer_name' => $customer?->name ?? 'مشتری',
+            'plan_name' => $order->plan_name,
+            'amount' => number_format((int) $order->final_amount),
+        ];
+
+        $this->smsManager->send('subscription_paid', $customer?->phone, $vars, $order, once: true);
+        $this->smsManager->notifyAdminSale('subscription', 'admin_subscription_paid', $vars, $order);
+    }
+
+    private function notifyPackagePaid(PackagePurchase $purchase, array $result): void
+    {
+        $vars = [
+            'customer_name' => $purchase->customer?->name ?? 'مشتری',
+            'package_name' => $purchase->package?->name ?? 'پکیج',
+            'amount' => number_format((int) $purchase->amount),
+            'license_key' => (string) ($result['license_key'] ?? $purchase->license?->license_key ?? ''),
+        ];
+
+        // Task 87 — خرید رزروشده → پیامک «رزرو شد» به‌جای پیامک لایسنس
+        if ($purchase->isReserved()) {
+            $this->smsManager->send('package_reserved', $purchase->customer?->phone, array_merge($vars, [
+                'end_date' => $purchase->reserved_activate_at
+                    ? (verta_date($purchase->reserved_activate_at, 'Y/m/d') ?? $purchase->reserved_activate_at->format('Y/m/d'))
+                    : '',
+            ]), $purchase, once: true);
+        } else {
+            $this->smsManager->send('purchase_paid', $purchase->customer?->phone, $vars, $purchase, once: true);
+        }
+
+        $this->smsManager->notifyAdminSale('package', 'admin_purchase_paid', $vars, $purchase);
+    }
+
+    private function notifyProductPaid(ProductPurchase $purchase): void
+    {
+        $vars = [
+            'product_name' => $purchase->product?->name ?? 'محصول',
+            'amount' => number_format((int) $purchase->amount),
+            'gateway' => $purchase->gateway ?? '-',
+        ];
+
+        $this->smsManager->notifyAdminSale('product', 'admin_product_paid', $vars, $purchase);
+    }
+
+    private function notifyTemplatePaid(TemplatePurchase $purchase): void
+    {
+        $vars = [
+            'template_name' => $purchase->template?->name ?? 'قالب',
+            'amount' => number_format((int) $purchase->amount),
+            'gateway' => $purchase->gateway ?? '-',
+        ];
+
+        $this->smsManager->notifyAdminSale('template', 'admin_template_paid', $vars, $purchase);
     }
 
     /**

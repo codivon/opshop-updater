@@ -38,7 +38,7 @@ class Template extends Model
     ];
 
     protected $fillable = [
-        'category_id', 'name', 'slug', 'short_description', 'description',
+        'category_id', 'project_id', 'name', 'slug', 'short_description', 'description',
         'thumbnail', 'price', 'discount', 'exclusive_price', 'exclusive_discount',
         'exclusive_note', 'exclusive_buyer_label', 'is_free', 'status', 'sort_order',
         'meta_title', 'meta_description',
@@ -71,6 +71,15 @@ class Template extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * Task 94 — پروژهٔ قالب (مثل Package::project): فرم پنل انتخابش را اجباری
+     * می‌گیرد و API قالب‌ها فقط قالب‌های پروژه‌های دارای اشتراکِ فعالِ مشتری را می‌بیند.
+     */
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class);
     }
 
     public function versions(): HasMany

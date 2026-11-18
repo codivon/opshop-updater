@@ -5,6 +5,7 @@ namespace App\Livewire\Templates;
 use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Comment;
+use App\Models\Project;
 use App\Models\Template;
 use App\Models\TemplateImage;
 use App\Models\TemplateLicense;
@@ -106,6 +107,13 @@ class Show extends Component
         $this->tab = in_array($tab, ['info', 'versions', 'gallery', 'purchases', 'licenses', 'comments']) ? $tab : 'info';
     }
 
+    /** Task 94 — پروژه‌ها برای سلکت ویرایش قالب */
+    #[Computed]
+    public function projects()
+    {
+        return Project::query()->orderBy('name')->get(['id', 'name']);
+    }
+
     /* ================================================================
      *  ویرایش قالب (اطلاعات + قیمت‌گذاری دوگانه + تصویر شاخص)
      * ================================================================ */
@@ -120,6 +128,8 @@ class Show extends Component
             'meta_title', 'meta_description',
         ]);
         $this->form['category_id'] = (string) ($this->template->category_id ?? '');
+        // Task 94 — پروژهٔ قالب (اجباری مثل فرم پکیج‌ها)
+        $this->form['project_id'] = (string) ($this->template->project_id ?? '');
         $this->thumbnailFile = null;
         $this->removeThumbnail = false;
         $this->thumbNonce++;
@@ -132,6 +142,8 @@ class Show extends Component
             'form.name' => ['required', 'string', 'max:190'],
             'form.slug' => ['nullable', 'string', 'max:190', 'alpha_dash:ascii', 'unique:templates,slug,'.$this->template->id],
             'form.category_id' => ['nullable', 'exists:categories,id'],
+            // Task 94 — پروژهٔ قالب اجباری است
+            'form.project_id' => ['required', 'exists:projects,id'],
             'form.short_description' => ['nullable', 'string', 'max:10000'],
             'form.description' => ['nullable', 'string', 'max:100000'],
             'form.price' => ['nullable', 'integer', 'min:0'],
@@ -154,6 +166,7 @@ class Show extends Component
             'form.name.required' => 'نام قالب الزامی است.',
             'form.slug.unique' => 'این نامک قبلاً استفاده شده است.',
             'form.status.required' => 'وضعیت را انتخاب کنید.',
+            'form.project_id.required' => 'انتخاب پروژه الزامی است.',
         ]);
 
         $form = $validated['form'];
@@ -173,6 +186,8 @@ class Show extends Component
         $form['meta_description'] = ($form['meta_description'] ?? '') ?: null;
         $form['sort_order'] = (int) ($form['sort_order'] ?? 0);
         $form['category_id'] = filled($form['category_id'] ?? '') ? (int) $form['category_id'] : null;
+        // Task 94 — پروژهٔ قالب (اجباری)
+        $form['project_id'] = (int) ($form['project_id'] ?? 0);
 
         if ($form['is_free']) {
             $form['price'] = 0;

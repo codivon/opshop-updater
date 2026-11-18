@@ -31,6 +31,11 @@
                         <x-badge variant="violet" icon="crown">به‌صورت اختصاصی فروخته شد</x-badge>
                     @endif
 
+                    {{-- Task 94 — پروژهٔ قالب (اجباری) ---}}
+                    @if($template->project)
+                        <x-badge variant="neutral" icon="box">پروژه: {{ $template->project->name }}</x-badge>
+                    @endif
+
                     @if($template->category)
                         <x-badge variant="primary" icon="tag">{{ $template->category->name }}</x-badge>
                     @endif
@@ -628,10 +633,22 @@
                 </x-field>
             </div>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {{-- Task 94 — پروژهٔ قالب (اجباری مثل فرم پکیج‌ها) ---}}
+                <x-field label="پروژه" for="eform.project_id" required>
+                    <select id="eform.project_id" wire:model="form.project_id" class="input {{ $errors->has('form.project_id') ? 'input-error' : '' }}">
+                        <option value="">انتخاب پروژه…</option>
+                        @foreach($this->projects as $project)
+                            <option value="{{ $project->id }}">{{ $project->name }}</option>
+                        @endforeach
+                    </select>
+                </x-field>
                 <x-field label="دسته‌بندی" for="eform.category_id">
                     <x-select id="eform.category_id" wire:model="form.category_id" :options="\App\Models\Category::flatOptions(\App\Models\Category::TYPE_TEMPLATE)" placeholder="بدون دسته" />
                 </x-field>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <x-field label="وضعیت" for="eform.status">
                     <x-select id="eform.status" wire:model="form.status" :options="\App\Models\Template::STATUS_LABELS" />
                 </x-field>

@@ -344,6 +344,26 @@
                                     </div>
                                 @endif
 
+                                {{-- Task 94 — انتخاب پروژه، روی فیلد «کد آپدیت پروژه شما»:
+                                     اشتراک صادرشده به همین پروژه گره می‌خورد و فروشگاهِ خریدارِ مشتری
+                                     (API پکیج/قالب) فقط محتوای همین پروژه را می‌بیند.
+                                     اگر فروشگاه فقط یک پروژهٔ فعال داشته باشد همان از قبل انتخاب است. --}}
+                                @if($this->projectOptions->isNotEmpty())
+                                    <div>
+                                        <label class="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-200">
+                                            <x-icon name="box" class="size-3.5 text-brand-600 dark:text-brand-400" />
+                                            پروژهٔ شما
+                                        </label>
+                                        <select wire:model="project" class="input">
+                                            <option value="">انتخاب پروژه…</option>
+                                            @foreach($this->projectOptions as $option)
+                                                <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <p class="mt-1 text-[11px] text-zinc-400">اشتراک، پکیج‌ها و قالب‌ها برای همین پروژه ثبت و نمایش داده می‌شوند.</p>
+                                    </div>
+                                @endif
+
                                 <div>
                                     <label class="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-zinc-700 dark:text-zinc-200">
                                         <x-icon name="key" class="size-3.5 text-brand-600 dark:text-brand-400" />

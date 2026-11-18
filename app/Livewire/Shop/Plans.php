@@ -8,6 +8,7 @@ use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Models\Gateway;
 use App\Models\Package;
+use App\Models\Project;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanDuration;
@@ -36,6 +37,9 @@ class Plans extends Component
     /** کد آپدیت مشتری (شناسه خرید) */
     public string $updateCode = '';
 
+    /** Task 94 — پروژهٔ انتخابی برای اشتراک (روی فیلد کد آپدیت) */
+    public string $project = '';
+
     /** کلید درگاه پرداخت انتخاب‌شده */
     public string $gateway = '';
 
@@ -52,6 +56,11 @@ class Plans extends Component
 
         // کد آپدیت معتبر قبلی (session) برای راحتی مشتری
         $this->updateCode = (string) (session('last_update_code') ?: session('shop_update_code', ''));
+
+        // Task 94 — اگر فروشگاه فقط یک پروژهٔ فعال دارد، همان از قبل انتخاب است
+        if ($this->projectOptions->count() === 1) {
+            $this->project = (string) $this->projectOptions->first()->id;
+        }
 
         // کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات)
         $this->initPaymentCaptcha();
@@ -123,6 +132,22 @@ class Plans extends Component
             ->orderBy('ordering')
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Task 94 — پروژه‌های فعال برای سلکتِ خرید اشتراک:
+     * اشتراکِ طرح‌محور از ابتدا پروژه نداشت و API پکیج/قالبِ پروژهٔ خریدار
+     * بر اساس project_idِ اشتراک کار می‌کند — بدون انتخاب پروژه، فروشگاهِ خریدار
+     * نه پکیج می‌بیند و نه قالب. «روی فیلد کد آپدیت» قرار می‌گیرد و اگر فروشگاه
+     * فقط یک پروژهٔ فعال داشته باشد همان از قبل انتخاب است (mount).
+     */
+    #[Computed]
+    public function projectOptions()
+    {
+        return Project::query()
+            ->active()
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 
     /* ---------------------------------------------------------------- */
@@ -209,6 +234,25 @@ class Plans extends Component
             return;
         }
 
+        // ---- Task 94 — پروژهٔ اشتراک (الزامی وقتی فروشگاه پروژهٔ فعال دارد) ----
+        $projectId = null;
+
+        if ($this->projectOptions->isNotEmpty()) {
+            if ($this->project === '') {
+                $this->toast('پروژهٔ موردنظر را انتخاب کنید؛ اشتراک برای همان پروژه ثبت می‌شود.', 'error');
+
+                return;
+            }
+
+            $projectId = (int) $this->project;
+
+            if (! $this->projectOptions->firstWhere('id', $projectId)) {
+                $this->toast('پروژهٔ انتخاب‌شده معتبر نیست.', 'error');
+
+                return;
+            }
+        }
+
         // ---- طرح ----
         /** @var SubscriptionPlan|null $plan */
         $plan = $this->plans->firstWhere('id', $planId);
@@ -265,6 +309,7 @@ class Plans extends Component
                 null,
                 null,
                 $durationMonths,
+                $projectId,
             );
         } catch (RuntimeException $e) {
             $this->toast($e->getMessage(), 'error');

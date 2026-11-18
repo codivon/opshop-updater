@@ -16,14 +16,21 @@
 
     {{-- ============ Filters ============ --}}
     <div class="card p-4">
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
-            <div class="sm:col-span-2">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="lg:col-span-2">
                 <x-input wire:model.live.debounce.400ms="search" type="search" icon="search" placeholder="جستجوی نام یا نامک…" />
             </div>
             <div>
-                <x-select wire:model.live="categoryFilter" :options="$this->categories" placeholder="همه دسته‌بندی‌ها" />
+                {{-- Task 94 — فیلتر پروژه (مثل لیست پکیج‌ها) ---}}
+                <select wire:model.live="projectFilter" class="input">
+                    <option value="">همه پروژه‌ها</option>
+                    @foreach($this->projects as $project)
+                        <option value="{{ $project->id }}">{{ $project->name }}</option>
+                    @endforeach
+                </select>
             </div>
-            <div>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <x-select wire:model.live="categoryFilter" :options="$this->categories" placeholder="همه دسته‌ها" />
                 <x-select wire:model.live="statusFilter" :options="[
                     \App\Models\Template::STATUS_ACTIVE   => 'فعال',
                     \App\Models\Template::STATUS_DRAFT    => 'پیش‌نویس',
@@ -73,8 +80,12 @@
                                class="text-base font-bold text-zinc-900 transition-colors hover:text-brand-600 dark:text-zinc-50">
                                 {{ $template->name }}
                             </a>
+                            @if($template->project)
+                                {{-- Task 94 — پروژهٔ قالب ---}}
+                                <x-badge variant="neutral" icon="box" :title="$template->project->name">{{ \Illuminate\Support\Str::limit($template->project->name, 18) }}</x-badge>
+                            @endif
                             @if($template->category)
-                                <x-badge variant="neutral">{{ $template->category->name }}</x-badge>
+                                <x-badge variant="primary">{{ $template->category->name }}</x-badge>
                             @endif
                         </div>
 
@@ -167,11 +178,22 @@
                     <x-input id="form.slug" wire:model="form.slug" dir="ltr" class="text-start" placeholder="modern-shop-template" />
                 </x-field>
             </div>
-
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {{-- Task 94 — پروژهٔ قالب (اجباری — مثل فرم پکیج‌ها) ---}}
+                <x-field label="پروژه" for="form.project_id" required>
+                    <select wire:model="form.project_id" id="form.project_id" class="input {{ $errors->has('form.project_id') ? 'input-error' : '' }}">
+                        <option value="">انتخاب پروژه…</option>
+                        @foreach($this->projects as $project)
+                            <option value="{{ $project->id }}">{{ $project->name }}</option>
+                        @endforeach
+                    </select>
+                </x-field>
                 <x-field label="دسته‌بندی" for="form.category_id">
                     <x-select id="form.category_id" wire:model="form.category_id" :options="$this->categories" placeholder="بدون دسته" />
                 </x-field>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <x-field label="وضعیت" for="form.status">
                     <x-select id="form.status" wire:model="form.status" :options="[
                         \App\Models\Template::STATUS_ACTIVE   => 'فعال (نمایش در فروشگاه)',

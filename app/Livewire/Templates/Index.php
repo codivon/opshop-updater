@@ -5,6 +5,7 @@ namespace App\Livewire\Templates;
 use App\Livewire\Concerns\AuthorizesAdmin;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Category;
+use App\Models\Project;
 use App\Models\Template;
 use App\Services\ImageUploadService;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +27,9 @@ class Index extends Component
 
     public string $categoryFilter = '';
 
+    /** Task 94 — فیلتر لیست بر اساس پروژه (مثل لیست پکیج‌ها) */
+    public string $projectFilter = '';
+
     public string $statusFilter = '';
 
     /* ---------------- Form (create/edit modal) ---------------- */
@@ -44,6 +48,7 @@ class Index extends Component
         'name' => '',
         'slug' => '',
         'category_id' => '',
+        'project_id' => '',
         'short_description' => '',
         'description' => '',
         'price' => 0,
@@ -62,6 +67,8 @@ class Index extends Component
             'form.name' => ['required', 'string', 'max:190'],
             'form.slug' => ['nullable', 'string', 'max:190', 'alpha_dash:ascii'],
             'form.category_id' => ['nullable', 'exists:categories,id'],
+            // Task 94 — پروژهٔ قالب اجباری است (مثل فرم پکیج‌ها)
+            'form.project_id' => ['required', 'exists:projects,id'],
             'form.short_description' => ['nullable', 'string', 'max:10000'],
             'form.description' => ['nullable', 'string', 'max:100000'],
             'form.price' => ['nullable', 'integer', 'min:0'],
@@ -83,6 +90,8 @@ class Index extends Component
     protected $messages = [
         'form.name.required' => 'نام قالب الزامی است.',
         'form.status.required' => 'وضعیت قالب الزامی است.',
+        'form.project_id.required' => 'انتخاب پروژه الزامی است.',
+        'form.project_id.exists' => 'پروژهٔ انتخاب‌شده معتبر نیست.',
         'thumbnailFile.image' => 'فایل تصویر شاخص معتبر نیست.',
         'thumbnailFile.max' => 'حجم تصویر شاخص حداکثر ۳ مگابایت.',
     ];
@@ -93,6 +102,11 @@ class Index extends Component
     }
 
     public function updatingCategoryFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatingProjectFilter(): void
     {
         $this->resetPage();
     }
@@ -117,6 +131,8 @@ class Index extends Component
             'name' => '',
             'slug' => '',
             'category_id' => '',
+            // Task 94 — اگر فروشگاه فقط یک پروژهٔ فعال دارد، همان از قبل انتخاب است
+            'project_id' => $this->projects->count() === 1 ? (string) $this->projects->first()->id : '',
             'short_description' => '',
             'description' => '',
             'price' => 0,
@@ -147,6 +163,7 @@ class Index extends Component
             'name' => $template->name,
             'slug' => $template->slug,
             'category_id' => (string) $template->category_id,
+            'project_id' => (string) ($template->project_id ?? ''),
             'short_description' => (string) $template->short_description,
             'description' => (string) $template->description,
             'price' => $template->price,
@@ -172,6 +189,8 @@ class Index extends Component
             'name' => trim($data['form']['name']),
             'slug' => trim((string) ($data['form']['slug'] ?? '')),
             'category_id' => $data['form']['category_id'] !== '' ? (int) $data['form']['category_id'] : null,
+            // Task 94 — پروژهٔ قالب (اجباری)
+            'project_id' => (int) $data['form']['project_id'],
             'short_description' => $data['form']['short_description'] ?: null,
             'description' => $data['form']['description'] ?: null,
             'price' => (int) ($data['form']['price'] ?? 0),
@@ -313,11 +332,18 @@ class Index extends Component
         return Category::flatOptions(Category::TYPE_TEMPLATE);
     }
 
+    /** Task 94 — پروژه‌ها برای فیلتر لیست و سلکت فرم (مثل پکیج‌ها) */
+    #[Computed]
+    public function projects()
+    {
+        return Project::query()->orderBy('name')->get(['id', 'name']);
+    }
+
     #[Computed]
     public function records()
     {
         return Template::query()
-            ->with(['category:id,name', 'latestVersion:id,template_id,version'])
+            ->with(['category:id,name', 'project:id,name', 'latestVersion:id,template_id,version'])
             ->withCount(['versions', 'purchases' => fn ($q) => $q->where('status', 'paid'), 'comments' => fn ($q) => $q->where('status', 'pending')])
             // درآمد واقعی هر قالب (خریدهای پرداخت‌شده)
             ->withSum(['purchases as paid_revenue_sum' => fn ($q) => $q->where('status', 'paid')], 'amount')
@@ -325,6 +351,7 @@ class Index extends Component
                 ->where('name', 'like', "%{$this->search}%")
                 ->orWhere('slug', 'like', "%{$this->search}%")))
             ->when($this->categoryFilter !== '', fn ($q) => $q->where('category_id', $this->categoryFilter))
+            ->when($this->projectFilter !== '', fn ($q) => $q->where('project_id', (int) $this->projectFilter))
             ->when($this->statusFilter !== '', fn ($q) => $q->where('status', $this->statusFilter))
             ->orderBy('sort_order')
             ->latest('id')

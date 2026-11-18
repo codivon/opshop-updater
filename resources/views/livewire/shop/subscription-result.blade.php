@@ -73,6 +73,15 @@
                     {{ $order->plan_name }}
                 </p>
             </div>
+            @if(!empty($order->meta['project']['name']))
+                <div class="rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
+                    <p class="text-xs text-zinc-400">پروژه</p>
+                    <p class="mt-1 flex items-center gap-1.5 text-sm font-bold text-zinc-800 dark:text-zinc-100">
+                        <x-icon name="box" class="size-4 text-brand-500" />
+                        {{ $order->meta['project']['name'] }}
+                    </p>
+                </div>
+            @endif
             <div class="rounded-2xl bg-zinc-50 p-4 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
                 <p class="text-xs text-zinc-400">مدت اعتبار</p>
                 <p class="mt-1 text-sm font-bold text-zinc-800 dark:text-zinc-100">
