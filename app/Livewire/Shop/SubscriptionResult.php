@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Shop;
 
+use App\Livewire\Concerns\WithToasts;
 use App\Models\PackageLicense;
 use App\Models\SubscriptionOrder;
 use App\Services\SubscriptionService;
@@ -14,6 +15,8 @@ use Livewire\Component;
 #[Title('نتیجه خرید اشتراک')]
 class SubscriptionResult extends Component
 {
+    use WithToasts;
+
     public SubscriptionOrder $order;
 
     public function mount(SubscriptionOrder $order, string $token): void

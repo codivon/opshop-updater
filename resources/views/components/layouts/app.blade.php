@@ -52,7 +52,6 @@
                 // به سایدبار قدیمی Blade (back/partials) اضافه شده بود و کاربر آن را نمی‌دید
                 ['route' => 'admin.revenue.index', 'title' => 'درآمد', 'icon' => 'banknote', 'match' => ['admin.revenue*']],
                 ['route' => 'admin.reports.index', 'title' => 'گزارش‌ها', 'icon' => 'bar-chart', 'match' => ['admin.reports*']],
-                ['route' => 'admin.logs.index', 'title' => 'لاگ‌ها', 'icon' => 'terminal', 'match' => ['admin.logs*']],
                 ['route' => 'admin.tools.backup', 'title' => 'پشتیبان‌گیری', 'icon' => 'archive', 'match' => ['admin.tools*']],
                 ['route' => 'admin.settings.security', 'title' => 'امنیت و امکانات', 'icon' => 'shield', 'match' => ['admin.settings.security']],
                 ['route' => 'admin.users.index', 'title' => 'کاربران', 'icon' => 'shield-check', 'match' => ['admin.users*']],
@@ -73,6 +72,8 @@
                 ['route' => 'admin.settings.home', 'title' => 'صفحهٔ اصلی فروشگاه', 'icon' => 'panel-top', 'match' => ['admin.settings.home']],
                 ['route' => 'admin.settings.index', 'title' => 'تنظیمات', 'icon' => 'settings', 'match' => ['admin.settings.index', 'admin.settings.gateways']],
                 ['route' => 'admin.settings.seo', 'title' => 'سئو', 'icon' => 'trending-up', 'match' => ['admin.settings.seo']],
+                // درخواست کاربر: منوی لاگ‌ها زیر منوی سئو منتقل شد (قبلاً در گروه «سیستم» بود)
+                ['route' => 'admin.logs.index', 'title' => 'لاگ‌ها', 'icon' => 'terminal', 'match' => ['admin.logs*']],
                 ['route' => 'admin.settings.developer', 'title' => 'تنظیمات برنامه‌نویس', 'icon' => 'wrench', 'match' => ['admin.settings.developer']],
             ],
         ],

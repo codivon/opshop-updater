@@ -58,6 +58,23 @@ class LoginController extends Controller
     }
 
     /**
+     * خروج مدیر — بدون نابودکردن کل سشن (Task 93).
+     *
+     * تریت AuthenticatesUsers با session()->invalidate() «کل سشن» را از بین
+     * می‌برد؛ قبلاً این کار لاگین مشتری فروشگاه را در همان مرورگر هم می‌کُشت.
+     * حالا سشن‌ها کوکی جدا دارند، اما برای ایمنی، خروج فقط گارد مدیر را می‌بندد
+     * و فقط توکن CSRF تازه می‌شود.
+     */
+    public function logout(Request $request)
+    {
+        Auth::guard('web')->logout();
+
+        $request->session()->regenerateToken();
+
+        return redirect('/');
+    }
+
+    /**
      * اعتبارسنجی فرم ورود مدیر + کپچای خودمیزبان + هانی‌پات ضدربات.
      * هر دو لایه از پنل امنیت و امکانات قابل خاموش/روشن‌کردن‌اند.
      */

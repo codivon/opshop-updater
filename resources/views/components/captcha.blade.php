@@ -38,6 +38,13 @@
     $inputAttrs = $wireTarget
         ? 'wire:model="'.e($wireTarget).'"'
         : 'name="'.e($name).'" required';
+
+    // Task 93 — جداسازی سشن مدیر/مشتری: اندپوینت‌های کپچا (تصویر/رفرش) باید
+    // کوکی سشنِ «همان سمت» فرم را بگیرند تا سؤال و پاسخ در یک سشن بمانند
+    $version = \App\Services\CaptchaService::version();
+    $captchaCtx = in_array($spot, ['admin_login', 'admin_register'], true) ? 'admin' : 'shop';
+    $captchaImgUrl = route('captcha.image').'?ctx='.$captchaCtx.'&v='.$version;
+    $captchaRefreshUrl = route('captcha.refresh', ['spot' => $spot, 'ctx' => $captchaCtx]);
 @endphp
 
 <div {{ $attributes->merge(['class' => 'space-y-1.5']) }}>
@@ -128,8 +135,6 @@
 
     {{-- ================= کپچای خودمیزبان (math / image) ================= --}}
     @unless($isCloud)
-        @php($version = \App\Services\CaptchaService::version())
-
         <div class="flex items-center justify-between gap-2 rounded-xl bg-zinc-50 px-3.5 py-2.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/60 dark:ring-zinc-700/60">
             <span class="flex min-w-0 items-center gap-2 text-sm">
                 <x-icon name="shield-check" class="size-4.5 shrink-0 text-brand-600 dark:text-brand-400" />
@@ -141,16 +146,16 @@
                 <button type="button" wire:click="{{ $refreshWire }}" wire:loading.attr="disabled"
                         class="inline-flex shrink-0 cursor-pointer items-center rounded-lg bg-white p-1 ring-1 ring-zinc-200/80 transition-opacity hover:opacity-75 dark:bg-white dark:ring-zinc-300/40"
                         title="سؤال دیگر — برای خوانایی کلیک کنید">
-                    <img src="{{ route('captcha.image') }}?v={{ $version }}"
+                    <img src="{{ $captchaImgUrl }}"
                          alt="{{ $driver === 'image' ? 'تصویر کد امنیتی حرف‌عددی؛ نویسه‌ها را بنویسید' : 'تصویر سؤال امنیتی؛ اعداد و عملگرها را بخوانید' }}"
                          width="150" height="38"
                          class="block h-9 w-auto select-none" draggable="false" />
                 </button>
             @else
-                <a href="{{ route('captcha.refresh', ['spot' => $spot]) }}"
+                <a href="{{ $captchaRefreshUrl }}"
                    class="inline-flex shrink-0 items-center rounded-lg bg-white p-1 ring-1 ring-zinc-200/80 transition-opacity hover:opacity-75 dark:bg-white dark:ring-zinc-300/40"
                    title="سؤال دیگر — برای خوانایی کلیک کنید">
-                    <img src="{{ route('captcha.image') }}?v={{ $version }}"
+                    <img src="{{ $captchaImgUrl }}"
                          alt="{{ $driver === 'image' ? 'تصویر کد امنیتی حرف‌عددی؛ نویسه‌ها را بنویسید' : 'تصویر سؤال امنیتی؛ اعداد و عملگرها را بخوانید' }}"
                          width="150" height="38"
                          class="block h-9 w-auto select-none" draggable="false" />
@@ -165,7 +170,7 @@
                     سؤال دیگر
                 </button>
             @else
-                <a href="{{ route('captcha.refresh', ['spot' => $spot]) }}"
+                <a href="{{ $captchaRefreshUrl }}"
                    class="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-zinc-500 transition-colors hover:bg-zinc-200/60 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700/60 dark:hover:text-zinc-200"
                    title="سؤال دیگر">
                     <x-icon name="refresh-cw" class="size-3.5" />

@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\CheckMaintenance;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\SeparateAdminSession;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Task 93 — جداسازی کامل سشن مدیر از سشن فروشگاه/مشتری (کوکی‌های جدا):
+        // باید قبل از StartSession اجرا شود تا نام کوکی از ابتدای درخواست درست باشد.
+        $middleware->prepend(SeparateAdminSession::class);
+
         // Task 85 — امنیت (M9): اعتماد به پروکسی معکوس (سی‌پنل/انجین‌کس/کلاودفلر)
         // تا IP واقعی کاربر در rate-limiter و گاردهای IP درست باشد.
         $middleware->trustProxies(at: '*');

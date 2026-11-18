@@ -358,15 +358,25 @@
                                     <div>
                                         @include('livewire.shop.partials.gateway-picker', ['gateways' => $this->gateways])
                                     </div>
-
-                                    {{-- کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات) --}}
-                                    @if(\App\Support\Features::captcha('checkout'))
-                                        <x-captcha spot="checkout" wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
-                                    @endif
                                 @endif
 
-                                {{-- کد تخفیف (پایه: مدت انتخابی) --}}
+                                {{-- کد تخفیف (پایه: مدت انتخابی) — درخواست کاربر: قبل از سؤال امنیتی --}}
                                 @include('livewire.shop.partials.discount-field', ['baseAmount' => $this->effectiveBaseFor($plan)])
+
+                                {{-- جداکنندهٔ کد تخفیف و سؤال امنیتی + کپچا — درخواست کاربر: سؤال امنیتی زیر کد تخفیف --}}
+                                @if(!$checkoutFree && \App\Support\Features::captcha('checkout'))
+                                    <div class="flex items-center gap-3" role="separator" aria-label="جداکنندهٔ کد تخفیف و سؤال امنیتی">
+                                        <span class="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></span>
+                                        <span class="flex items-center gap-1.5 text-[11px] font-bold text-zinc-400 dark:text-zinc-500">
+                                            <x-icon name="shield-check" class="size-3.5" />
+                                            اعتبارسنجی امنیتی
+                                        </span>
+                                        <span class="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></span>
+                                    </div>
+
+                                    {{-- کپچای فرم پرداخت (ضدربات — درایور از پنل امنیت و امکانات) --}}
+                                    <x-captcha spot="checkout" wireTarget="captcha" name="captcha" refreshWire="refreshCaptcha" />
+                                @endif
 
                                 <div class="flex items-center justify-between gap-2 rounded-xl bg-white p-3 text-sm ring-1 ring-zinc-200/70 dark:bg-zinc-800 dark:ring-zinc-700/50">
                                     <span class="text-zinc-500 dark:text-zinc-400">مبلغ قابل پرداخت</span>

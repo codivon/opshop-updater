@@ -175,6 +175,13 @@ class Index extends Component
             Artisan::call('config:clear');
             Artisan::call('view:clear');
 
+            // اگر سشن روی استور کش باشد، cache:clear استور را flush می‌کند و سشن‌ها
+            // نابود می‌شوند — سشن همین کاربر را بلافاصله بازنویسی می‌کنیم تا لاگین بماند
+            // (همان الگوی حفاظت Developer::runCacheCommand — Task 93).
+            if (request()->hasSession()) {
+                request()->session()->save();
+            }
+
             $this->toast('کش سیستم با موفقیت پاک شد.');
         } catch (\Throwable $e) {
             $this->toast('خطا در پاک‌سازی کش: '.$e->getMessage(), 'error');
