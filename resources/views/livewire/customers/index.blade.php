@@ -84,7 +84,11 @@
                                     <div class="flex items-center gap-3">
                                         <x-avatar :name="$customer->name" />
                                         <div class="min-w-0">
-                                            <p class="truncate font-semibold text-zinc-800 dark:text-zinc-100">{{ $customer->name }}</p>
+                                            <a href="{{ route('admin.customers.show', $customer) }}" wire:navigate
+                                               class="truncate font-semibold text-zinc-800 transition-colors hover:text-brand-600 dark:text-zinc-100 dark:hover:text-brand-400"
+                                               title="مشاهدهٔ پروندهٔ مشتری">
+                                                {{ $customer->name }}
+                                            </a>
                                             <p class="truncate text-xs text-zinc-400" dir="ltr">{{ $customer->email }}</p>
                                         </div>
                                     </div>
@@ -122,6 +126,11 @@
                                 <td class="hidden text-sm text-zinc-500 sm:table-cell">{{ verta_date($customer->created_at) }}</td>
                                 <td>
                                     <div class="flex items-center justify-end gap-1">
+                                        <a href="{{ route('admin.customers.show', $customer) }}" wire:navigate
+                                           class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                           title="پروندهٔ مشتری">
+                                            <x-icon name="eye" class="size-4.5" />
+                                        </a>
                                         <button type="button" wire:click="openEdit({{ $customer->id }})"
                                                 class="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
                                                 title="ویرایش">

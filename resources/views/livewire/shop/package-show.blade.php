@@ -397,11 +397,18 @@
                 {{-- buy button --}}
                 @php($buyDisabled = !$effectiveFree && !$this->isCoveredBySubscription && $this->gateways->isEmpty())
                 @php($renewalLocked = in_array($this->renewalNotice['state'] ?? '', ['blocked', 'reserved']))
-                @php($buyDisabled = $buyDisabled || $renewalLocked)
+                @php($buyDisabled = $buyDisabled && ! $renewalLocked)
                 @php($covered = $this->isCoveredBySubscription)
-                <x-btn wire:click="buy" :loading="true" icon="{{ $covered ? 'crown' : ($effectiveFree ? 'download' : ($renewalLocked ? 'lock' : 'wallet')) }}" class="w-full" :disabled="$buyDisabled">
-                    {{ $covered ? 'دریافت رایگان با اشتراک' : ($effectiveFree ? 'دریافت رایگان' : ($renewalLocked ? 'خرید در بازهٔ فعلی امکان‌پذیر نیست' : 'خرید و پرداخت')) }}
-                </x-btn>
+                @if($renewalLocked)
+                    {{-- Task 88 — دکمهٔ قفل‌شده اما کلیک‌پذیر: با کلیک مودال زیبای محدودیت باز می‌شود --}}
+                    <x-btn variant="secondary" wire:click="showRenewalInfo" icon="lock" class="w-full">
+                        خرید در بازهٔ فعلی امکان‌پذیر نیست
+                    </x-btn>
+                @else
+                    <x-btn wire:click="buy" :loading="true" icon="{{ $covered ? 'crown' : ($effectiveFree ? 'download' : 'wallet') }}" class="w-full" :disabled="$buyDisabled">
+                        {{ $covered ? 'دریافت رایگان با اشتراک' : ($effectiveFree ? 'دریافت رایگان' : 'خرید و پرداخت') }}
+                    </x-btn>
+                @endif
 
                 <p class="flex items-center justify-center gap-1.5 text-xs leading-4 text-zinc-400">
                     <x-icon name="shield-check" class="size-4 shrink-0 text-emerald-500" />
@@ -465,4 +472,7 @@
 
     {{-- مودال هشدار فیلترشکن/VPN — گارد IP پرداخت --}}
     <x-vpn-guard-modal wireModel="showVpnModal" retryMethod="buy" />
+
+    {{-- مودال مدرن محدودیت خرید مجدد (خرید تکراری پکیج) — Task 88 --}}
+    <x-renewal-modal />
 </div>

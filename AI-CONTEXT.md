@@ -279,6 +279,12 @@ checkout در `Shop\PackageShow::buy()`: کد آپدیت → Customer → گار
 - **پیامک‌های جدید** (مایگریشن 2026_11_18_000002 + `SmsTemplate::SYSTEM_KEYS`): `package_reserved`، `package_renewal_activated`، `subscription_reserved` — متن/کد پترن از پنل «پیامک‌ها ← قالب‌ها» قابل ویرایش؛ جای پترن هر درایور همان‌جا پر می‌شود.
 - **نمایش در UI**: بنر وضعیت در صفحهٔ پکیج (`renewalNotice` computed — رنگ‌ها: blocked=amber، window=emerald، reserved=violet) + قفل دکمهٔ خرید؛ بنر/قفل روی کارت طرح‌ها در اشتراک‌ها (`renewalNotices`)؛ کارت «خرید رزروشده» در صفحهٔ نتیجهٔ پرداخت؛ بج «رزروشده» در پروفایل مشتری؛ پاسخ‌های API: `reserved`/`activation_at`/`message` + 422 برای مسدود.
 
+## ۶.۱۱ پروندهٔ مشتری + مودال محدودیت خرید (Task 88)
+
+- **پروندهٔ مشتری** `/admin/customers/{customer}` (`admin.customers.show` → `App\Livewire\Customers\Show`): هویت مشتری + کد آپدیت قابل‌کپی، ۶ KPI (مجموع/پکیج/قالب/اشتراک/لایسنس فعال/اشتراک فعال)، ۲ نمودار (تفکیک نوع + روند ۱۲ماه)، جدول‌های تفکیک‌شده با اسکرول (`max-h-96 overflow-y-auto`) و مودال‌های مدیریت. **حسابداری ضد دوبارشماری** (مثل صفحهٔ درآمد): اشتراک = SubscriptionOrder(paid) + Subscription دستیِ paid بدون order. ⚠️ خرید «محصول» به مشتری گره نمی‌خورد (ProductPurchase بدون customer_id — مهمان‌محور) → در پرونده نمایش داده نمی‌شود.
+- **مدیریت از پرونده**: اشتراک (افزودن دستی/از طرح با انتخاب مدت + صدور لایسنس پکیج‌های همراه از طریق `SubscriptionService::grantFreeAccess` / ویرایش / حذف / ±ماه سریع)، لایسنس پکیج (صدور دستی با generateKey / ویرایش انضا+وضعیت / ±ماه / ابطال↔فعال / حذف)، لایسنس قالب (ابطال↔فعال / حذف)، سفارش در انتظار (تأیید با `SubscriptionService::approve` / رد با دلیل). همهٔ اکشن‌ها با `customer_id !== $this->customer->id → abort(404)` گارد مالکیت دارند. ⚠️ اشتراک **رزروشده** قابل ویرایش/±ماه نیست (status=reserved + reserved_activate_at → جریان فعال‌سازی خودکار Task 87 را خراب می‌کند) — فقط حذف مجاز است.
+- **مودال محدودیت خرید مجدد** (`x-renewal-modal` + trait `WithRenewalModal`): پیام مسدود/رزرو با آیکون، چیپ‌های طرح/روزمانده/تاریخ فعال‌سازی و دکمه‌ها. دو مسیر ورود: ① اکشن buy (پکیج/طرح/checkout طرح‌ها) → `openRenewalModal(evaluate...('package'|'plan'))` از روی payload غنی‌شدهٔ RenewalService (کلیدهای `reason` + `activate_at` + object زمینه اضافه شد — additive)؛ ② دکمهٔ قفل‌شدهٔ خرید (package-show + subscriptions-index) دیگر disabled نیست → `showRenewalInfo()` / `showRenewalInfo(planId)` از روی `pageNoticeFor*` مودال باز می‌کند (`openRenewalModalFromNotice`). آیکون‌های استفاده‌شده باید در `App\View\Components\Icon::ICONS` موجود باشند (`calendar-check`/`layout-list` نداریم — به‌جایش sparkles/crown).
+
 ## ۷. گاتچاهای حیاتی (خلاصه تجربه — حتماً رعایت شود)
 
 1. **Blade**: کلاس bare ممنوع (`Route::` → `\Illuminate\Support\Facades\Route::`)؛ `@php(...)` inline را با بلاک `@php @endphp` قاطی نکنید؛ interpolation `{{ }}` **داخل تگ کامپوننت** (`<x-icon ... {{ $x }} />`) تگ را غیرقابل‌کامپایل می‌کند → با `@if` شاخه‌بندی کنید.
@@ -321,6 +327,10 @@ checkout در `Shop\PackageShow::buy()`: کد آپدیت → Customer → گار
 
 
 ---
+
+- (۷۴) 🆕 Task 88 — در blade لایووایر، پراپرتی `#[Computed]` باید با `$this->xxx` خوانده شود (نه `$xxx`) وگرنه «Undefined variable» در رندر (الگوی پنل: `$this->packageOptions`).
+- (۷۵) 🆕 Task 88 — انتقال مالکیت رکورد بین مشتری‌ها را تست کنید: هر اکشن پروندهٔ مشتری باید قبل از تغییر، تعلق رکورد به مشتریِ route را چک کند (`findOrFail` تنها کافی نیست — ID از سمت کلاینت می‌آید).
+- (۷۶) 🆕 Task 88 — کپچای پرداخت «حداقل زمان» دارد (`sec_captcha_min_seconds` پیش‌فرض ۲ثانیه): در تست مرورگر، پر کردن سریعِ فرم + submit قبل از ۲ ثانیه → «پاسخ سؤال امنیتی نادرست است» و سؤال تازه می‌شود؛ بین fill و click منتظر بمانید.
 
 ## ۸. روش تست استاندارد (playbook)
 

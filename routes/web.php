@@ -239,6 +239,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', EnsureAdminRole::cla
     Route::get('purchases', App\Livewire\Purchases\Index::class)->name('purchases.index');
     Route::get('purchases/{purchase}', App\Livewire\Purchases\Show::class)->name('purchases.show');
     Route::get('customers', App\Livewire\Customers\Index::class)->name('customers.index');
+    // پروندهٔ کامل مشتری: خریدها/لایسنس‌ها/اشتراک‌ها با نمودار + مدیریت (Task 88)
+    Route::get('customers/{customer}', App\Livewire\Customers\Show::class)->name('customers.show');
     Route::get('subscriptions', App\Livewire\Subscriptions\Index::class)->name('subscriptions.index');
 
     // طرح‌های اشتراک + درخواست‌ها/تأییدها

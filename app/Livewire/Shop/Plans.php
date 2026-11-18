@@ -3,6 +3,7 @@
 namespace App\Livewire\Shop;
 
 use App\Livewire\Concerns\WithPaymentGuard;
+use App\Livewire\Concerns\WithRenewalModal;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Models\Gateway;
@@ -10,6 +11,7 @@ use App\Models\Package;
 use App\Models\SubscriptionOrder;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanDuration;
+use App\Services\RenewalService;
 use App\Services\SubscriptionService;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -22,6 +24,7 @@ use RuntimeException;
 class Plans extends Component
 {
     use WithPaymentGuard;
+    use WithRenewalModal;
     use WithToasts;
 
     /** آیا مودال خرید باز است؟ */
@@ -212,6 +215,15 @@ class Plans extends Component
 
         if (! $plan) {
             $this->toast('طرح انتخاب‌شده معتبر نیست.', 'error');
+
+            return;
+        }
+
+        // ---- Task 88 — گارد خرید مجدد طرح (مودال مدرن محدودیت) ----
+        $renewal = app(RenewalService::class)->evaluateSubscriptionRenewal($customer->id, $plan->id);
+
+        if (! $renewal['allowed']) {
+            $this->openRenewalModal($renewal, 'plan');
 
             return;
         }

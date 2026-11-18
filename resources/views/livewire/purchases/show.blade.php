@@ -112,11 +112,11 @@
             <div class="flex items-center gap-4">
                 <x-avatar :name="$purchase->customer?->name ?? '؟'" size="lg" />
                 <div class="min-w-0">
-                    <a href="{{ route('admin.customers.index') }}?search={{ urlencode($purchase->customer?->name ?? '') }}" wire:navigate
+                    <a href="{{ $purchase->customer ? route('admin.customers.show', $purchase->customer) : route('admin.customers.index') }}" wire:navigate
                        class="block truncate text-base font-bold text-zinc-800 transition-colors hover:text-brand-600 dark:text-zinc-100 dark:hover:text-brand-400">
                         {{ $purchase->customer?->name ?? '—' }}
                     </a>
-                    <a href="{{ route('admin.customers.index') }}?search={{ urlencode($purchase->customer?->email ?? '') }}" wire:navigate
+                    <a href="{{ $purchase->customer ? route('admin.customers.show', $purchase->customer) : route('admin.customers.index') }}" wire:navigate
                        class="mt-0.5 block truncate text-sm text-zinc-500 transition-colors hover:text-brand-600 dark:text-zinc-400" dir="ltr">
                         {{ $purchase->customer?->email ?? '—' }}
                     </a>

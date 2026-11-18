@@ -284,8 +284,8 @@
                                         {{ $myOrder->admin_status === 'approved' ? 'فعال شده' : 'در انتظار تأیید مدیر' }}
                                     </x-btn>
                                 @elseif($renewalNotice && in_array($renewalNotice['state'], ['blocked', 'reserved']))
-                                    {{-- Task 87 — خرید مجدد این طرح در بازهٔ فعلی مجاز نیست (بنر بالا توضیح می‌دهد) --}}
-                                    <x-btn variant="secondary" icon="lock" class="w-full" disabled>
+                                    {{-- Task 88 — خرید مجدد این طرح در بازهٔ فعلی مجاز نیست؛ کلیک → مودال زیبای محدودیت --}}
+                                    <x-btn variant="secondary" icon="lock" class="w-full" wire:click="showRenewalInfo({{ $plan->id }})">
                                         خرید در بازهٔ فعلی امکان‌پذیر نیست
                                     </x-btn>
                                 @else
@@ -564,4 +564,7 @@
 
     {{-- مودال هشدار فیلترشکن/VPN — گارد IP پرداخت --}}
     <x-vpn-guard-modal wireModel="showVpnModal" retryMethod="buy" />
+
+    {{-- مودال مدرن محدودیت خرید مجدد طرح — Task 88 --}}
+    <x-renewal-modal />
 </div>

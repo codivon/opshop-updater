@@ -3,6 +3,7 @@
 namespace App\Livewire\Shop;
 
 use App\Livewire\Concerns\WithPaymentGuard;
+use App\Livewire\Concerns\WithRenewalModal;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Models\DiscountCode;
@@ -29,6 +30,7 @@ use Livewire\Component;
 class PackageShow extends Component
 {
     use WithPaymentGuard;
+    use WithRenewalModal;
     use WithToasts;
 
     public Package $package;
@@ -412,7 +414,8 @@ class PackageShow extends Component
             $renewal = app(RenewalService::class)->evaluatePackageRenewal($customer->id, $this->package->id);
 
             if (! $renewal['allowed']) {
-                $this->toast($renewal['message'], 'error');
+                // پیام زیبای مودال آیکون‌دار به‌جای توست ساده (Task 88)
+                $this->openRenewalModal($renewal, 'package');
 
                 return;
             }
@@ -630,6 +633,18 @@ class PackageShow extends Component
             ->orderByDesc('id')
             ->get()
             ->first(fn (Subscription $sub) => $sub->effectivePackages()->contains('id', $this->package->id));
+    }
+
+    /** کلیک روی دکمهٔ قفل‌شدهٔ خرید → نمایش مودال زیبای محدودیت (Task 88) */
+    public function showRenewalInfo(): void
+    {
+        $notice = $this->renewalNotice;
+
+        if (! $notice) {
+            return;
+        }
+
+        $this->openRenewalModalFromNotice($notice, 'package');
     }
 
     public function render()

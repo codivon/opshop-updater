@@ -90,24 +90,23 @@ class RenewalService
      */
     public function evaluatePackageRenewal(int $customerId, int $packageId): array
     {
-        $deny = fn (string $message) => [
-            'allowed' => false, 'reserved' => false, 'message' => $message,
+        $deny = fn (string $message, string $reason = 'window_closed', ?Carbon $activateAt = null) => [
+            'allowed' => false, 'reserved' => false, 'message' => $message, 'reason' => $reason,
             'days_remaining' => null, 'active_license' => null, 'meta' => null,
+            'activate_at' => $activateAt?->format('Y-m-d H:i:s'),
         ];
 
         // ۱) خرید رزروشدهٔ فعال‌نشده → تا فعال‌سازی، خرید مجدد نداریم
         if ($reserved = $this->findReservedPurchase($customerId, $packageId)) {
             return $deny(
                 'شما یک خرید رزروشده برای این پکیج دارید که پس از پایان دورهٔ فعلی شما ('
-                .$this->jdate($reserved->reserved_activate_at).') به‌صورت خودکار فعال می‌شود؛ تا آن زمان امکان خرید مجدد وجود ندارد.'
-            );
+                .$this->jdate($reserved->reserved_activate_at).') به‌صورت خودکار فعال می‌شود؛ تا آن زمان امکان خرید مجدد وجود ندارد.', 'reserved_active', $reserved->reserved_activate_at);
         }
 
         // ۲) خرید رزروشدهٔ در انتظار پرداخت → ابتدا آن را تکمیل کنید
         if ($pending = $this->findPendingReservedPurchase($customerId, $packageId)) {
             return $deny(
-                'شما یک خرید رزروشده برای این پکیج در انتظار پرداخت دارید؛ ابتدا پرداخت آن را تکمیل کنید یا آن را رها کنید تا پس از پایان دورهٔ فعلی فعال شود.'
-            );
+                'شما یک خرید رزروشده برای این پکیج در انتظار پرداخت دارید؛ ابتدا پرداخت آن را تکمیل کنید یا آن را رها کنید تا پس از پایان دورهٔ فعلی فعال شود.', 'reserved_payment', $pending->reserved_activate_at);
         }
 
         // ۳) لایسنس فعال → پنجرهٔ ۵ روزه
@@ -122,18 +121,21 @@ class RenewalService
 
         // لایسنس نامحدود → خرید مجدد بی‌معنا
         if ($license->expires_at === null) {
-            return $deny('شما لایسنس نامحدود این پکیج را در اختیار دارید و نیازی به خرید مجدد نیست.');
+            return $deny('شما لایسنس نامحدود این پکیج را در اختیار دارید و نیازی به خرید مجدد نیست.', 'unlimited');
         }
 
         $daysRemaining = max(0, (int) floor(now()->diffInDays($license->expires_at, false)));
 
         // هنوز در پنجرهٔ بستهٔ خرید
         if ($daysRemaining > self::WINDOW_DAYS) {
-            return $deny(
-                'شما این پکیج را با طرح «'.$this->licensePlanLabel($license).'» خریداری کرده‌اید و اعتبار آن تا '
-                .fa_num($daysRemaining).' روز دیگر به پایان می‌رسد. از '.fa_num(self::WINDOW_DAYS).' روز مانده به پایان اعتبار می‌توانید طرح بعدی را خریداری کنید؛ '
-                .'خرید جدید پس از پایان دورهٔ فعلی به‌صورت خودکار فعال خواهد شد.'
-            );
+            return [
+                'allowed' => false, 'reserved' => false,
+                'message' => 'شما این پکیج را با طرح «'.$this->licensePlanLabel($license).'» خریداری کرده‌اید و اعتبار آن تا '
+                    .fa_num($daysRemaining).' روز دیگر به پایان می‌رسد. از '.fa_num(self::WINDOW_DAYS).' روز مانده به پایان اعتبار می‌توانید طرح بعدی را خریداری کنید؛ '
+                    .'خرید جدید پس از پایان دورهٔ فعلی به‌صورت خودکار فعال خواهد شد.',
+                'reason' => 'window_closed',
+                'days_remaining' => null, 'active_license' => $license, 'meta' => null, 'activate_at' => null,
+            ];
         }
 
         // پنجرهٔ ۵ روزه → خرید مجاز اما رزرو
@@ -324,24 +326,23 @@ class RenewalService
      */
     public function evaluateSubscriptionRenewal(int $customerId, int $planId): array
     {
-        $deny = fn (string $message) => [
-            'allowed' => false, 'reserved' => false, 'message' => $message,
+        $deny = fn (string $message, string $reason = 'window_closed', ?Carbon $activateAt = null) => [
+            'allowed' => false, 'reserved' => false, 'message' => $message, 'reason' => $reason,
             'days_remaining' => null, 'active_subscription' => null,
+            'activate_at' => $activateAt?->format('Y-m-d H:i:s'),
         ];
 
         // ۱) اشتراک رزروشده → تا فعال‌سازی، خرید مجدد نداریم
         if ($reserved = $this->findReservedSubscription($customerId, $planId)) {
             return $deny(
                 'شما یک خرید رزروشده برای همین طرح دارید که پس از پایان اشتراک فعلی شما ('
-                .$this->jdate($reserved->reserved_activate_at).') به‌صورت خودکار فعال می‌شود؛ تا آن زمان امکان خرید مجدد وجود ندارد.'
-            );
+                .$this->jdate($reserved->reserved_activate_at).') به‌صورت خودکار فعال می‌شود؛ تا آن زمان امکان خرید مجدد وجود ندارد.', 'reserved_active', $reserved->reserved_activate_at);
         }
 
         // ۲) سفارشِ در انتظار تأیید مدیر → تا تعیین تکلیف، درخواست جدید نداریم
         if ($pendingOrder = $this->findPendingPlanOrder($customerId, $planId)) {
             return $deny(
-                'شما یک درخواست خرید برای همین طرح دارید که در انتظار تأیید مدیر است؛ پس از تعیین تکلیف آن می‌توانید درخواست جدید ثبت کنید.'
-            );
+                'شما یک درخواست خرید برای همین طرح دارید که در انتظار تأیید مدیر است؛ پس از تعیین تکلیف آن می‌توانید درخواست جدید ثبت کنید.', 'pending_order');
         }
 
         // ۳) اشتراک فعال → پنجرهٔ ۵ روزه
@@ -358,18 +359,20 @@ class RenewalService
 
         if ($expiresAt === null) {
             return $deny(
-                'اشتراک «'.($subscription->plan?->name ?? 'طرح فعلی').'» شما نامحدود است و نیازی به خرید مجدد نیست.'
-            );
+                'اشتراک «'.($subscription->plan?->name ?? 'طرح فعلی').'» شما نامحدود است و نیازی به خرید مجدد نیست.', 'unlimited');
         }
 
         $daysRemaining = max(0, (int) floor(now()->diffInDays($expiresAt, false)));
 
         if ($daysRemaining > self::WINDOW_DAYS) {
-            return $deny(
-                'شما طرح «'.($subscription->plan?->name ?? 'طرح فعلی').'» را در اشتراک فعلی خود دارید و '
-                .fa_num($daysRemaining).' روز از اعتبار آن باقی مانده است. از '.fa_num(self::WINDOW_DAYS).' روز مانده به پایان اشتراک می‌توانید طرح جدید را خریداری کنید؛ '
-                .'خرید جدید به‌صورت رزرو ذخیره شده و پس از پایان دورهٔ فعلی به‌طور خودکار فعال می‌شود.'
-            );
+            return [
+                'allowed' => false, 'reserved' => false,
+                'message' => 'شما طرح «'.($subscription->plan?->name ?? 'طرح فعلی').'» را در اشتراک فعلی خود دارید و '
+                    .fa_num($daysRemaining).' روز از اعتبار آن باقی مانده است. از '.fa_num(self::WINDOW_DAYS).' روز مانده به پایان اشتراک می‌توانید طرح جدید را خریداری کنید؛ '
+                    .'خرید جدید به‌صورت رزرو ذخیره شده و پس از پایان دورهٔ فعلی به‌طور خودکار فعال می‌شود.',
+                'reason' => 'window_closed',
+                'days_remaining' => null, 'active_subscription' => $subscription, 'activate_at' => null,
+            ];
         }
 
         return [
@@ -655,7 +658,7 @@ class RenewalService
     }
 
     /** برچسب طرحِ لایسنس فعلی (برای پیام‌ها) */
-    private function licensePlanLabel(PackageLicense $license): string
+    public function licensePlanLabel(PackageLicense $license): string
     {
         $planName = $license->purchase?->pricingPlan?->name;
 

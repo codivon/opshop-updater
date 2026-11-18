@@ -97,7 +97,7 @@
                                     </a>
                                 </td>
                                 <td>
-                                    <a href="{{ route('admin.customers.index') }}?search={{ urlencode($purchase->customer?->name ?? '') }}" wire:navigate
+                                    <a href="{{ $purchase->customer ? route('admin.customers.show', $purchase->customer) : route('admin.customers.index') }}" wire:navigate
                                        class="group flex items-center gap-3">
                                         <x-avatar :name="$purchase->customer?->name ?? '؟'" size="sm" />
                                         <span class="truncate text-sm font-medium text-zinc-700 transition-colors group-hover:text-brand-600 dark:text-zinc-200 dark:group-hover:text-brand-400">

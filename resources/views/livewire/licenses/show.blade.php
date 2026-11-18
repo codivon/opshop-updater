@@ -79,7 +79,7 @@
 
             <div class="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/80 dark:bg-zinc-800/60 dark:ring-zinc-700">
                 <p class="text-xs font-medium text-zinc-500 dark:text-zinc-400">مشتری</p>
-                <a href="{{ route('admin.customers.index') }}?search={{ urlencode($license->customer?->name ?? '') }}" wire:navigate
+                <a href="{{ $license->customer ? route('admin.customers.show', $license->customer) : route('admin.customers.index') }}" wire:navigate
                    class="mt-1.5 flex items-center gap-1.5 truncate text-sm font-bold text-zinc-800 transition-colors hover:text-brand-600 dark:text-zinc-100 dark:hover:text-brand-400">
                     <x-avatar :name="$license->customer?->name ?? '؟'" size="xs" />
                     {{ $license->customer?->name ?? '—' }}

@@ -3,6 +3,7 @@
 namespace App\Livewire\Shop;
 
 use App\Livewire\Concerns\WithPaymentGuard;
+use App\Livewire\Concerns\WithRenewalModal;
 use App\Livewire\Concerns\WithToasts;
 use App\Models\Customer;
 use App\Models\DiscountCode;
@@ -24,6 +25,7 @@ use Livewire\Component;
 class SubscriptionsIndex extends Component
 {
     use WithPaymentGuard;
+    use WithRenewalModal;
     use WithToasts;
 
     /** کد آپدیت مشتری */
@@ -413,6 +415,15 @@ class SubscriptionsIndex extends Component
             return;
         }
 
+        // ---- Task 88 — گارد خرید مجدد طرح (مودال مدرن محدودیت) ----
+        $renewal = app(RenewalService::class)->evaluateSubscriptionRenewal($customer->id, $plan->id);
+
+        if (! $renewal['allowed']) {
+            $this->openRenewalModal($renewal, 'plan');
+
+            return;
+        }
+
         // ---- مدت اعتبار انتخابی (طرح‌های چندمدتی) ----
         /** @var SubscriptionPlanDuration|null $durationOption */
         $durationOption = $this->selectedDurationFor($plan);
@@ -483,6 +494,18 @@ class SubscriptionsIndex extends Component
 
         // پولی → درگاه
         $this->redirect($result['payment_url'], navigate: false);
+    }
+
+    /** کلیک روی دکمهٔ قفل‌شدهٔ خرید طرح → نمایش مودال زیبای محدودیت (Task 88) */
+    public function showRenewalInfo(int $planId): void
+    {
+        $notice = $this->renewalNotices->get($planId);
+
+        if (! $notice) {
+            return;
+        }
+
+        $this->openRenewalModalFromNotice($notice, 'plan');
     }
 
     public function render()

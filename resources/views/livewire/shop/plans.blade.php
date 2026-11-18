@@ -399,4 +399,7 @@
 
     {{-- مودال هشدار فیلترشکن/VPN — گارد IP پرداخت --}}
     <x-vpn-guard-modal wireModel="showVpnModal" retryMethod="buy" />
+
+    {{-- مودال مدرن محدودیت خرید مجدد طرح — Task 88 --}}
+    <x-renewal-modal />
 </div>
