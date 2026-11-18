@@ -10,9 +10,9 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * Task 92 — کارت «کلید عمومی فروشگاه» در پروفایل مشتری:
- *  - وقتی کلید امضای لایسنس تنظیم شده باشد، کارت با دکمه‌های کپی رندر می‌شود
- *  - کلید هرگز در DOM رندر نمی‌شود (کپی با کلیک و از طریق $wire انجام می‌شود)
+ * Task 92/95 — کارت «کلید عمومی فروشگاه» در پروفایل مشتری:
+ *  - وقتی کلید امضای لایسنس تنظیم شده باشد، کارت با فیلد نمایش کلید + دکمهٔ «کپی کلید» رندر می‌شود
+ *  - کلید عمومی راز نیست و مطابق طراحی جدید، داخل فیلد نمایش داده می‌شود (مثل کد آپدیت)
  *  - وقتی کلیدی تنظیم نشده، کارت نمایش داده نمی‌شود
  *
  * نکته: سرویس کلید، .env را مستقیم می‌خواند؛ پس در تست سرویس را Mock می‌کنیم
@@ -57,14 +57,15 @@ class CustomerProfileKeyTest extends TestCase
             ->html();
 
         $this->assertStringContainsString('کلید عمومی را هم در فروشگاه خود تنظیم کنید', $html);
-        $this->assertStringContainsString('کپی خط .env', $html);
-        $this->assertStringContainsString('کپی فقط کلید', $html);
+        $this->assertStringContainsString('کپی کلید', $html);
         $this->assertStringContainsString('PACKAGE_LICENSE_PUBLIC_KEY', $html);
 
-        // کلید به‌صورت متنِ نمایشی رندر نمی‌شود — فقط نق‌نق‌دار
-        $this->assertStringContainsString('••••••', $html);
-        // کلید اصلاً در DOM رندر نمی‌شود (کپی با کلیک و از طریق $wire انجام می‌شود)
-        $this->assertStringNotContainsString('BEGIN PUBLIC KEY', $html);
+        // طراحی جدید: کلید عمومی (راز نیست) داخل فیلد نمایش داده می‌شود — مثل کد آپدیت
+        $this->assertStringContainsString('BEGIN PUBLIC KEY', $html);
+        // دکمه‌های قدیمی (کپی خط .env / کپی فقط کلید) و نشان «پنهان» حذف شده‌اند
+        $this->assertStringNotContainsString('کپی خط .env', $html);
+        $this->assertStringNotContainsString('کپی فقط کلید', $html);
+        $this->assertStringNotContainsString('پنهان', $html);
     }
 
     public function test_profile_hides_public_key_card_when_no_key_configured(): void
