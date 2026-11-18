@@ -265,7 +265,9 @@ class CustomerLogin extends Component
 
         $this->toast('ثبت‌نام با موفقیت انجام شد؛ خوش آمدید! کد آپدیت شما: '.$customer->update_code);
 
-        $this->redirect($this->safeRedirectTarget(), navigate: true);
+        // پس از ثبت‌نام همیشه به پروفایل مشتری می‌رویم (حتی با ?redirect= در آدرس):
+        // تازه‌وارد باید کد آپدیت خود و راهنمای اتصال فروشگاه را در پروفایل ببیند.
+        $this->redirect(route('customer.profile'), navigate: true);
     }
 
     /* ------------------------------------------------------------------ */

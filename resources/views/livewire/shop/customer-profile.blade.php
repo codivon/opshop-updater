@@ -29,6 +29,106 @@
         </div>
     </header>
 
+    {{-- ============ کد آپدیت — کلید اتصال فروشگاه‌ساز به مرکز آپدیت ============ --}}
+    <section class="card overflow-hidden p-0" x-data="{ copied: false }" aria-labelledby="update-code-title">
+        <div class="grid lg:grid-cols-5">
+
+            {{-- جعبه کد (در RTL سمت راست؛ در موبایل بالای صفحه) --}}
+            <div class="shop-hero relative flex flex-col justify-center gap-3.5 overflow-hidden p-5 sm:p-6 lg:col-span-2">
+                <div class="pointer-events-none absolute inset-0 opacity-[0.07]" aria-hidden="true"
+                     style="background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 28px 28px;"></div>
+                <div class="shop-hero-glow pointer-events-none absolute -bottom-16 -start-14 size-44 rounded-full" aria-hidden="true"></div>
+
+                <p class="relative flex items-center gap-1.5 text-xs font-bold text-teal-50/90">
+                    <x-icon name="sparkles" class="size-4" />
+                    کد آپدیت اختصاصی شما
+                </p>
+
+                {{-- کادر کد + دکمه کپی --}}
+                <div class="relative flex items-center gap-2 rounded-2xl bg-black/25 p-2.5 ring-1 ring-white/20 backdrop-blur-sm">
+                    <code dir="ltr"
+                          class="min-w-0 flex-1 select-all px-1.5 font-mono text-lg font-black tracking-[0.14em] text-white"
+                          aria-label="کد آپدیت شما">{{ $customer?->update_code }}</code>
+
+                    <button type="button" data-copy="{{ $customer?->update_code }}" aria-label="کپی کد آپدیت"
+                            @click="
+                                const done = () => {
+                                    copied = true;
+                                    window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'کد آپدیت کپی شد؛ آن را در فروشگاه‌ساز خود وارد کنید.', type: 'success' } }));
+                                    setTimeout(() => copied = false, 2200);
+                                };
+                                const fallback = () => {
+                                    const ta = document.createElement('textarea');
+                                    ta.value = $el.dataset.copy;
+                                    ta.style.cssText = 'position:fixed;opacity:0';
+                                    document.body.appendChild(ta);
+                                    ta.select();
+                                    try { document.execCommand('copy'); } catch (e) {}
+                                    ta.remove();
+                                    done();
+                                };
+                                (navigator.clipboard && navigator.clipboard.writeText)
+                                    ? navigator.clipboard.writeText($el.dataset.copy).then(done, fallback)
+                                    : fallback();
+                            "
+                            class="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-black transition-all duration-150"
+                            :class="copied ? 'bg-white text-emerald-700 shadow-sm' : 'bg-white/15 text-white hover:bg-white/25'">
+                        <x-icon name="copy" class="size-4" x-show="!copied" />
+                        <x-icon name="check" class="size-4" x-show="copied" x-cloak />
+                        <span x-text="copied ? 'کپی شد!' : 'کپی کد'">کپی کد</span>
+                    </button>
+                </div>
+
+                <p class="relative flex items-start gap-1.5 text-[11px] leading-5 text-teal-50/80">
+                    <x-icon name="shield-check" class="mt-0.5 size-3.5 shrink-0" />
+                    این کد کلید حساب شماست؛ فقط در فروشگاه‌ساز خودتان واردش کنید و در اختیار دیگران نگذارید.
+                </p>
+            </div>
+
+            {{-- راهنمای ساده: این کد چه‌کار می‌کند؟ --}}
+            <div class="space-y-4 p-5 sm:p-6 lg:col-span-3">
+                <div class="flex items-center gap-3">
+                    <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-600 ring-1 ring-brand-500/20 dark:bg-brand-500/15 dark:text-brand-400 dark:ring-brand-400/20">
+                        <x-icon name="plug" class="size-5.5" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 id="update-code-title" class="text-base font-black text-zinc-900 dark:text-zinc-50">
+                            فروشگاه‌ساز خود را به این مرکز وصل کنید
+                        </h2>
+                        <p class="mt-0.5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                            همه‌چیز با همین یک کد انجام می‌شود — پکیج، قالب و لایسنس.
+                        </p>
+                    </div>
+                </div>
+
+                <ol class="grid gap-3 sm:grid-cols-3">
+                    <li class="rounded-2xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/50 dark:ring-zinc-700/50">
+                        <span class="flex size-7 items-center justify-center rounded-xl bg-brand-500/15 text-sm font-black text-brand-600 dark:text-brand-400" aria-hidden="true">۱</span>
+                        <p class="mt-2.5 text-xs font-black text-zinc-800 dark:text-zinc-100">کد را در فروشگاه بگذارید</p>
+                        <p class="mt-1 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                            در پنل فروشگاه‌ساز خود، بخش افزونه‌ها را باز کنید و این کد را در کادر «کد آپدیت» وارد کنید.
+                        </p>
+                    </li>
+                    <li class="rounded-2xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/50 dark:ring-zinc-700/50">
+                        <span class="flex size-7 items-center justify-center rounded-xl bg-brand-500/15 text-sm font-black text-brand-600 dark:text-brand-400" aria-hidden="true">۲</span>
+                        <p class="mt-2.5 text-xs font-black text-zinc-800 dark:text-zinc-100">خریدها به همین کد وصل می‌شود</p>
+                        <p class="mt-1 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                            هر پکیج و قالبی که از اینجا بخرید روی همین کد ثبت می‌شود و بلافاصله در سایت شما دیده می‌شود.
+                        </p>
+                    </li>
+                    <li class="rounded-2xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/50 dark:ring-zinc-700/50">
+                        <span class="flex size-7 items-center justify-center rounded-xl bg-brand-500/15 text-sm font-black text-brand-600 dark:text-brand-400" aria-hidden="true">۳</span>
+                        <p class="mt-2.5 text-xs font-black text-zinc-800 dark:text-zinc-100">یک کلیک تا نصب</p>
+                        <p class="mt-1 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                            از همان‌جا پکیج یا قالب دلخواه را نصب و به‌روزرسانی کنید؛ دانلود دستی فایل لازم نیست.
+                        </p>
+                    </li>
+                </ol>
+            </div>
+
+        </div>
+    </section>
+
     {{-- ============ Stats ============ --}}
     <section class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div class="card flex items-center gap-4 p-5">

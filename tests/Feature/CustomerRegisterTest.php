@@ -115,8 +115,10 @@ class CustomerRegisterTest extends TestCase
         );
     }
 
-    public function test_register_redirects_to_safe_internal_redirect_param(): void
+    public function test_register_always_redirects_to_profile_even_with_redirect_param(): void
     {
+        // تازه‌وارد باید کد آپدیت و راهنمای اتصال فروشگاه را در پروفایل ببیند؛
+        // پس حتی با پارامتر redirect داخلی هم مقصد پروفایل است.
         Livewire::withQueryParams(['redirect' => route('shop.subscriptions')])
             ->test(CustomerLogin::class)
             ->call('switchTab', 'register')
@@ -124,7 +126,7 @@ class CustomerRegisterTest extends TestCase
             ->set('reg.email', 'redirected@example.com')
             ->set('reg.website_url', 'redirected.ir')
             ->call('register')
-            ->assertRedirect(route('shop.subscriptions'));
+            ->assertRedirect(route('customer.profile'));
     }
 
     public function test_register_ignores_foreign_redirect_host(): void
