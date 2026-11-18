@@ -101,6 +101,28 @@
                 پس از پایان دورهٔ فعلی، خرید رزروشدهٔ شما به‌صورت خودکار فعال و پیامک اطلاع‌رسانی ارسال می‌شود.
             </p>
         @endif
+
+        {{-- Task 92 — راهنمای جایگزینی اشتراک با تیکت (فقط برای طرح‌ها با اشتراک فعال؛ پکیج‌ها ربطی به اشتراک ندارند) --}}
+        @if(($d['kind'] ?? 'package') === 'plan' && in_array($state, ['blocked', 'unlimited'], true))
+            <div class="mx-auto mt-4 max-w-sm rounded-2xl bg-brand-50 p-3.5 text-start ring-1 ring-brand-500/20 dark:bg-brand-500/10 dark:ring-brand-400/20">
+                <p class="flex items-start gap-2 text-xs leading-6 font-bold text-brand-800 dark:text-brand-200">
+                    <x-icon name="ticket" class="mt-0.5 size-4 shrink-0" />
+                    می‌خواهید اشتراک جدید جایگزین اشتراک فعلی شود؟
+                </p>
+                <p class="mt-1 text-[11px] leading-5 text-brand-800/80 dark:text-brand-200/75">
+                    از پنل مشتری خود (پروفایل ← تب «تیکت‌های پشتیبانی») تیکت ارسال کنید؛ کارشناسان ما
+                    جایگزینی اشتراک شما را انجام می‌دهند.
+                </p>
+                <div class="mt-2.5">
+                    {{-- مهمان → ورود مشتری با بازگشت به پروفایل؛ واردشده → مستقیم پروفایل --}}
+                    <a href="{{ route('shop.login', ['redirect' => route('customer.profile')]) }}" wire:navigate>
+                        <x-btn variant="soft" size="sm" icon="message-circle" class="w-full">
+                            ارسال تیکت از پنل مشتری
+                        </x-btn>
+                    </a>
+                </div>
+            </div>
+        @endif
     </div>
 
     <x-slot:footer>

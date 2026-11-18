@@ -62,9 +62,11 @@ class PaymentService
             $gatewayConfigs = get_gateway_configs($gateway);
 
             // 2️⃣ آدرس کال‌بک درگاه: کاربر پس از پرداخت ابتدا به صفحه‌ی «نتیجه پرداخت» پنل
-            // برمی‌گردد (نمایش وضعیت + شمارش معکسه‌ی ۱۰ ثانیه‌ای) و از همان صفحه به
+            // برمی‌گردد (نمایش وضعیت + شمارش معکسمه‌ی ۱۰ ثانیه‌ای) و از همان صفحه به
             // callback_url فروشگاه (که هنگام ایجاد خرید ثبت شده) بازگردانده می‌شود.
-            $callbackUrl = URL::route('payment.callback');
+            // Task 92: access_token به‌صورت سگمنت مسیر جاسازی می‌شود تا بازگشتِ لغوِ
+            // درگاه‌هایی که شناسهٔ تراکنش را در کال‌بک نمی‌فرستند هم قابل شناسایی باشد.
+            $callbackUrl = URL::route('payment.callback', ['reference' => $purchase->access_token]);
 
             // 3️⃣ ایجاد Invoice
             $invoice = (new Invoice)
@@ -150,7 +152,8 @@ class PaymentService
 
             // کال‌بک درگاه همان مسیر مشترک پنل است؛ WebPaymentController تشخیص می‌دهد
             // که تراکنش متعلق به سفارش اشتراک است و آن را به صفحه نتیجه اشتراک هدایت می‌کند.
-            $callbackUrl = URL::route('payment.callback');
+            // Task 92: access_token در مسیر جاسازی می‌شود (شناسایی بازگشتِ لغو بدون شناسهٔ تراکنش)
+            $callbackUrl = URL::route('payment.callback', ['reference' => $order->access_token]);
 
             $planName = $order->plan_name;
 
@@ -229,7 +232,8 @@ class PaymentService
 
             // کال‌بک درگاه همان مسیر مشترک پنل است؛ WebPaymentController تشخیص می‌دهد
             // که تراکنش متعلق به خرید محصول است و آن را به صفحه نتیجه محصول هدایت می‌کند.
-            $callbackUrl = URL::route('payment.callback');
+            // Task 92: access_token در مسیر جاسازی می‌شود (شناسایی بازگشتِ لغو بدون شناسهٔ تراکنش)
+            $callbackUrl = URL::route('payment.callback', ['reference' => $purchase->access_token]);
 
             $productName = $purchase->product?->name ?? 'محصول';
 
@@ -307,7 +311,8 @@ class PaymentService
 
             // کال‌بک درگاه همان مسیر مشترک پنل است؛ WebPaymentController تشخیص می‌دهد
             // که تراکنش متعلق به خرید قالب است و آن را به صفحه نتیجه قالب هدایت می‌کند.
-            $callbackUrl = URL::route('payment.callback');
+            // Task 92: access_token در مسیر جاسازی می‌شود (شناسایی بازگشتِ لغو بدون شناسهٔ تراکنش)
+            $callbackUrl = URL::route('payment.callback', ['reference' => $purchase->access_token]);
 
             $templateName = $purchase->template?->name ?? 'قالب';
 

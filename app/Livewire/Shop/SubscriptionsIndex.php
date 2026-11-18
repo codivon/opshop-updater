@@ -219,9 +219,16 @@ class SubscriptionsIndex extends Component
             return collect();
         }
 
+        // Task 92 — فقط سفارش‌هایی «در انتظار تأیید مدیر» دیده می‌شوند که پرداختشان کامل شده؛
+        // سفارشِ بی‌پاسخِ ناتمام از درگاه (status=pending) نباید خرید مجدد را قفل کند
+        // (بازگشت/لغو از درگاه = پرداخت موفق نبوده → پیام «در انتظار تأیید مدیر» غلط است)
         return SubscriptionOrder::query()
             ->where('customer_id', $customer->id)
             ->whereIn('admin_status', [SubscriptionOrder::ADMIN_STATUS_PENDING, SubscriptionOrder::ADMIN_STATUS_APPROVED, SubscriptionOrder::ADMIN_STATUS_REJECTED])
+            ->where(function ($q) {
+                $q->where('status', SubscriptionOrder::STATUS_PAID)
+                    ->orWhereIn('admin_status', [SubscriptionOrder::ADMIN_STATUS_APPROVED, SubscriptionOrder::ADMIN_STATUS_REJECTED]);
+            })
             ->get()
             ->keyBy('subscription_plan_id');
     }

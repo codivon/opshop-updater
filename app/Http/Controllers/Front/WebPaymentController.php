@@ -44,16 +44,18 @@ class WebPaymentController extends Controller
     {
         // شناسه تراکنش با کلیدهای متداول درگاه‌ها (همان جریان API)
         // transactionId (camelCase) → درگاه آزمایشی local
+        // Task 92: سگمنت مسیر {reference} هم شناسهٔ تراکنش می‌تواند باشد (کال‌بک با شناسهٔ جاسازی‌شده)
         $transactionId = $request->input('transaction_id')
             ?? $request->input('transactionId')
             ?? $request->input('Authority')
             ?? $request->input('tracking_code')
-            ?? $request->input('token');
+            ?? $request->input('token')
+            ?? $request->route('reference');
 
         if (! $transactionId) {
-            return redirect()
-                ->route('shop.home')
-                ->with('error', 'اطلاعات تراکنش ناقص است.');
+            // درگاه کاملاً خالی برگشته (بدون شناسهٔ تراکنش و بدون شناسهٔ ارجاع مسیر)
+            // قبلاً به صفحهٔ اصلی می‌رفت و کاربر هیچ بازخوردی نمی‌گرفت (گزارش Task 92)
+            return redirect()->route('payment.canceled');
         }
 
         // ---------- ۱) سفارش اشتراک (طرح اشتراک) ----------
@@ -149,9 +151,13 @@ class WebPaymentController extends Controller
         $purchase = PackagePurchase::where('transaction_id', $transactionId)->first();
 
         if (! $purchase) {
-            return redirect()
-                ->route('shop.home')
-                ->with('error', 'رکورد خرید یافت نشد.');
+            // آخرین شناسه‌ای که باقی می‌ماند: reference مسیر (access_token)
+            if (($reference = (string) $request->route('reference')) !== ''
+                && ($redirect = $this->redirectByReference($reference, $request))) {
+                return $redirect;
+            }
+
+            return redirect()->route('payment.canceled');
         }
 
         // تأیید پرداخت + صدور/تمدید لایسنس
@@ -199,7 +205,55 @@ class WebPaymentController extends Controller
     }
 
     /**
+     * Task 92 — شناسایی سفارش از روی reference مسیر کال‌بک (access_token) و هدایت به
+     * صفحهٔ نتیجهٔ خودش. برای بازگشت‌های لغو/ناتمام درگاه‌هایی است که شناسهٔ تراکنش
+     * را در کال‌بک نمی‌فرستند؛ وضعیت سفارش بدون تغییر می‌ماند و صفحهٔ نتیجه آن را
+     * «در انتظار پرداخت/ناموفق» نشان می‌دهد.
+     */
+    private function redirectByReference(string $reference, Request $request): ?RedirectResponse
+    {
+        // سفارش اشتراک
+        $subscriptionOrder = SubscriptionOrder::where('access_token', $reference)->first();
+
+        if ($subscriptionOrder) {
+            return redirect()
+                ->route('subscription.result', ['order' => $subscriptionOrder, 'token' => $subscriptionOrder->access_token])
+                ->with('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+        }
+
+        // خرید پکیج
+        $purchase = PackagePurchase::where('access_token', $reference)->first();
+
+        if ($purchase) {
+            return redirect()
+                ->route('payment.result', ['purchase' => $purchase, 'token' => $purchase->access_token])
+                ->with('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+        }
+
+        // خرید محصول
+        $productPurchase = ProductPurchase::where('access_token', $reference)->first();
+
+        if ($productPurchase) {
+            return redirect()
+                ->route('payment.result.product', ['purchase' => $productPurchase, 'token' => $productPurchase->access_token])
+                ->with('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+        }
+
+        // خرید قالب
+        $templatePurchase = TemplatePurchase::where('access_token', $reference)->first();
+
+        if ($templatePurchase) {
+            return redirect()
+                ->route('payment.result.template', ['purchase' => $templatePurchase, 'token' => $templatePurchase->access_token])
+                ->with('error', 'پرداخت این سفارش به پایان نرسید یا از سمت درگاه تأیید نشد.');
+        }
+
+        return null;
+    }
+
+    /**
      * آیا callback_url به یکی از مسیرهای کال‌بک خود پنل اشاره می‌کند؟
+     * Task 92: مسیر با سگمنت شناسهٔ ارجاع (/payment/callback/{ref}) هم داخلی است.
      */
     private function isInternalCallback(string $url): bool
     {
@@ -210,6 +264,19 @@ class WebPaymentController extends Controller
             $panel = [$this->hostWithPort($panelUrl), rtrim((string) parse_url($panelUrl, PHP_URL_PATH), '/')];
 
             if ($given === $panel) {
+                return true;
+            }
+        }
+
+        // پیشوند مسیر کال‌بک داخلی + هر هاستی غیر از هاست خود پنل، بیرونی است
+        if (str_starts_with($given[1], '/payment/callback')) {
+            $internalHosts = array_filter(array_unique(array_map('strtolower', [
+                (string) request()->getHost(),
+                (string) parse_url((string) route('payment.callback'), PHP_URL_HOST),
+                (string) parse_url((string) config('app.url'), PHP_URL_HOST),
+            ])));
+
+            if ($given[0] === '' || in_array(strtolower($given[0]), $internalHosts, true)) {
                 return true;
             }
         }

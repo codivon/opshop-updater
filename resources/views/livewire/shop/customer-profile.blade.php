@@ -129,6 +129,119 @@
         </div>
     </section>
 
+    {{-- ============ کلید عمومی فروشگاه — تکمیل‌کنندهٔ کد آپدیت (Task 92) ============ --}}
+    @if($this->licensePublicKey)
+        @php($pk = $this->licensePublicKey)
+        <section class="card overflow-hidden p-0" x-data="{ copiedEnv: false, copiedKey: false }" aria-labelledby="public-key-title">
+            <div class="grid lg:grid-cols-5">
+
+                {{-- پنل کلید: مخفی + دکمه‌های کپی (در RTL سمت راست؛ بالای موبایل) --}}
+                <div class="relative flex flex-col justify-center gap-3.5 overflow-hidden bg-zinc-900 p-5 sm:p-6 lg:col-span-2 dark:bg-black/40">
+                    <div class="pointer-events-none absolute inset-0 opacity-[0.06]" aria-hidden="true"
+                         style="background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 28px 28px;"></div>
+
+                    <p class="relative flex items-center gap-1.5 text-xs font-bold text-zinc-300">
+                        <x-icon name="key" class="size-4 text-brand-400" />
+                        کلید عمومی لایسنس
+                        <span class="ms-auto inline-flex items-center gap-1 rounded-lg bg-white/10 px-2 py-0.5 text-[10px] font-black text-zinc-300 ring-1 ring-white/15">
+                            <x-icon name="eye" class="size-3" />
+                            پنهان
+                        </span>
+                    </p>
+
+                    {{-- کادر نق‌نق‌دار — کلید هرگز نمایش داده نمی‌شود، فقط کپی --}}
+                    <div class="relative flex items-center justify-center gap-2 rounded-2xl bg-black/40 px-3.5 py-4 ring-1 ring-white/15">
+                        <code class="select-none font-mono text-sm font-black tracking-[0.35em] text-zinc-400" aria-label="کلید عمومی مخفی است">••••••••••••••••••••••••</code>
+                    </div>
+
+                    {{-- دکمه‌های کپی — کلید در DOM نیست؛ با کلیک از سرور گرفته و کپی می‌شود --}}
+                    <div class="relative grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <button type="button" aria-label="کپی خط .env کلید عمومی"
+                                @click="
+                                    const text = await $wire.publicKeyForCopy('env');
+                                    if (!text) return;
+                                    const done = () => { copiedEnv = true; window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'خط .env کلید عمومی کپی شد؛ در فایل .env فروشگاه خود بچسبانید.', type: 'success' } })); setTimeout(() => copiedEnv = false, 2200); };
+                                    const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove(); done(); };
+                                    (navigator.clipboard && navigator.clipboard.writeText) ? navigator.clipboard.writeText(text).then(done, fallback) : fallback();
+                                "
+                                class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-brand-500 px-3.5 py-2.5 text-xs font-black text-white transition-all duration-150 hover:bg-brand-600"
+                                :class="copiedEnv ? '!bg-white !text-brand-700 shadow-sm' : ''">
+                            <x-icon name="copy" class="size-4" />
+                            <span x-text="copiedEnv ? 'کپی شد!' : 'کپی خط .env'">کپی خط .env</span>
+                        </button>
+
+                        <button type="button" aria-label="کپی کلید عمومی"
+                                @click="
+                                    const text = await $wire.publicKeyForCopy('raw');
+                                    if (!text) return;
+                                    const done = () => { copiedKey = true; window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'کلید عمومی کپی شد.', type: 'success' } })); setTimeout(() => copiedKey = false, 2200); };
+                                    const fallback = () => { const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove(); done(); };
+                                    (navigator.clipboard && navigator.clipboard.writeText) ? navigator.clipboard.writeText(text).then(done, fallback) : fallback();
+                                "
+                                class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-white/10 px-3.5 py-2.5 text-xs font-black text-white ring-1 ring-white/20 transition-all duration-150 hover:bg-white/20"
+                                :class="copiedKey ? '!bg-white !text-zinc-800 shadow-sm' : ''">
+                            <x-icon name="copy" class="size-4" />
+                            <span x-text="copiedKey ? 'کپی شد!' : 'کپی فقط کلید'">کپی فقط کلید</span>
+                        </button>
+                    </div>
+
+                    <p class="relative flex items-start gap-1.5 text-[11px] leading-5 text-zinc-400">
+                        <x-icon name="shield-check" class="mt-0.5 size-3.5 shrink-0 text-brand-400" />
+                        این کلید «عمومی» است و راز محسوب نمی‌شود؛ در صورت تعویض کلید از پنل مدیریت، نسخهٔ جدید را دوباره در فروشگاه خود تنظیم کنید.
+                    </p>
+                </div>
+
+                {{-- راهنمای سه‌قدمی --}}
+                <div class="space-y-4 p-5 sm:p-6 lg:col-span-3">
+                    <div class="flex items-center gap-3">
+                        <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-600 ring-1 ring-brand-500/20 dark:bg-brand-500/15 dark:text-brand-400 dark:ring-brand-400/20">
+                            <x-icon name="shield-check" class="size-5.5" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 id="public-key-title" class="text-base font-black text-zinc-900 dark:text-zinc-50">
+                                کلید عمومی را هم در فروشگاه خود تنظیم کنید
+                            </h2>
+                            <p class="mt-0.5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                                علاوه بر کد آپدیت، این کلید هم لازم است — بدون آن پکیج‌ها و قالب‌ها فعال نمی‌شوند.
+                            </p>
+                        </div>
+                    </div>
+
+                    <ol class="grid gap-3 sm:grid-cols-3">
+                        <li class="rounded-2xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/50 dark:ring-zinc-700/50">
+                            <span class="flex size-7 items-center justify-center rounded-xl bg-brand-500/15 text-sm font-black text-brand-600 dark:text-brand-400" aria-hidden="true">۱</span>
+                            <p class="mt-2.5 text-xs font-black text-zinc-800 dark:text-zinc-100">کلید را کپی کنید</p>
+                            <p class="mt-1 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                                با دکمه‌های کنار، «خط .env» یا «فقط کلید» را کپی کنید — کلید نمایش داده نمی‌شود.
+                            </p>
+                        </li>
+                        <li class="rounded-2xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/50 dark:ring-zinc-700/50">
+                            <span class="flex size-7 items-center justify-center rounded-xl bg-brand-500/15 text-sm font-black text-brand-600 dark:text-brand-400" aria-hidden="true">۲</span>
+                            <p class="mt-2.5 text-xs font-black text-zinc-800 dark:text-zinc-100">در فایل .env فروشگاه بگذارید</p>
+                            <p class="mt-1 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                                در فایل .env پروژهٔ فروشگاه‌ساز خود، متغیر <span class="font-mono text-[10px] font-bold" dir="ltr">PACKAGE_LICENSE_PUBLIC_KEY</span> را با این مقدار تنظیم کنید.
+                            </p>
+                        </li>
+                        <li class="rounded-2xl bg-zinc-50 p-3.5 ring-1 ring-zinc-200/70 dark:bg-zinc-800/50 dark:ring-zinc-700/50">
+                            <span class="flex size-7 items-center justify-center rounded-xl bg-brand-500/15 text-sm font-black text-brand-600 dark:text-brand-400" aria-hidden="true">۳</span>
+                            <p class="mt-2.5 text-xs font-black text-zinc-800 dark:text-zinc-100">کش پیکربندی را پاک کنید</p>
+                            <p class="mt-1 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                                اگر فایل <span class="font-mono text-[10px] font-bold" dir="ltr">bootstrap/cache/config.php</span> دارید آن را حذف کنید یا فرمان <span class="font-mono text-[10px] font-bold" dir="ltr">config:clear</span> را اجرا کنید.
+                            </p>
+                        </li>
+                    </ol>
+
+                    <p class="flex items-start gap-2 rounded-2xl bg-amber-50 p-3.5 text-[11px] leading-5 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20">
+                        <x-icon name="alert-circle" class="mt-0.5 size-4 shrink-0" />
+                        بدون این کلید، فروشگاه شما امضای پکیج‌ها را تأیید نمی‌کند و نصب یا به‌روزرسانی متوقف می‌ماند.
+                        اگر گام‌ها برایتان مبهم است، از تب «تیکت‌های پشتیبانی» راهنمایی بگیرید.
+                    </p>
+                </div>
+
+            </div>
+        </section>
+    @endif
+
     {{-- ============ Stats ============ --}}
     <section class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div class="card flex items-center gap-4 p-5">

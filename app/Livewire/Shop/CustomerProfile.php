@@ -9,6 +9,7 @@ use App\Models\PackageLicense;
 use App\Models\PackagePurchase;
 use App\Models\Ticket;
 use App\Models\TicketReply;
+use App\Services\LicenseSigningKeyService;
 use App\Services\SubscriptionService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -357,6 +358,41 @@ class CustomerProfile extends Component
     public function mySubscription()
     {
         return $this->customer()?->activePlanSubscription();
+    }
+
+    /**
+     * Task 92 — کلید عمومی لایسنس برای فروشگاه‌ساز مشتری:
+     * مشتری کلید را «نمی‌بیند» ولی می‌تواند کپی‌اش کند (دکمهٔ کپی در ویو).
+     * بدون این کلید در .env فروشگاه، امضای پکیج‌ها تأیید نمی‌شود (fail-closed).
+     */
+    #[Computed]
+    public function licensePublicKey(): ?array
+    {
+        $status = app(LicenseSigningKeyService::class)->status();
+
+        if (($status['state'] ?? '') !== 'ok' || empty($status['public_key']) || empty($status['shop_env_value'])) {
+            return null;
+        }
+
+        return [
+            'public_key' => (string) $status['public_key'],
+            'env_line' => (string) $status['shop_env_value'],
+        ];
+    }
+
+    /**
+     * Task 92 — محتوای کپی کلید عمومی (نسخهٔ خط .env یا فقط کلید).
+     * کلید در DOM رندر نمی‌شود؛ فقط با همین درخواستِ کلیکِ «کپی» به کلیپ‌بورد می‌رود.
+     */
+    public function publicKeyForCopy(string $variant = 'env'): ?string
+    {
+        $pk = $this->licensePublicKey;
+
+        if (! $pk) {
+            return null;
+        }
+
+        return $variant === 'raw' ? $pk['public_key'] : $pk['env_line'];
     }
 
     /** گات تیکت: آیا مشتری اجازهٔ استفاده از سیستم تیکت را دارد؟ (اشتراک فعال = شرط)

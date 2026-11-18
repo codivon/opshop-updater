@@ -81,6 +81,8 @@ trait WithRenewalModal
 
         $this->renewalModalData = [
             'state' => $state,
+            // Task 92 — kind برای راهنمای «جایگزینی اشتراک با تیکت» (فقط برای طرح‌ها)
+            'kind' => $kind,
             'title' => $titles[$kind][$state] ?? ($kind === 'package' ? 'امکان خرید مجدد فعلاً وجود ندارد' : 'امکان خرید مجدد این طرح فعلاً وجود ندارد'),
             'message' => $renewal['message'] ?? '',
             'days' => $state === 'blocked' ? $days : null,
@@ -109,6 +111,7 @@ trait WithRenewalModal
 
         $this->renewalModalData = [
             'state' => $state,
+            'kind' => $kind,
             'title' => $state === 'reserved'
                 ? 'خرید رزروشده دارید'
                 : ($kind === 'package' ? 'این پکیج را از قبل دارید' : 'این طرح را از قبل دارید'),

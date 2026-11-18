@@ -362,7 +362,8 @@ class RenewalService
 
         if ($expiresAt === null) {
             return $deny(
-                'اشتراک «'.($subscription->plan?->name ?? 'طرح فعلی').'» شما نامحدود است و نیازی به خرید مجدد نیست.', 'unlimited');
+                'اشتراک «'.($subscription->plan?->name ?? 'طرح فعلی').'» شما نامحدود است و نیازی به خرید مجدد نیست. '
+                .'اگر می‌خواهید اشتراک جدیدی جایگزین اشتراک فعلی شما شود، از پنل مشتری خود تیکت ارسال کنید تا توسط پشتیبانی انجام شود.', 'unlimited');
         }
 
         $daysRemaining = max(0, (int) floor(now()->diffInDays($expiresAt, false)));
@@ -372,7 +373,8 @@ class RenewalService
                 'allowed' => false, 'reserved' => false,
                 'message' => 'شما طرح «'.($subscription->plan?->name ?? 'طرح فعلی').'» را در اشتراک فعلی خود دارید و '
                     .fa_num($daysRemaining).' روز از اعتبار آن باقی مانده است. از '.fa_num(self::WINDOW_DAYS).' روز مانده به پایان اشتراک می‌توانید طرح جدید را خریداری کنید؛ '
-                    .'خرید جدید به‌صورت رزرو ذخیره شده و پس از پایان دورهٔ فعلی به‌طور خودکار فعال می‌شود.',
+                    .'خرید جدید به‌صورت رزرو ذخیره شده و پس از پایان دورهٔ فعلی به‌طور خودکار فعال می‌شود. '
+                    .'اگر می‌خواهید اشتراک جدید جایگزین اشتراک فعلی شما شود، از پنل مشتری خود تیکت ارسال کنید تا توسط پشتیبانی انجام شود.',
                 'reason' => 'window_closed',
                 'days_remaining' => null, 'active_subscription' => $subscription, 'activate_at' => null,
             ];

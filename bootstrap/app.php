@@ -18,8 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // تا IP واقعی کاربر در rate-limiter و گاردهای IP درست باشد.
         $middleware->trustProxies(at: '*');
 
-        // درگاه‌های پرداخت بانکی با POST خارج از Laravel (بدون توکن CSRF) به کال‌بک برمی‌گردند
-        $middleware->validateCsrfTokens(except: ['payment/callback', 'api/*']);
+        // درگاه‌های پرداخت بانکی با POST خارج از Laravel (بدون توکن CSRF) به کال‌بک برمی‌گردند؛
+        // Task 92: کال‌بک ممکن است شناسهٔ ارجاع را در سگمنت مسیر داشته باشد (payment/callback/{ref})
+        $middleware->validateCsrfTokens(except: ['payment/callback', 'payment/callback/*', 'api/*']);
 
         // هدرهای امنیتی روی همهٔ پاسخ‌ها (وب + API): ضدکلیک‌جک، nosniff و…
         // (کلید اصلی + HSTS از پنل «امنیت و امکانات»)

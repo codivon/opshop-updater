@@ -28,6 +28,7 @@ use App\Livewire\Shop\Home;
 use App\Livewire\Shop\PackageCheckout;
 use App\Livewire\Shop\PackageShow;
 use App\Livewire\Shop\PackagesIndex;
+use App\Livewire\Shop\PaymentCanceled;
 use App\Livewire\Shop\PaymentResult;
 use App\Livewire\Shop\ProductPaymentResult;
 use App\Livewire\Shop\ProductShow;
@@ -121,8 +122,15 @@ Route::get('subscription/result/{order}/{token}', SubscriptionResult::class)->na
 Route::get('changelog', Changelog::class)->name('shop.changelog');
 
 // پرداخت (عمومی) — Task 85: throttle روی کال‌بک (جلوگیری از هجوم/اسکن تراکنش‌ها)
-Route::get('payment/callback', [WebPaymentController::class, 'callback'])->middleware('throttle:30,1')->name('payment.callback');
-Route::post('payment/callback', [WebPaymentController::class, 'callback'])->middleware('throttle:30,1')->name('payment.callback.post');
+// Task 92: سگمنت اختیاری {reference} = access_token سفارش؛ حتی اگر درگاه در بازگشتِ لغو
+// شناسهٔ تراکنش را نفرستد، سفارش شناسایی و به صفحهٔ نتیجهٔ خودش هدایت می‌شود.
+Route::get('payment/callback/{reference?}', [WebPaymentController::class, 'callback'])->middleware('throttle:30,1')->name('payment.callback');
+Route::post('payment/callback/{reference?}', [WebPaymentController::class, 'callback'])->middleware('throttle:30,1')->name('payment.callback.post');
+
+// صفحهٔ «پرداخت لغو/ناتمام» — وقتی درگاه بدون هیچ شناسه‌ای برمی‌گرداند یا کاربر پرداخت را نیمه‌کاره رها می‌کند
+Route::get('payment/canceled', PaymentCanceled::class)
+    ->name('payment.canceled');
+
 Route::get('payment/result/{purchase}/{token}', PaymentResult::class)->name('payment.result');
 
 // صفحه تسویه خریدهای API (مرحله میانی پیش از درگاه):
