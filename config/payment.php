@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\Payments\SadadOfficial;
 use App\Services\Payments\SamanCached;
 use App\Services\Payments\SepRest;
 use Shetabit\Multipay\Drivers\Aqayepardakht\Aqayepardakht;
@@ -25,7 +26,6 @@ use Shetabit\Multipay\Drivers\Payping\Payping;
 use Shetabit\Multipay\Drivers\Paystar\Paystar;
 use Shetabit\Multipay\Drivers\Poolam\Poolam;
 use Shetabit\Multipay\Drivers\Rayanpay\Rayanpay;
-use Shetabit\Multipay\Drivers\Sadad\Sadad;
 use Shetabit\Multipay\Drivers\Sepehr\Sepehr;
 use Shetabit\Multipay\Drivers\Sepordeh\Sepordeh;
 use Shetabit\Multipay\Drivers\Sizpay\Sizpay;
@@ -265,11 +265,14 @@ return [
             'currency' => 'T', // Can be R, T (Rial, Toman)
         ],
         'sadad' => [
+            // Task 97: آدرس‌های رسمی سداد مطابق نمونهٔ کد رسمی بانک ملی (PHP-master.zip).
+            // قبلاً بدون /vpg بود و پاسخ بانک همیشه خطای عمومی می‌داد. با env قابل override است
+            // (تست با سرور شبیه‌ساز سداد / تغییر آیندهٔ endpoint بانک بدون دست‌زدن به کد).
             'apiPaymentByMultiIdentityUrl' => 'https://sadad.shaparak.ir/VPG/api/v0/PaymentByMultiIdentityRequest',
             'apiPaymentByIdentityUrl' => 'https://sadad.shaparak.ir/api/v0/PaymentByIdentity/PaymentRequest',
-            'apiPaymentUrl' => 'https://sadad.shaparak.ir/api/v0/Request/PaymentRequest',
-            'apiPurchaseUrl' => 'https://sadad.shaparak.ir/Purchase',
-            'apiVerificationUrl' => 'https://sadad.shaparak.ir/VPG/api/v0/Advice/Verify',
+            'apiPaymentUrl' => env('SADAD_API_PAYMENT_URL', 'https://sadad.shaparak.ir/vpg/api/v0/Request/PaymentRequest'),
+            'apiPurchaseUrl' => env('SADAD_REDIRECT_URL', 'https://sadad.shaparak.ir/VPG/Purchase'),
+            'apiVerificationUrl' => env('SADAD_API_VERIFICATION_URL', 'https://sadad.shaparak.ir/vpg/api/v0/Advice/Verify'),
             'key' => '',
             'merchantId' => '',
             'terminalId' => '',
@@ -491,7 +494,8 @@ return [
         'payping' => Payping::class,
         'paystar' => Paystar::class,
         'poolam' => Poolam::class,
-        'sadad' => Sadad::class,
+        // سداد رسمی (بانک ملی) — مطابق نمونهٔ رسمی بانک + لاگ کامل ResCode/Description (Task 97)
+        'sadad' => SadadOfficial::class,
         // سامان با WSDL لوکال‌کش‌شده (رفع خطای Couldn't load WSDL در هاست اشتراکی)
         'saman' => SamanCached::class,
         // سامان SEP نسخه REST (بدون SOAP) — جایگزین مطمئن برای هاست‌های بدون SOAP/WSDL

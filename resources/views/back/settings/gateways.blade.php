@@ -287,10 +287,13 @@
                                         ['key' => 'saman', 'label' => 'درگاه سامان', 'abbr' => 'سامان', 'fields' => [
                                             ['name' => 'merchantId', 'label' => 'کد پذیرنده', 'type' => 'text'],
                                         ]],
-                                        ['key' => 'sadad', 'label' => 'درگاه بانک ملی', 'abbr' => 'ملی', 'fields' => [
-                                            ['name' => 'terminalId', 'label' => 'شماره پذیرنده', 'type' => 'text'],
-                                            ['name' => 'merchantId', 'label' => 'کد پذیرنده', 'type' => 'text'],
-                                            ['name' => 'key', 'label' => 'کلید تراکنش', 'type' => 'text'],
+                                        ['key' => 'sadad', 'label' => 'درگاه بانک ملی (سداد)', 'abbr' => 'ملی', 'fields' => [
+                                            // Task 97: برچسب‌های قدیمی جابجا بودند (terminalId را «شماره پذیرنده» می‌نوشت) →
+                                            // شماره پذیرنده جای ترمینال ذخیره می‌شد و بانک خطای عمومی می‌داد. حالا دقیقاً
+                                            // مطابق واژگان اطلاعیهٔ رسمی بانک ملی برچسب‌گذاری شده + hint برای هر فیلد.
+                                            ['name' => 'merchantId', 'label' => 'شماره پذیرنده', 'type' => 'text', 'hint' => '«شماره پذیرنده» در اطلاعیهٔ بانک (مثل 000000140352535 — صفرهای ابتدایی را نگه دارید)'],
+                                            ['name' => 'terminalId', 'label' => 'شماره ترمینال', 'type' => 'text', 'hint' => '«شماره ترمینال» در اطلاعیهٔ بانک — نه شماره پذیرنده!'],
+                                            ['name' => 'key', 'label' => 'کلید ترمینال', 'type' => 'text', 'hint' => '«کلید ترمینال» (کلید تراکنش) در اطلاعیهٔ بانک — رشتهٔ base64'],
                                         ]],
                                         ['key' => 'zibal', 'label' => 'درگاه زیبال', 'abbr' => 'ZB', 'fields' => [
                                             ['name' => 'merchantId', 'label' => 'کد پذیرنده', 'type' => 'text'],
@@ -379,6 +382,9 @@
                                                                            class="form-control ltr {{ $g['key'] }}"
                                                                            value="{{ $gateway->config($field['name']) }}"
                                                                            required>
+                                                                @endif
+                                                                @if (! empty($field['hint']))
+                                                                    <small class="form-text text-muted d-block mt-1">{{ $field['hint'] }}</small>
                                                                 @endif
                                                             </div>
                                                         @endforeach
